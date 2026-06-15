@@ -1,0 +1,41 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+.next/
+.vite/
+coverage/
+
+# Foundry / Solidity
+cache/
+out/
+broadcast/
+artifacts/
+typechain/
+
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# Local outputs
+tmp/
+temp/
+*.log

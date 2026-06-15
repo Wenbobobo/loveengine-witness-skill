@@ -1,0 +1,115 @@
+{
+  "skill_id": "loveengine-witness",
+  "name": "LoveEngine Witness Skill",
+  "version": "0.1.0-m0",
+  "status": "draft",
+  "spec_version": "2026-06-04",
+  "spec_ref": "docs/specs/love-engine-skill-spec.md",
+  "spec_hash": "sha256:056fb68844c8cb4951b1191140b93f2afa3d0a1d4c4eb69cb094679de888e9d7",
+  "package_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
+  "source_refs": [
+    "docs/specs/love-engine-skill-spec.md",
+    "UAS接口文档.md",
+    "UAS 见证方案 2.0.md",
+    "docs/kb/source-inventory.md"
+  ],
+  "source_hashes": {
+    "docs/specs/love-engine-skill-spec.md": "sha256:056fb68844c8cb4951b1191140b93f2afa3d0a1d4c4eb69cb094679de888e9d7",
+    "UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
+    "UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
+    "docs/kb/source-inventory.md": "sha256:2d79c0b11f16e0cce3acf479a955309d6f1a6d8aca4bd55c31b49740920de1c8"
+  },
+  "network": {
+    "compatible_protocol": "loveengine-witness-net/0.1",
+    "registry_url": "local-fixture://skills/loveengine-witness/registry",
+    "minimum_supported_skill_version": "0.1.0-m0",
+    "allowed_version_statuses": [
+      "draft"
+    ]
+  },
+  "capabilities": [
+    "explain_pol",
+    "register_witness",
+    "watch_live_text",
+    "build_evidence_bundle",
+    "sign_vote",
+    "sync_evidence",
+    "propagate_skill",
+    "verify_manifest"
+  ],
+  "permissions": [
+    "read_chain",
+    "read_live_text",
+    "read_local_sources",
+    "request_local_signature",
+    "submit_transaction"
+  ],
+  "tools": [
+    {
+      "name": "verify_manifest",
+      "schema_ref": "tools/validate_loveengine_m0.py",
+      "description": "Validate manifest hash, source references, fixture integrity, and M0 safety rules."
+    },
+    {
+      "name": "capability_self_check",
+      "schema_ref": "tools/loveengine_m0_self_check.py",
+      "description": "Run M0 validation and print the local node capability self-check summary."
+    }
+  ],
+  "governance_parameters": {
+    "min_valid_votes": {
+      "default": 69,
+      "deploy_time_parameter": true,
+      "source_note": "治理参数；可按见证方案 2.0 的最少 50 个抽样思路调整，不在业务逻辑中硬编码。"
+    },
+    "max_selected_witnesses": {
+      "default": 1000,
+      "deploy_time_parameter": true
+    },
+    "approval_threshold_bps": {
+      "default": 9000,
+      "deploy_time_parameter": true
+    },
+    "broadcast_window_seconds": {
+      "default": 7200,
+      "deploy_time_parameter": true,
+      "source_note": "BROADCAST_WINDOW is a deployment/governance parameter."
+    },
+    "min_broadcast_interval_seconds": {
+      "default": 1209600,
+      "deploy_time_parameter": true,
+      "source_note": "MIN_BROADCAST_INTERVAL is a deployment/governance parameter."
+    }
+  },
+  "vote_signature": {
+    "type": "EIP-712",
+    "latest_active_proposal_only": false,
+    "required_bindings": [
+      "chain_id",
+      "verifying_contract",
+      "proposal_id",
+      "support",
+      "reason_hash",
+      "payload_hash",
+      "nonce",
+      "deadline"
+    ],
+    "private_key_boundary": "The Agent requests a local signer such as Clef, cast keystore, browser wallet, or AA policy. Raw private keys are never loaded into prompts, logs, fixtures, or Agent context."
+  },
+  "relayer_policy": {
+    "batchRegister": "any_relayer",
+    "batchVote": "any_relayer",
+    "private_keys_in_agent_context": false
+  },
+  "public_sink": {
+    "readonly_methods": [
+      "getTotalUTO"
+    ],
+    "owner_mutation_backdoor": false
+  },
+  "m0_artifacts": {
+    "agent_onboarding": "skills/loveengine-witness/agent-onboarding.md",
+    "node_profile_fixture": "skills/loveengine-witness/fixtures/agent-node-profile.fixture.json",
+    "propagation_task_fixture": "skills/loveengine-witness/fixtures/propagation-task.fixture.json"
+  }
+}

@@ -1,0 +1,10 @@
+[project]
+name = "loveengine-witness-skill"
+version = "0.1.0"
+description = "LoveEngine Witness Skill repository and M0 validation tools"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false

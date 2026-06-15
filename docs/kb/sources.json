@@ -1,0 +1,402 @@
+[
+  {
+    "id": "repo-readme",
+    "title": "LoveEngine Witness Skill README",
+    "path": "README.md",
+    "source_group": "repository",
+    "layer": "onboarding",
+    "domain_tags": [
+      "LoveEngine",
+      "Witness Skill",
+      "GitHub",
+      "onboarding"
+    ],
+    "status": "current",
+    "canonical_role": "Repository entrypoint",
+    "summary": "Project status, quick start, repository layout, read order, development target, interface docs, and verification."
+  },
+  {
+    "id": "repo-agents",
+    "title": "AGENTS.md",
+    "path": "AGENTS.md",
+    "source_group": "repository",
+    "layer": "agent-guidance",
+    "domain_tags": [
+      "Agent",
+      "workflow",
+      "hash integrity"
+    ],
+    "status": "current",
+    "canonical_role": "Agent working rules",
+    "summary": "Agent instructions for source boundaries, current direction, hash protection, and safety invariants."
+  },
+  {
+    "id": "repo-contributing",
+    "title": "Contributing",
+    "path": "CONTRIBUTING.md",
+    "source_group": "repository",
+    "layer": "development",
+    "domain_tags": [
+      "GitHub",
+      "PR",
+      "workflow"
+    ],
+    "status": "current",
+    "canonical_role": "Developer contribution guide",
+    "summary": "Branch, PR, interface, verification, and current priority rules."
+  },
+  {
+    "id": "docs-readme",
+    "title": "LoveEngine documentation",
+    "path": "docs/README.md",
+    "source_group": "docs",
+    "layer": "onboarding",
+    "domain_tags": [
+      "docs",
+      "API",
+      "specs"
+    ],
+    "status": "current",
+    "canonical_role": "Documentation entrypoint",
+    "summary": "Documentation map for API, development, specs, and knowledge base."
+  },
+  {
+    "id": "repo-structure",
+    "title": "Repository structure",
+    "path": "docs/development/repository-structure.md",
+    "source_group": "docs/development",
+    "layer": "development",
+    "domain_tags": [
+      "repository structure",
+      "source materials"
+    ],
+    "status": "current",
+    "canonical_role": "Repository structure guide",
+    "summary": "Explains maintainable areas, source material boundaries, and prototype layout."
+  },
+  {
+    "id": "integration-guide",
+    "title": "Integration guide",
+    "path": "docs/development/integration-guide.md",
+    "source_group": "docs/development",
+    "layer": "development",
+    "domain_tags": [
+      "integration",
+      "M1",
+      "M2",
+      "Agent adapter"
+    ],
+    "status": "current",
+    "canonical_role": "Auxiliary developer integration guide",
+    "summary": "Local checks, read order, task split, interface boundaries, and PR acceptance."
+  },
+  {
+    "id": "love-engine-skill-spec",
+    "title": "LoveEngine Skill 开发规格",
+    "path": "docs/specs/love-engine-skill-spec.md",
+    "source_group": "docs/specs",
+    "layer": "spec",
+    "domain_tags": [
+      "LoveEngine",
+      "UAS",
+      "Agent network",
+      "Witness",
+      "Skill"
+    ],
+    "status": "current",
+    "canonical_role": "Main development spec",
+    "summary": "Current LoveEngine Witness Skill spec focused on Agent network propagation, witness protocol, contracts, evidence, signatures, and MVP slices."
+  },
+  {
+    "id": "love-engine-next-phase-spec",
+    "title": "LoveEngine Witness Skill 下一阶段规格",
+    "path": "docs/specs/love-engine-next-phase-spec.md",
+    "source_group": "docs/specs",
+    "layer": "spec",
+    "domain_tags": [
+      "LoveEngine",
+      "UAS",
+      "Agent network",
+      "M1",
+      "M2"
+    ],
+    "status": "current",
+    "canonical_role": "M1/M2 next phase spec",
+    "summary": "Defines local witness loop, schema, contracts, CLI, tests, and acceptance criteria."
+  },
+  {
+    "id": "api-readme",
+    "title": "API documents",
+    "path": "docs/api/README.md",
+    "source_group": "docs/api",
+    "layer": "api",
+    "domain_tags": [
+      "API",
+      "contracts",
+      "Agent"
+    ],
+    "status": "current",
+    "canonical_role": "API documentation entrypoint",
+    "summary": "Status labels and constraints for contract and Agent APIs."
+  },
+  {
+    "id": "contract-api",
+    "title": "LoveEngine contract API",
+    "path": "docs/api/loveengine-contract-api.md",
+    "source_group": "docs/api",
+    "layer": "api",
+    "domain_tags": [
+      "LoveEngine",
+      "contracts",
+      "WitnessDAO",
+      "EIP-712"
+    ],
+    "status": "current",
+    "canonical_role": "Contract API handoff",
+    "summary": "M2 target ABI, events, integration order, and tests for the four contracts."
+  },
+  {
+    "id": "agent-skill-api",
+    "title": "Agent and Skill API",
+    "path": "docs/api/agent-skill-api.md",
+    "source_group": "docs/api",
+    "layer": "api",
+    "domain_tags": [
+      "LoveEngine",
+      "Skill",
+      "Agent",
+      "Harness",
+      "Hermes"
+    ],
+    "status": "current",
+    "canonical_role": "Agent and Skill API handoff",
+    "summary": "SkillManifest, AgentNodeProfile, PropagationTask, EvidenceBundle, Transcript, and tool contract."
+  },
+  {
+    "id": "source-inventory",
+    "title": "Source inventory",
+    "path": "docs/kb/source-inventory.md",
+    "source_group": "docs/kb",
+    "layer": "inventory",
+    "domain_tags": [
+      "sources",
+      "knowledge base"
+    ],
+    "status": "current",
+    "canonical_role": "Local source inventory",
+    "summary": "Inventory for source materials, developer docs, M0 implementation, and version priority."
+  },
+  {
+    "id": "uas-api-doc",
+    "title": "UAS Smart Contracts API 文档",
+    "path": "UAS接口文档.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "UAS",
+      "contracts",
+      "ABI",
+      "WitnessDAO"
+    ],
+    "status": "current",
+    "canonical_role": "Collaborator contract API source",
+    "summary": "Collaborator notes for UAS contracts and integration interfaces."
+  },
+  {
+    "id": "uas-witness-2",
+    "title": "UAS 见证方案 2.0",
+    "path": "UAS 见证方案 2.0.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "UAS",
+      "Witness",
+      "Agent network",
+      "Voting"
+    ],
+    "status": "current",
+    "canonical_role": "Latest witness plan source",
+    "summary": "Open registration, Agent-assisted witness, vote-count-based 90 percent threshold, text live witness and signing strategy."
+  },
+  {
+    "id": "uas-2",
+    "title": "UAS 2",
+    "path": "UAS 2.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "UAS",
+      "UHAH",
+      "Product spec"
+    ],
+    "status": "previous",
+    "canonical_role": "Previous product source",
+    "summary": "Earlier UAS/UHAH product and four-contract design."
+  },
+  {
+    "id": "loveengine-skill-notes",
+    "title": "LoveEngine Skill notes",
+    "path": "LoveEngine Skill.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "Skill",
+      "Witness",
+      "Agent"
+    ],
+    "status": "source",
+    "canonical_role": "Early Skill notes",
+    "summary": "Early notes on LoveEngine Skill as witness and public opinion collector."
+  },
+  {
+    "id": "love-engine-notes",
+    "title": "Love Engine",
+    "path": "Love Engine.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "LoveEngine",
+      "UAS",
+      "UHAH",
+      "UTO"
+    ],
+    "status": "source",
+    "canonical_role": "Early theory and product source",
+    "summary": "LoveEngine, UAS, UHAH, UTO and transitional implementation notes."
+  },
+  {
+    "id": "naturaldao-dev",
+    "title": "NaturalDAO 开发",
+    "path": "NaturalDAO 开发.md",
+    "source_group": "source",
+    "layer": "NaturalDAO",
+    "domain_tags": [
+      "NaturalDAO",
+      "EAP",
+      "Skills",
+      "Memory Lib"
+    ],
+    "status": "background",
+    "canonical_role": "Upper-level background source",
+    "summary": "NaturalDAO, EAP, Skills, Memory Lib and engineering background."
+  },
+  {
+    "id": "skill-template",
+    "title": "Skill 模板",
+    "path": "Skill 模板.md",
+    "source_group": "source",
+    "layer": "LoveEngine",
+    "domain_tags": [
+      "Skill",
+      "Witness"
+    ],
+    "status": "working",
+    "canonical_role": "Early template source",
+    "summary": "Early module and process template for LoveEngine Witness."
+  },
+  {
+    "id": "skill-manifest",
+    "title": "LoveEngine Witness Skill manifest",
+    "path": "skills/loveengine-witness/skill-manifest.json",
+    "source_group": "skill",
+    "layer": "implementation-fixture",
+    "domain_tags": [
+      "LoveEngine",
+      "Skill",
+      "M0",
+      "manifest"
+    ],
+    "status": "current",
+    "canonical_role": "M0 Skill manifest",
+    "summary": "Manifest with source hashes, package hash, capabilities, permissions, governance parameters and signing boundaries."
+  },
+  {
+    "id": "agent-onboarding",
+    "title": "LoveEngine Witness Skill Agent onboarding",
+    "path": "skills/loveengine-witness/agent-onboarding.md",
+    "source_group": "skill",
+    "layer": "implementation-fixture",
+    "domain_tags": [
+      "LoveEngine",
+      "Agent onboarding",
+      "M0"
+    ],
+    "status": "current",
+    "canonical_role": "M0 Agent onboarding",
+    "summary": "Minimal onboarding for new Agents joining or propagating the Skill."
+  },
+  {
+    "id": "node-profile-fixture",
+    "title": "Agent node profile fixture",
+    "path": "skills/loveengine-witness/fixtures/agent-node-profile.fixture.json",
+    "source_group": "skill",
+    "layer": "fixture",
+    "domain_tags": [
+      "Agent node",
+      "fixture",
+      "M0"
+    ],
+    "status": "current",
+    "canonical_role": "Node profile fixture",
+    "summary": "Fixture for runtime, capabilities, signer type and private-key boundary."
+  },
+  {
+    "id": "propagation-task-fixture",
+    "title": "Propagation task fixture",
+    "path": "skills/loveengine-witness/fixtures/propagation-task.fixture.json",
+    "source_group": "skill",
+    "layer": "fixture",
+    "domain_tags": [
+      "Skill propagation",
+      "fixture",
+      "M0"
+    ],
+    "status": "current",
+    "canonical_role": "Propagation task fixture",
+    "summary": "Fixture for propagate_skill task with manifest hash and acceptance checks."
+  },
+  {
+    "id": "validate-m0",
+    "title": "M0 validator",
+    "path": "tools/validate_loveengine_m0.py",
+    "source_group": "tools",
+    "layer": "validation",
+    "domain_tags": [
+      "M0",
+      "validation",
+      "hash integrity"
+    ],
+    "status": "current",
+    "canonical_role": "M0 validation command",
+    "summary": "Validates manifest, source hashes, fixture integrity, safety rules, and tamper rejection."
+  },
+  {
+    "id": "self-check",
+    "title": "M0 self-check",
+    "path": "tools/loveengine_m0_self_check.py",
+    "source_group": "tools",
+    "layer": "validation",
+    "domain_tags": [
+      "M0",
+      "self-check",
+      "Agent"
+    ],
+    "status": "current",
+    "canonical_role": "M0 self-check command",
+    "summary": "Runs validation and prints local node capability summary."
+  },
+  {
+    "id": "validate-sources",
+    "title": "Source inventory validator",
+    "path": "tools/validate_sources.py",
+    "source_group": "tools",
+    "layer": "validation",
+    "domain_tags": [
+      "sources",
+      "validation"
+    ],
+    "status": "current",
+    "canonical_role": "Source inventory validation command",
+    "summary": "Validates sources.json fields, duplicate IDs, and paths."
+  }
+]

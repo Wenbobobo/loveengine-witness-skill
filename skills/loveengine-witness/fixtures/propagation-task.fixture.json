@@ -1,0 +1,22 @@
+{
+  "task_id": "loveengine-m0-propagate-skill-fixture",
+  "task_type": "propagate_skill",
+  "session_id": null,
+  "proposal_id": null,
+  "assigned_nodes": [],
+  "min_required_nodes": 1,
+  "expires_at": "2026-06-11T00:00:00+08:00",
+  "manifest_ref": "skills/loveengine-witness/skill-manifest.json",
+  "manifest_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
+  "payload_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
+  "required_capabilities": [
+    "manifest_verification",
+    "skill_propagation"
+  ],
+  "acceptance_checks": [
+    "verify_manifest_hash",
+    "verify_source_hashes",
+    "run_capability_self_check"
+  ],
+  "status": "open"
+}

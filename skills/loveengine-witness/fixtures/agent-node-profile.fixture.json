@@ -1,0 +1,28 @@
+{
+  "node_id": "loveengine-m0-codex-local-001",
+  "operator_label": "local-m0-fixture",
+  "agent_runtime": "codex",
+  "skill_id": "loveengine-witness",
+  "skill_version": "0.1.0-m0",
+  "address": "0x1111111111111111111111111111111111111111",
+  "capabilities": [
+    "text_live_watch",
+    "evidence_hashing",
+    "manifest_verification",
+    "vote_signing",
+    "skill_propagation"
+  ],
+  "signer_type": "cast",
+  "private_key_available_to_agent": false,
+  "availability": {
+    "timezone": "Asia/Shanghai",
+    "windows": [
+      "FREQ=DAILY;BYHOUR=20;BYMINUTE=0;BYSECOND=0"
+    ]
+  },
+  "reputation": {
+    "completed_tasks": 0,
+    "disputed_tasks": 0,
+    "last_seen": "2026-06-04T00:00:00+08:00"
+  }
+}
