@@ -12,10 +12,13 @@ uv run python .\tools\check.py
 Then read:
 
 - `docs/development/integration-guide.md`
-- `docs/specs/love-engine-skill-spec.md`
-- `docs/specs/love-engine-next-phase-spec.md`
+- `docs/development/contract-team-handoff.md`
+- `docs/specs/love-engine-master-plan.md`
+- `docs/specs/love-engine-agent-network-pilot-spec.md`
+- `docs/specs/love-engine-local-witness-loop-spec.md`
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
+- `docs/api/agent-network-api.md`
 
 ## Branch naming
 
@@ -43,10 +46,11 @@ Use `.github/pull_request_template.md`.
 
 ## Interface rules
 
-Contract or adapter changes must update:
+Contract, network protocol, or adapter changes must update:
 
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
+- `docs/api/agent-network-api.md` when M3 interfaces change
 - the relevant spec under `docs/specs/`
 
 Do not weaken these constraints:
@@ -62,6 +66,7 @@ Run:
 
 ```powershell
 uv run python .\tools\check.py
+uv run pytest -m "not integration"
 ```
 
 For a narrower check:
@@ -73,13 +78,15 @@ uv run python .\tools\loveengine_m0_self_check.py
 uv run python .\tools\validate_sources.py
 ```
 
+For contracts and the end-to-end demo:
+
+```powershell
+cd contracts
+forge test
+cd ..
+uv run pytest .\tests\test_demo.py
+```
+
 ## Current priority
 
-The next implementation slice is M1/M2 Local Witness Loop:
-
-1. JSON schemas for manifest, node profile, evidence bundle, and transcript.
-2. `tools/loveengine/` CLI.
-3. Foundry four-contract prototype.
-4. EIP-712 typed data generation.
-5. local relayer dry-run.
-6. local-loop transcript.
+M1/M2 Local Witness Loop is implemented. The active plan is `docs/specs/love-engine-agent-network-pilot-spec.md`: M2 release closeout followed by the M3 signed three-node Relay Hub pilot.

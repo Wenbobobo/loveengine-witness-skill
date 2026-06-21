@@ -5,10 +5,10 @@
   "proposal_id": null,
   "assigned_nodes": [],
   "min_required_nodes": 1,
-  "expires_at": "2026-06-11T00:00:00+08:00",
-  "manifest_ref": "skills/loveengine-witness/skill-manifest.json",
-  "manifest_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
-  "payload_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
+  "expires_at": null,
+  "manifest_ref": "skills/loveengine-witness/skill-manifest.m0.json",
+  "manifest_hash": "sha256:84e9986a4ec838495a6cbcc9d99db9cbb409cfe213d6069d28e194ab52b3bb60",
+  "payload_hash": "sha256:84e9986a4ec838495a6cbcc9d99db9cbb409cfe213d6069d28e194ab52b3bb60",
   "required_capabilities": [
     "manifest_verification",
     "skill_propagation"
@@ -18,5 +18,5 @@
     "verify_source_hashes",
     "run_capability_self_check"
   ],
-  "status": "open"
+  "status": "fixture"
 }

@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  validate:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,5 +16,30 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync
-      - name: Check
+      - name: Repository checks
         run: uv run python tools/check.py
+      - name: Python tests
+        run: uv run pytest -m "not integration"
+
+  foundry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync
+      - name: Install pinned contract dependencies
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std@v1.9.7 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+      - name: Contract tests
+        working-directory: contracts
+        run: forge test
+      - name: Local-loop integration
+        run: uv run pytest tests/test_demo.py

@@ -6,17 +6,16 @@ This repository keeps the current LoveEngine source notes in the root directory 
 
 ## Status
 
-Current version: `0.1.0-m0`
+Current version: `0.2.0-local-loop`
 
-M0 is a verifiable Skill package and handoff layer:
+M0 remains available as the verifiable package baseline. M1/M2 now add:
 
-- `skills/loveengine-witness/skill-manifest.json` records source hashes, permissions, capabilities, governance parameters, and signing boundaries.
-- `skills/loveengine-witness/agent-onboarding.md` gives a new Agent the minimum operating context.
-- `skills/loveengine-witness/fixtures/` contains node and propagation task fixtures.
-- `tools/validate_loveengine_m0.py` validates source integrity, manifest integrity, fixture consistency, safety rules, and tamper rejection.
-- `tools/loveengine_m0_self_check.py` runs validation and prints the local node capability summary.
-
-M0 does not include deployed contracts, real EIP-712 signatures, relayer code, live evidence ingestion, or a local chain demo. Those are M1/M2 work.
+- JSON Schema for manifest, node profile, EvidenceBundle and transcript.
+- An installable `loveengine` machine-readable CLI.
+- EIP-712 register/vote typed-data builders and relayer dry-run validation.
+- Foundry implementations of WitnessDAO, CorporateSink, StreamingEngine and PublicSink.
+- A real five-witness Anvil demo and a 69-signature Foundry scale test.
+- A verifiable, secret-free LocalLoopTranscript fixture.
 
 ## Quick start
 
@@ -26,20 +25,24 @@ Install tooling with uv:
 uv sync
 ```
 
-Run the M0 checks:
+Run repository and Python checks:
 
 ```powershell
-uv run python .\tools\validate_loveengine_m0.py
-uv run python .\tools\validate_loveengine_m0.py --tamper-check
-uv run python .\tools\loveengine_m0_self_check.py
+uv run python .\tools\check.py
+uv run pytest -m "not integration"
+uv run loveengine manifest verify
 ```
 
-Equivalent Python commands:
+With Foundry v1.7.1 installed:
 
 ```powershell
-python .\tools\validate_loveengine_m0.py
-python .\tools\validate_loveengine_m0.py --tamper-check
-python .\tools\loveengine_m0_self_check.py
+cd contracts
+forge install foundry-rs/forge-std@v1.9.7 --no-git
+forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+forge test
+cd ..
+uv run loveengine demo local-loop --output .\examples\transcripts
+uv run loveengine transcript verify .\examples\transcripts\local-loop.fixture.json
 ```
 
 ## Repository layout
@@ -57,6 +60,11 @@ python .\tools\loveengine_m0_self_check.py
 │   └── specs/
 ├── skills/
 │   └── loveengine-witness/
+├── schemas/
+├── src/loveengine_witness/
+├── tests/
+├── contracts/
+├── examples/transcripts/
 ├── tools/
 ├── .github/
 ├── Love Engine.md
@@ -77,16 +85,17 @@ For auxiliary developers:
 1. `README.md`
 2. `CONTRIBUTING.md`
 3. `docs/development/integration-guide.md`
-4. `docs/specs/love-engine-skill-spec.md`
-5. `docs/specs/love-engine-next-phase-spec.md`
-6. `docs/api/README.md`
+4. `docs/specs/love-engine-master-plan.md`
+5. `docs/specs/love-engine-agent-network-pilot-spec.md`
+6. `docs/specs/love-engine-local-witness-loop-spec.md`
+7. `docs/api/README.md`
 
 For contract work:
 
 1. `docs/api/loveengine-contract-api.md`
 2. `UAS接口文档.md`
 3. `UAS 见证方案 2.0.md`
-4. `docs/specs/love-engine-next-phase-spec.md`
+4. `docs/specs/love-engine-local-witness-loop-spec.md`
 
 For Agent / Harness / Hermes adapter work:
 
@@ -95,11 +104,9 @@ For Agent / Harness / Hermes adapter work:
 3. `docs/api/agent-skill-api.md`
 4. `docs/development/integration-guide.md`
 
-## Development target
+## Implemented local loop
 
-Next phase: M1/M2 Local Witness Loop.
-
-The intended local loop:
+The current local loop:
 
 ```text
 manifest verify
@@ -118,12 +125,15 @@ manifest verify
 -> transcript
 ```
 
-The detailed spec is `docs/specs/love-engine-next-phase-spec.md`.
+The engineering roadmap is `docs/specs/love-engine-master-plan.md`.
+The implemented M1/M2 baseline is specified by `docs/specs/love-engine-local-witness-loop-spec.md`.
+The active M2 closeout and M3 implementation spec is `docs/specs/love-engine-agent-network-pilot-spec.md`.
 
 ## Interface docs
 
 - `docs/api/loveengine-contract-api.md`: WitnessDAO, CorporateSink, StreamingEngine, PublicSink.
 - `docs/api/agent-skill-api.md`: SkillManifest, AgentNodeProfile, PropagationTask, EvidenceBundle, LocalLoopTranscript, tool contract.
+- `docs/api/agent-network-api.md`: SkillRegistry, signed node/bootstrap messages, network tasks, receipts, Relay Hub, and M3 CLI.
 
 Important constraints:
 
@@ -141,7 +151,7 @@ Before a PR or handoff, run:
 uv run python .\tools\check.py
 ```
 
-This runs M0 validation, tamper check, self-check, and source inventory validation.
+This runs M0 validation, tamper check, self-check, source inventory validation, and active-document path validation.
 
 ## License
 

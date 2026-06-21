@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "tools" / "validate_loveengine_m0.py"
 NODE_PROFILE = ROOT / "skills" / "loveengine-witness" / "fixtures" / "agent-node-profile.fixture.json"
-MANIFEST = ROOT / "skills" / "loveengine-witness" / "skill-manifest.json"
+MANIFEST = ROOT / "skills" / "loveengine-witness" / "skill-manifest.m0.json"
 
 
 def main() -> int:

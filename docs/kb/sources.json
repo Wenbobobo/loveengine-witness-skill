@@ -91,9 +91,9 @@
     "summary": "Local checks, read order, task split, interface boundaries, and PR acceptance."
   },
   {
-    "id": "love-engine-skill-spec",
-    "title": "LoveEngine Skill 开发规格",
-    "path": "docs/specs/love-engine-skill-spec.md",
+    "id": "love-engine-master-plan",
+    "title": "LoveEngine Witness Skill 工程总规划",
+    "path": "docs/specs/love-engine-master-plan.md",
     "source_group": "docs/specs",
     "layer": "spec",
     "domain_tags": [
@@ -104,13 +104,13 @@
       "Skill"
     ],
     "status": "current",
-    "canonical_role": "Main development spec",
-    "summary": "Current LoveEngine Witness Skill spec focused on Agent network propagation, witness protocol, contracts, evidence, signatures, and MVP slices."
+    "canonical_role": "Canonical engineering plan",
+    "summary": "Current progress, engineering boundaries, milestone baseline, risks, and authority order."
   },
   {
-    "id": "love-engine-next-phase-spec",
-    "title": "LoveEngine Witness Skill 下一阶段规格",
-    "path": "docs/specs/love-engine-next-phase-spec.md",
+    "id": "love-engine-local-witness-loop-spec",
+    "title": "LoveEngine M1/M2 Local Witness Loop SPEC",
+    "path": "docs/specs/love-engine-local-witness-loop-spec.md",
     "source_group": "docs/specs",
     "layer": "spec",
     "domain_tags": [
@@ -121,8 +121,81 @@
       "M2"
     ],
     "status": "current",
-    "canonical_role": "M1/M2 next phase spec",
-    "summary": "Defines local witness loop, schema, contracts, CLI, tests, and acceptance criteria."
+    "canonical_role": "Active M1/M2 implementation spec",
+    "summary": "Defines schemas, CLI, contracts, EIP-712, relayer, local loop, tests, and acceptance criteria."
+  },
+  {
+    "id": "planning-archive-2026-06-21",
+    "title": "2026-06-21 规划文档归档",
+    "path": "docs/archive/planning/2026-06-21/README.md",
+    "source_group": "docs/archive",
+    "layer": "archive",
+    "domain_tags": [
+      "LoveEngine",
+      "planning",
+      "provenance"
+    ],
+    "status": "archived",
+    "canonical_role": "Superseded planning index",
+    "summary": "Maps superseded plans and development guides to the current canonical documents."
+  },
+  {
+    "id": "archived-love-engine-skill-spec",
+    "title": "Archived LoveEngine Skill 开发规格",
+    "path": "docs/archive/planning/2026-06-21/love-engine-skill-spec.md",
+    "source_group": "docs/archive",
+    "layer": "archive",
+    "domain_tags": [
+      "LoveEngine",
+      "planning",
+      "historical"
+    ],
+    "status": "archived",
+    "canonical_role": "Superseded main spec",
+    "summary": "Historical pre-rebaseline engineering specification."
+  },
+  {
+    "id": "archived-love-engine-next-phase-spec",
+    "title": "Archived LoveEngine Witness Skill 下一阶段规格",
+    "path": "docs/archive/planning/2026-06-21/love-engine-next-phase-spec.md",
+    "source_group": "docs/archive",
+    "layer": "archive",
+    "domain_tags": [
+      "LoveEngine",
+      "planning",
+      "historical"
+    ],
+    "status": "archived",
+    "canonical_role": "Superseded M1/M2 spec",
+    "summary": "Historical local witness loop planning before milestone rebaseline."
+  },
+  {
+    "id": "archived-integration-guide",
+    "title": "Archived integration guide",
+    "path": "docs/archive/planning/2026-06-21/integration-guide.md",
+    "source_group": "docs/archive",
+    "layer": "archive",
+    "domain_tags": [
+      "integration",
+      "historical"
+    ],
+    "status": "archived",
+    "canonical_role": "Superseded integration guide",
+    "summary": "Historical guide containing parent-workspace paths."
+  },
+  {
+    "id": "archived-repository-structure",
+    "title": "Archived repository structure",
+    "path": "docs/archive/planning/2026-06-21/repository-structure.md",
+    "source_group": "docs/archive",
+    "layer": "archive",
+    "domain_tags": [
+      "repository",
+      "historical"
+    ],
+    "status": "archived",
+    "canonical_role": "Superseded repository guide",
+    "summary": "Historical repository guide written before the standalone repository became canonical."
   },
   {
     "id": "api-readme",
@@ -295,9 +368,9 @@
     "summary": "Early module and process template for LoveEngine Witness."
   },
   {
-    "id": "skill-manifest",
-    "title": "LoveEngine Witness Skill manifest",
-    "path": "skills/loveengine-witness/skill-manifest.json",
+    "id": "skill-manifest-m0",
+    "title": "LoveEngine Witness Skill M0 manifest",
+    "path": "skills/loveengine-witness/skill-manifest.m0.json",
     "source_group": "skill",
     "layer": "implementation-fixture",
     "domain_tags": [
@@ -306,9 +379,87 @@
       "M0",
       "manifest"
     ],
+    "status": "previous",
+    "canonical_role": "M0 compatibility manifest",
+    "summary": "Preserved 0.1.1-m0 manifest used by the compatibility validator and fixtures."
+  },
+  {
+    "id": "skill-manifest",
+    "title": "LoveEngine Witness Skill manifest",
+    "path": "skills/loveengine-witness/skill-manifest.json",
+    "source_group": "skill",
+    "layer": "implementation-fixture",
+    "domain_tags": [
+      "LoveEngine",
+      "Skill",
+      "M1",
+      "M2",
+      "manifest"
+    ],
     "status": "current",
-    "canonical_role": "M0 Skill manifest",
-    "summary": "Manifest with source hashes, package hash, capabilities, permissions, governance parameters and signing boundaries."
+    "canonical_role": "Current local-loop Skill manifest",
+    "summary": "0.2.0-local-loop manifest with schemas, commands, contracts, EIP-712 and evidence boundaries."
+  },
+  {
+    "id": "protocol-schemas",
+    "title": "LoveEngine protocol schemas",
+    "path": "schemas",
+    "source_group": "implementation",
+    "layer": "schema",
+    "domain_tags": [
+      "M1",
+      "JSON Schema",
+      "protocol"
+    ],
+    "status": "current",
+    "canonical_role": "Machine-readable protocol schemas",
+    "summary": "Draft 2020-12 schemas for manifest, node profile, evidence bundle, and transcript."
+  },
+  {
+    "id": "python-protocol-package",
+    "title": "LoveEngine Python protocol package",
+    "path": "src/loveengine_witness",
+    "source_group": "implementation",
+    "layer": "application",
+    "domain_tags": [
+      "M1",
+      "M2",
+      "CLI",
+      "EIP-712"
+    ],
+    "status": "current",
+    "canonical_role": "Protocol, CLI and local-loop implementation",
+    "summary": "Canonical JSON, hashes, schemas, CLI, typed data, relayer, signer boundary and Anvil demo."
+  },
+  {
+    "id": "foundry-contracts",
+    "title": "LoveEngine Foundry contracts",
+    "path": "contracts/src",
+    "source_group": "implementation",
+    "layer": "contracts",
+    "domain_tags": [
+      "M2",
+      "Foundry",
+      "WitnessDAO"
+    ],
+    "status": "current",
+    "canonical_role": "Four-contract local implementation",
+    "summary": "WitnessDAO, CorporateSink, StreamingEngine and read-only PublicSink."
+  },
+  {
+    "id": "local-loop-transcript-fixture",
+    "title": "Local loop transcript fixture",
+    "path": "examples/transcripts/local-loop.fixture.json",
+    "source_group": "implementation",
+    "layer": "fixture",
+    "domain_tags": [
+      "M2",
+      "Anvil",
+      "transcript"
+    ],
+    "status": "current",
+    "canonical_role": "Auditable local-loop fixture",
+    "summary": "Secret-free transcript generated by a five-witness Anvil execution."
   },
   {
     "id": "agent-onboarding",
@@ -398,5 +549,67 @@
     "status": "current",
     "canonical_role": "Source inventory validation command",
     "summary": "Validates sources.json fields, duplicate IDs, and paths."
+  },
+  {
+    "id": "contract-team-handoff",
+    "title": "LoveEngine contract team handoff",
+    "path": "docs/development/contract-team-handoff.md",
+    "source_group": "docs/development",
+    "layer": "development",
+    "domain_tags": [
+      "contracts",
+      "handoff",
+      "M2"
+    ],
+    "status": "current",
+    "canonical_role": "Contract implementation handoff",
+    "summary": "Maps the source contract proposal to the implemented interfaces, security additions, test evidence, and governance questions."
+  },
+  {
+    "id": "love-engine-agent-network-pilot-spec",
+    "title": "LoveEngine M2 收口与 M3 Agent 网络试点 SPEC",
+    "path": "docs/specs/love-engine-agent-network-pilot-spec.md",
+    "source_group": "docs/specs",
+    "layer": "spec",
+    "domain_tags": [
+      "LoveEngine",
+      "M2",
+      "M3",
+      "Agent network"
+    ],
+    "status": "current",
+    "canonical_role": "Active M3 implementation spec",
+    "summary": "Defines M2 closeout and the SkillRegistry, signed-node, Relay Hub, event bridge, and three-node network pilot."
+  },
+  {
+    "id": "agent-network-api",
+    "title": "LoveEngine Agent Network API",
+    "path": "docs/api/agent-network-api.md",
+    "source_group": "docs/api",
+    "layer": "api",
+    "domain_tags": [
+      "M3",
+      "SkillRegistry",
+      "Relay Hub",
+      "EIP-712"
+    ],
+    "status": "current",
+    "canonical_role": "M3 Agent network API handoff",
+    "summary": "SkillRegistry ABI, signed profiles, bootstrap, network tasks, receipts, Relay Hub protocol, and CLI."
+  },
+  {
+    "id": "adr-onchain-skill-registry",
+    "title": "ADR 0001: On-chain SkillRegistry",
+    "path": "docs/decisions/0001-onchain-skill-registry.md",
+    "source_group": "docs/decisions",
+    "layer": "decision",
+    "domain_tags": [
+      "M3",
+      "SkillRegistry",
+      "architecture"
+    ],
+    "status": "accepted",
+    "canonical_role": "Skill release trust decision",
+    "summary": "Chooses an on-chain publisher-scoped registry while keeping artifact transport independent from GitHub."
   }
 ]

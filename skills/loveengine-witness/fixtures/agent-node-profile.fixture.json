@@ -3,7 +3,7 @@
   "operator_label": "local-m0-fixture",
   "agent_runtime": "codex",
   "skill_id": "loveengine-witness",
-  "skill_version": "0.1.0-m0",
+  "skill_version": "0.1.1-m0",
   "address": "0x1111111111111111111111111111111111111111",
   "capabilities": [
     "text_live_watch",

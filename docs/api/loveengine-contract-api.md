@@ -1,15 +1,17 @@
 # LoveEngine contract API
 
-本文是 LoveEngine Witness Skill 的合约对接文档。它参考 `LoveEngineSkill/UAS接口文档.md`，并按当前规格修正了签名安全边界。状态：M1/M2 target，尚未有完整合约实现。
+本文是 LoveEngine Witness Skill 的合约对接文档。它参考 `UAS接口文档.md`，并按当前规格修正了签名安全边界。状态：M2 local implementation。
+
+原接口到当前实现的完整映射、测试证据和待协作团队确认事项见 `docs/development/contract-team-handoff.md`。
 
 ## 合约总览
 
 | 合约 | 职责 | 状态 |
 | --- | --- | --- |
-| `WitnessDAO` | 见证者注册、提案、批量投票、执行下游状态变更 | M2 target |
-| `CorporateSink` | 企业直播排期、凭证 hash、补偿记录 | M2 target |
-| `StreamingEngine` | UTO 流账本计算和用户数更新 | M2 target |
-| `PublicSink` | 只读公共账本查询入口 | M2 target |
+| `WitnessDAO` | 见证者注册、提案、批量投票、执行下游状态变更 | M2 local implemented |
+| `CorporateSink` | 企业直播排期、凭证 hash、补偿记录 | M2 local implemented |
+| `StreamingEngine` | UTO 流账本计算和用户数更新 | M2 local implemented |
+| `PublicSink` | 只读公共账本查询入口 | M2 local implemented |
 
 ## 通用规则
 
@@ -23,7 +25,7 @@
 
 ### RegisterSignature
 
-M2 target:
+M2 local implemented:
 
 ```solidity
 struct RegisterSignature {
@@ -46,7 +48,7 @@ struct RegisterSignature {
 
 ### VoteSignature
 
-M2 target:
+M2 local implemented:
 
 ```solidity
 struct VoteSignature {
@@ -91,8 +93,7 @@ function activeProposalId() external view returns (uint256);
 
 ```solidity
 event WitnessRegistered(address indexed witness);
-event WitnessExited(address indexed witness);
-event ProposalCreated(uint256 indexed proposalId, uint8 proposalType, bytes32 evidenceBundleHash);
+event ProposalCreated(uint256 indexed proposalId, uint8 proposalType, bytes32 evidenceBundleHash, bytes32 payloadHash);
 event VoteAccepted(uint256 indexed proposalId, address indexed witness, bool support, bytes32 reasonHash);
 event ProposalFinalized(uint256 indexed proposalId, bool passed, uint256 totalVotes, uint256 supportVotes);
 event ProposalExecuted(uint256 indexed proposalId);
@@ -105,6 +106,7 @@ M2 default:
 - `totalVotes >= min_valid_votes`
 - `supportVotes / totalVotes >= approval_threshold_bps`
 - proposal still active
+- `proposalId` equals the current active proposal before proposal state is read
 - vote signatures valid
 - nonce not used
 - deadline not expired

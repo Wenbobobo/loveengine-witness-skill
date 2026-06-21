@@ -1,96 +1,72 @@
 # Integration guide
 
-本文给辅助开发团队使用。目标是让团队能直接接上 LoveEngine Witness Skill 的 M1/M2 开发，而不是重新解释整个 DAism 材料库。
+本文给参与 LoveEngine Witness Skill M2 收口和 M3 Agent 网络试点的开发者和 Agent 使用。
 
-## 1. 本地检查
+## 1. 初始化
 
 ```powershell
-cd D:\zWenbo\AI\DAism
-python .\tools\validate_loveengine_m0.py
-python .\tools\validate_loveengine_m0.py --tamper-check
-python .\tools\loveengine_m0_self_check.py
+cd <loveengine-witness-skill>
+uv sync
+uv run python .\tools\check.py
 ```
 
-如果这三条命令不通过，先修复 M0 包一致性，再进入新功能开发。
+不要依赖父目录 DAism 中的重复脚本或文档。
 
-## 2. 必读文件
+## 2. 阅读顺序
 
-开发前读：
+1. `README.md`
+2. `docs/specs/love-engine-master-plan.md`
+3. `docs/specs/love-engine-agent-network-pilot-spec.md`
+4. `docs/specs/love-engine-local-witness-loop-spec.md`
+5. `docs/api/README.md`
+6. `skills/loveengine-witness/skill-manifest.json`
 
-- `README.md`
-- `CONTRIBUTING.md`
-- `docs/specs/love-engine-skill-spec.md`
-- `docs/specs/love-engine-next-phase-spec.md`
-- `docs/api/loveengine-contract-api.md`
-- `docs/api/agent-skill-api.md`
-- `skills/loveengine-witness/skill-manifest.json`
+查原始约束时再读：
 
-需要查原始设计时读：
+- `UAS接口文档.md`
+- `UAS 见证方案 2.0.md`
 
-- `LoveEngineSkill/UAS接口文档.md`
-- `LoveEngineSkill/UAS 见证方案 2.0.md`
-- `docs/kb/source-inventory.md`
+## 3. 开发顺序
 
-## 3. 当前工程目标
+M1：
 
-下一阶段是 M1/M2 Local Witness Loop。
+1. 先写 schema 或行为测试并确认失败。
+2. 实现最小 domain/use-case。
+3. 实现 CLI adapter。
+4. 运行 pytest 和 M0 compatibility。
 
-交付应覆盖：
+M2：
 
-- ManifestV2 / AgentNodeProfileV2 / EvidenceBundleV1 / TranscriptV1 schema。
-- `tools/loveengine/` CLI。
-- 本地见证者 fixture 生成。
-- EIP-712 typed data 生成。
-- Foundry 四合约原型。
-- local relayer dry-run。
-- local-loop transcript。
+1. 安装并固定 Foundry。
+2. 先写失败的 Foundry 测试。
+3. 按 StreamingEngine、PublicSink、CorporateSink、WitnessDAO 顺序实现。
+4. 接 EIP-712、signer、relayer 和 demo。
+5. 生成 transcript 并进行敏感信息扫描。
 
-不要求覆盖：
+M3：
 
-- 真实直播平台。
-- 真实 Agent 网络发现。
-- 生产级身份系统。
-- UHAH 完整业务。
-- 交易型 Token。
+1. 先为 SkillRegistry 状态迁移、签名篡改和 Relay 重投递编写失败测试。
+2. 实现 Registry 与 `0.3.0-network-pilot` manifest。
+3. 实现节点 profile、bootstrap、task 和 receipt 的 EIP-712 校验。
+4. 实现只使用出站连接的 RelayTransport 和 SQLite 队列。
+5. 接入 Registry 与 `BroadcastScheduled` 事件，最后运行三节点 Anvil E2E。
 
-## 4. 建议任务拆分
+## 4. 接口规则
 
-| 任务 | 输出 |
-| --- | --- |
-| Schema | JSON schema、fixture、schema tests |
-| CLI | `loveengine manifest verify`、`node declare`、`evidence build` |
-| Contracts | WitnessDAO、CorporateSink、PublicSink、StreamingEngine |
-| EIP-712 | register/vote typed data、nonce/deadline/payload hash 测试 |
-| Relayer | batchRegister/batchVote dry-run |
-| Demo | local-loop 一键脚本和 transcript |
+- 新增或修改公开字段时同步更新 `schemas/` 和 `docs/api/`。
+- EVM 大整数在 JSON 中使用十进制字符串。
+- raw private key、mnemonic、keystore 和 token 不能进入 Agent context、fixture、日志或 transcript。
+- relayer 只能提交签名，不得替 witness 签名。
+- 任何治理默认值必须标注为 fixture、部署参数或治理参数。
 
-## 5. 接口边界
+## 5. PR 验收
 
-Agent 可以：
+PR 必须列出：
 
-- 读源资料和 manifest。
-- 校验 hash。
-- 生成证据包和 typed data。
-- 请求本地 signer 签名。
-- 交给 relayer 提交。
-- 生成 transcript。
+- 修改层：docs、skill、schemas、Python、contracts、relayer 或 adapter。
+- 公开接口变化。
+- manifest/hash 影响。
+- 验证命令和结果。
+- 未完成内容。
 
-Agent 不可以：
-
-- 保存或读取私钥。
-- 替见证者做不可追责的最终判断。
-- 省略 `proposalId`、nonce、deadline、payload hash。
-- 修改原始资料后不更新 hash。
-- 把 UTO 当成金融资产设计。
-
-## 6. PR 验收
-
-PR 至少说明：
-
-- 改了哪些层。
-- 接口状态是 M0、M1 target 还是 M2 target。
-- 是否改了 manifest 保护范围内的文件。
-- 验证命令和输出摘要。
-- 仍未完成的部分。
-
-PR 模板在 `.github/pull_request_template.md`。
+使用 `.github/pull_request_template.md` 自查。

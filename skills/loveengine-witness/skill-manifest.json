@@ -1,115 +1,87 @@
 {
+  "schema_version": "loveengine.skill-manifest/0.2",
   "skill_id": "loveengine-witness",
-  "name": "LoveEngine Witness Skill",
-  "version": "0.1.0-m0",
+  "version": "0.2.0-local-loop",
   "status": "draft",
-  "spec_version": "2026-06-04",
-  "spec_ref": "docs/specs/love-engine-skill-spec.md",
-  "spec_hash": "sha256:056fb68844c8cb4951b1191140b93f2afa3d0a1d4c4eb69cb094679de888e9d7",
-  "package_hash": "sha256:2b1cf0c948b8476ec1e07f76cabb9c24ec717c710c870796520ab5ec1efaad2d",
+  "protocol": "loveengine-witness-net/0.2",
   "source_refs": [
-    "docs/specs/love-engine-skill-spec.md",
+    "docs/specs/love-engine-master-plan.md",
+    "docs/specs/love-engine-agent-network-pilot-spec.md",
+    "docs/specs/love-engine-local-witness-loop-spec.md",
+    "docs/development/contract-team-handoff.md",
+    "docs/decisions/0001-onchain-skill-registry.md",
+    "docs/api/agent-network-api.md",
+    "docs/api/agent-skill-api.md",
+    "docs/api/loveengine-contract-api.md",
+    "docs/kb/source-inventory.md",
     "UAS接口文档.md",
     "UAS 见证方案 2.0.md",
-    "docs/kb/source-inventory.md"
+    "schemas/skill-manifest-v2.schema.json",
+    "schemas/agent-node-profile-v2.schema.json",
+    "schemas/evidence-bundle-v1.schema.json",
+    "schemas/local-loop-transcript-v1.schema.json",
+    "contracts/src/WitnessDAO.sol",
+    "contracts/src/CorporateSink.sol",
+    "contracts/src/StreamingEngine.sol",
+    "contracts/src/PublicSink.sol",
+    "src/loveengine_witness/cli.py",
+    "src/loveengine_witness/demo.py"
   ],
   "source_hashes": {
-    "docs/specs/love-engine-skill-spec.md": "sha256:056fb68844c8cb4951b1191140b93f2afa3d0a1d4c4eb69cb094679de888e9d7",
+    "docs/specs/love-engine-master-plan.md": "sha256:abef5428d5fb5ad7de7f5044bf75a265837c60dbc57382fa9a09daf07f03e54e",
+    "docs/specs/love-engine-agent-network-pilot-spec.md": "sha256:56ff1065ea241dec9efa5e96817f4fb0e8d3056e267ae17444f759136c6e8f61",
+    "docs/specs/love-engine-local-witness-loop-spec.md": "sha256:8516603ae3a74799be464fc73de13449995ca337f117ae1c3465fec67d7c1675",
+    "docs/development/contract-team-handoff.md": "sha256:7c5dd7983fb25fd81ecd40a43b03e02742b42fe3897ea33d2a77edb38fb4e3f1",
+    "docs/decisions/0001-onchain-skill-registry.md": "sha256:afdafa491d0ab218e43162d0b199f9957bf28b5701bfbec603b4583b19a5eb5a",
+    "docs/api/agent-network-api.md": "sha256:9e70e613d7d7818a9e17390f0f6018841e81c572a19682403029d03cc9f9b7e1",
+    "docs/api/agent-skill-api.md": "sha256:54844e8cdf59597dc1427a2a8dafa49a9327534772766c8a41e77d982a304cf9",
+    "docs/api/loveengine-contract-api.md": "sha256:fb645002aea6f1d2653e9aebacf7a13447f25c5fb777741958218ff42b3a0ffe",
+    "docs/kb/source-inventory.md": "sha256:b2cc3b48d540e3b54ea64f59c2183646f4a247fcc945dfe7a25f55b8bec269c1",
     "UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
     "UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
-    "docs/kb/source-inventory.md": "sha256:2d79c0b11f16e0cce3acf479a955309d6f1a6d8aca4bd55c31b49740920de1c8"
+    "schemas/skill-manifest-v2.schema.json": "sha256:65faa3916293c8ac4ff94af7b5d7475c40720cb07671cec371f269a0533c1718",
+    "schemas/agent-node-profile-v2.schema.json": "sha256:8b336bf2074b8e7fac66aaf794cb1248faeb5fdc96d79ead7661ba94dc4568fb",
+    "schemas/evidence-bundle-v1.schema.json": "sha256:51f6944aa53de056e8d5766eefc3cf78f7542451953e3dde11718818714f0817",
+    "schemas/local-loop-transcript-v1.schema.json": "sha256:e52199341907cec8f45339cf5a739b65722c5f04956b5ce01314fbfe878a5d78",
+    "contracts/src/WitnessDAO.sol": "sha256:e8ddfcfc2563d6d36f73331381a0bbc5b1f43ccea12e93e24cd3e6d4c1aef900",
+    "contracts/src/CorporateSink.sol": "sha256:e86f745e2648c704ec08b00c7f536e05ecdadd1608dbea831cdd9ea0d0f9fecc",
+    "contracts/src/StreamingEngine.sol": "sha256:8d63e4c1d193a1df32fcbc306e26cc7145e9b0b2c64628b33687bbdf71305073",
+    "contracts/src/PublicSink.sol": "sha256:6a3de6d3776a4d2fb8642901050e8b743ce03b89a2e46e084d09ba7424da00fc",
+    "src/loveengine_witness/cli.py": "sha256:c2e83cb197df7dd40406b0eb1e3f003a51b06bb91dc92b0135ca006ceffca2a4",
+    "src/loveengine_witness/demo.py": "sha256:83c31826aa5cf57a8c14d254bfae2482eeef7b46a63b835d5dfe00d5749bd14e"
   },
-  "network": {
-    "compatible_protocol": "loveengine-witness-net/0.1",
-    "registry_url": "local-fixture://skills/loveengine-witness/registry",
-    "minimum_supported_skill_version": "0.1.0-m0",
-    "allowed_version_statuses": [
-      "draft"
-    ]
+  "commands": {
+    "manifest_verify": "loveengine manifest verify",
+    "node_declare": "loveengine node declare",
+    "fixture_generate": "loveengine fixture generate",
+    "evidence_build": "loveengine evidence build",
+    "register_message": "loveengine eip712 register-message",
+    "vote_message": "loveengine eip712 vote-message",
+    "batch_register": "loveengine relayer batch-register --dry-run",
+    "batch_vote": "loveengine relayer batch-vote --dry-run",
+    "local_loop": "loveengine demo local-loop",
+    "transcript_verify": "loveengine transcript verify"
   },
-  "capabilities": [
-    "explain_pol",
-    "register_witness",
-    "watch_live_text",
-    "build_evidence_bundle",
-    "sign_vote",
-    "sync_evidence",
-    "propagate_skill",
-    "verify_manifest"
-  ],
-  "permissions": [
-    "read_chain",
-    "read_live_text",
-    "read_local_sources",
-    "request_local_signature",
-    "submit_transaction"
-  ],
-  "tools": [
-    {
-      "name": "verify_manifest",
-      "schema_ref": "tools/validate_loveengine_m0.py",
-      "description": "Validate manifest hash, source references, fixture integrity, and M0 safety rules."
-    },
-    {
-      "name": "capability_self_check",
-      "schema_ref": "tools/loveengine_m0_self_check.py",
-      "description": "Run M0 validation and print the local node capability self-check summary."
-    }
-  ],
-  "governance_parameters": {
-    "min_valid_votes": {
-      "default": 69,
-      "deploy_time_parameter": true,
-      "source_note": "治理参数；可按见证方案 2.0 的最少 50 个抽样思路调整，不在业务逻辑中硬编码。"
-    },
-    "max_selected_witnesses": {
-      "default": 1000,
-      "deploy_time_parameter": true
-    },
-    "approval_threshold_bps": {
-      "default": 9000,
-      "deploy_time_parameter": true
-    },
-    "broadcast_window_seconds": {
-      "default": 7200,
-      "deploy_time_parameter": true,
-      "source_note": "BROADCAST_WINDOW is a deployment/governance parameter."
-    },
-    "min_broadcast_interval_seconds": {
-      "default": 1209600,
-      "deploy_time_parameter": true,
-      "source_note": "MIN_BROADCAST_INTERVAL is a deployment/governance parameter."
-    }
+  "contracts": {
+    "WitnessDAO": "contracts/src/WitnessDAO.sol",
+    "CorporateSink": "contracts/src/CorporateSink.sol",
+    "StreamingEngine": "contracts/src/StreamingEngine.sol",
+    "PublicSink": "contracts/src/PublicSink.sol"
   },
-  "vote_signature": {
-    "type": "EIP-712",
-    "latest_active_proposal_only": false,
-    "required_bindings": [
-      "chain_id",
-      "verifying_contract",
-      "proposal_id",
-      "support",
-      "reason_hash",
-      "payload_hash",
-      "nonce",
-      "deadline"
-    ],
-    "private_key_boundary": "The Agent requests a local signer such as Clef, cast keystore, browser wallet, or AA policy. Raw private keys are never loaded into prompts, logs, fixtures, or Agent context."
+  "eip712": {
+    "domain_name": "LoveEngine WitnessDAO",
+    "domain_version": "1",
+    "register_type": "Register(address witness,uint256 nonce,uint256 deadline)",
+    "vote_type": "Vote(address witness,uint256 proposalId,bool support,bytes32 reasonHash,bytes32 payloadHash,uint256 nonce,uint256 deadline)"
   },
-  "relayer_policy": {
-    "batchRegister": "any_relayer",
-    "batchVote": "any_relayer",
+  "evidence": {
+    "schema": "schemas/evidence-bundle-v1.schema.json",
+    "artifact_hash": "sha256",
+    "payload_hash": "keccak256",
+    "raw_evidence_on_chain": false
+  },
+  "security": {
     "private_keys_in_agent_context": false
   },
-  "public_sink": {
-    "readonly_methods": [
-      "getTotalUTO"
-    ],
-    "owner_mutation_backdoor": false
-  },
-  "m0_artifacts": {
-    "agent_onboarding": "skills/loveengine-witness/agent-onboarding.md",
-    "node_profile_fixture": "skills/loveengine-witness/fixtures/agent-node-profile.fixture.json",
-    "propagation_task_fixture": "skills/loveengine-witness/fixtures/propagation-task.fixture.json"
-  }
+  "package_hash": "sha256:53a3a727cbf325cb00fb7159db962c2c6a8a529d8882fcbf863a1fadb96f8269"
 }

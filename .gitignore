@@ -10,6 +10,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
 venv/
 dist/
 build/
