@@ -143,7 +143,7 @@ docs/                     当前文档和历史归档
 
 ### M3：Agent 网络试点
 
-状态：实施中。
+状态：本地试点完成。
 
 目标：验证三个以上节点之间的 Skill 传播和任务协作。
 
@@ -154,6 +154,8 @@ docs/                     当前文档和历史归档
 - 任务有发行者、签名、过期时间和重放保护。
 - deprecated 版本不能接受新任务。
 - 三个本地节点可验证同一 manifest、消费链上事件任务并提交签名回执。
+- `NetworkTranscriptV1` 可复算，记录 connected、queued、delivered、acked、rejected 和 latency。
+- M3 本地验收使用三个独立 Agent 子进程和出站 WebSocket；不要求公网入站端口。
 
 ### M4：证据与争议闭环
 

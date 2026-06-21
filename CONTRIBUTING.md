@@ -85,8 +85,9 @@ cd contracts
 forge test
 cd ..
 uv run pytest .\tests\test_demo.py
+uv run pytest .\tests\integration\test_network_demo.py
 ```
 
 ## Current priority
 
-M1/M2 Local Witness Loop is implemented. The active plan is `docs/specs/love-engine-agent-network-pilot-spec.md`: M2 release closeout followed by the M3 signed three-node Relay Hub pilot.
+M1/M2 Local Witness Loop and the M3 signed three-process Relay Hub pilot are implemented. New protocol work starts from the master plan and must preserve the M3 network transcript and no-secret acceptance gates.

@@ -35,6 +35,9 @@
 - `src/loveengine_witness/`：Python protocol、use case、adapter 和 CLI。
 - `schemas/`：机器可读协议。
 - `contracts/`：Foundry 合约工程。
+- `src/loveengine_witness/relay*.py`：Relay Hub、SQLite 队列和出站节点连接。
+- `src/loveengine_witness/network_*.py`：M3 签名协议、三进程 demo 和 transcript。
+- `contracts/src/SkillRegistry.sol`：Publisher 命名空间版本事实层。
 - `tests/`：Python 测试。
 - `examples/transcripts/`：脱敏、可复跑的示例。
 

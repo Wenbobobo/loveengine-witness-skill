@@ -20,7 +20,7 @@
 | M0 fixture | 只有 fixture，没有真实协议实现 |
 | M1 implemented | schema / CLI 已实现并有自动测试 |
 | M2 local implemented | 本地链、合约、relayer 或 transcript 已实现 |
-| M3 target | 当前 Agent 网络试点实施目标 |
+| M3 local implemented | 本地 Anvil、Relay Hub 和三节点进程试点已实现 |
 | M4+ target | 后续真实证据和争议闭环目标 |
 | Open | 仍需决策 |
 

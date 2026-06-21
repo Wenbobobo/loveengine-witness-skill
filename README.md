@@ -6,7 +6,7 @@ This repository keeps the current LoveEngine source notes in the root directory 
 
 ## Status
 
-Current version: `0.2.0-local-loop`
+Current version: `0.3.0-network-pilot`
 
 M0 remains available as the verifiable package baseline. M1/M2 now add:
 
@@ -16,6 +16,15 @@ M0 remains available as the verifiable package baseline. M1/M2 now add:
 - Foundry implementations of WitnessDAO, CorporateSink, StreamingEngine and PublicSink.
 - A real five-witness Anvil demo and a 69-signature Foundry scale test.
 - A verifiable, secret-free LocalLoopTranscript fixture.
+
+M3 adds:
+
+- Publisher-scoped on-chain `SkillRegistry` release facts.
+- Signed node profiles, Publisher bootstrap, tasks, and receipts.
+- HTTP/WebSocket Relay Hub with SQLite at-least-once delivery.
+- Chain-event idempotency by chainId, transaction hash, and log index.
+- A real three-process Agent pilot for `propagate_skill` and `observe_broadcast`.
+- A verifiable, secret-free NetworkTranscript fixture with delivery metrics.
 
 ## Quick start
 
@@ -43,6 +52,8 @@ forge test
 cd ..
 uv run loveengine demo local-loop --output .\examples\transcripts
 uv run loveengine transcript verify .\examples\transcripts\local-loop.fixture.json
+uv run loveengine network demo --nodes 3 --output .\examples\transcripts
+uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
 ```
 
 ## Repository layout
@@ -127,7 +138,7 @@ manifest verify
 
 The engineering roadmap is `docs/specs/love-engine-master-plan.md`.
 The implemented M1/M2 baseline is specified by `docs/specs/love-engine-local-witness-loop-spec.md`.
-The active M2 closeout and M3 implementation spec is `docs/specs/love-engine-agent-network-pilot-spec.md`.
+The implemented M2 closeout and M3 pilot spec is `docs/specs/love-engine-agent-network-pilot-spec.md`.
 
 ## Interface docs
 

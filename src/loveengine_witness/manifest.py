@@ -22,6 +22,8 @@ def verify_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
 
     if manifest.get("schema_version") == "loveengine.skill-manifest/0.2":
         validate_schema(manifest, "skill-manifest-v2.schema.json")
+    if manifest.get("schema_version") == "loveengine.skill-manifest/0.3":
+        validate_schema(manifest, "skill-manifest-v3.schema.json")
 
     refs = manifest.get("source_refs")
     hashes = manifest.get("source_hashes")

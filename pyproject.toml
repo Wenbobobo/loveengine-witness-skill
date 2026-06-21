@@ -1,10 +1,11 @@
 [project]
 name = "loveengine-witness-skill"
-version = "0.2.0"
+version = "0.3.0"
 description = "LoveEngine Witness Skill repository and M0 validation tools"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiohttp>=3.14.1",
     "eth-account>=0.13.7",
     "eth-hash[pycryptodome]>=0.8.0",
     "eth-utils>=6.0.0",

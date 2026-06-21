@@ -810,9 +810,10 @@ wheels = [
 
 [[package]]
 name = "loveengine-witness-skill"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "eth-account" },
     { name = "eth-hash", extra = ["pycryptodome"] },
     { name = "eth-utils" },
@@ -827,6 +828,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.14.1" },
     { name = "eth-account", specifier = ">=0.13.7" },
     { name = "eth-hash", extras = ["pycryptodome"], specifier = ">=0.8.0" },
     { name = "eth-utils", specifier = ">=6.0.0" },

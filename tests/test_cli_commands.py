@@ -29,13 +29,13 @@ def load_schema(name: str) -> Draft202012Validator:
     return Draft202012Validator(schema)
 
 
-def test_manifest_verify_accepts_current_m0_package() -> None:
+def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     result = run_cli("manifest", "verify")
 
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.2.0-local-loop"
+    assert output["version"] == "0.3.0-network-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -229,3 +229,18 @@ def test_argument_errors_are_machine_readable() -> None:
     assert result.returncode == 2
     error = json.loads(result.stderr)["error"]
     assert error["code"] == "invalid_arguments"
+
+
+def test_network_transcript_cli_verifies_committed_fixture() -> None:
+    result = run_cli(
+        "network",
+        "transcript",
+        "verify",
+        str(ROOT / "examples" / "transcripts" / "network-pilot.fixture.json"),
+    )
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["valid"] is True
+    assert output["node_count"] == 3
+    assert output["receipt_count"] == 6

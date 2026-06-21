@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import sys
 from pathlib import Path
@@ -14,8 +15,20 @@ from .demo import run_local_loop
 from .fixtures import generate_witness_fixtures
 from .jsonio import read_json, write_json
 from .manifest import DEFAULT_MANIFEST, verify_manifest
+from .network_demo import run_network_demo
+from .network_node import connect_node
+from .network_protocol import (
+    build_bootstrap,
+    verify_bootstrap,
+    verify_node_profile,
+)
+from .network_transcript import verify_network_transcript
+from .network_typed_data import build_node_profile_typed_data
 from .node_profile import build_node_profile
+from .registry import publish_plan, verify_release
 from .relayer import plan_batch
+from .relay import RelayStore
+from .relay_server import serve_forever
 from .transcript import verify_transcript
 from .typed_data import build_register_typed_data, build_vote_typed_data
 
@@ -39,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
     node_declare = node_commands.add_parser("declare")
     node_declare.add_argument("--config", type=Path, required=True)
     node_declare.add_argument("--output", type=Path)
+    node_profile = node_commands.add_parser("profile")
+    node_profile_commands = node_profile.add_subparsers(dest="node_profile_command")
+    node_profile_sign = node_profile_commands.add_parser("sign")
+    node_profile_sign.add_argument("--input", type=Path, required=True)
 
     fixture = commands.add_parser("fixture")
     fixture_commands = fixture.add_subparsers(dest="fixture_command")
@@ -77,6 +94,57 @@ def build_parser() -> argparse.ArgumentParser:
     local_loop = demo_commands.add_parser("local-loop")
     local_loop.add_argument("--config", type=Path)
     local_loop.add_argument("--output", type=Path, required=True)
+
+    registry = commands.add_parser("registry")
+    registry_commands = registry.add_subparsers(dest="registry_command")
+    registry_publish = registry_commands.add_parser("publish")
+    registry_publish.add_argument("--input", type=Path, required=True)
+    registry_publish.add_argument("--dry-run", action="store_true")
+    registry_verify = registry_commands.add_parser("verify")
+    registry_verify.add_argument("--release", type=Path, required=True)
+    registry_verify.add_argument("--artifact", type=Path, required=True)
+    registry_verify.add_argument("--chain-id", required=True)
+    registry_verify.add_argument("--registry", required=True)
+    registry_verify.add_argument("--publisher", required=True)
+
+    bootstrap = commands.add_parser("bootstrap")
+    bootstrap_commands = bootstrap.add_subparsers(dest="bootstrap_command")
+    bootstrap_build = bootstrap_commands.add_parser("build")
+    bootstrap_build.add_argument("--input", type=Path, required=True)
+    bootstrap_build.add_argument("--output", type=Path)
+    bootstrap_verify = bootstrap_commands.add_parser("verify")
+    bootstrap_verify.add_argument("path", type=Path)
+    bootstrap_verify.add_argument("--chain-id", required=True)
+    bootstrap_verify.add_argument("--registry", required=True)
+
+    relay = commands.add_parser("relay")
+    relay_commands = relay.add_subparsers(dest="relay_command")
+    relay_serve = relay_commands.add_parser("serve")
+    relay_serve.add_argument("--bootstrap", type=Path, required=True)
+    relay_serve.add_argument("--db", type=Path, required=True)
+    relay_serve.add_argument("--host", default="127.0.0.1")
+    relay_serve.add_argument("--port", type=int, default=8765)
+
+    node_connect = node_commands.add_parser("connect")
+    node_connect.add_argument("--url", required=True)
+    node_connect.add_argument("--profile", type=Path, required=True)
+    node_connect.add_argument("--rpc-url")
+    node_connect.add_argument("--address")
+    node_connect.add_argument("--expected-tasks", type=int, default=0)
+    node_connect.add_argument("--output", type=Path)
+    node_connect.add_argument("--dry-run", action="store_true")
+
+    network = commands.add_parser("network")
+    network_commands = network.add_subparsers(dest="network_command")
+    network_demo = network_commands.add_parser("demo")
+    network_demo.add_argument("--nodes", type=int, default=3)
+    network_demo.add_argument("--output", type=Path, required=True)
+    network_transcript = network_commands.add_parser("transcript")
+    network_transcript_commands = network_transcript.add_subparsers(
+        dest="network_transcript_command"
+    )
+    network_transcript_verify = network_transcript_commands.add_parser("verify")
+    network_transcript_verify.add_argument("path", type=Path)
     return parser
 
 
@@ -92,6 +160,44 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.output:
             write_json(args.output, profile)
         return profile
+    if (
+        args.command == "node"
+        and args.node_command == "profile"
+        and args.node_profile_command == "sign"
+    ):
+        value = read_json(args.input)
+        return {
+            "typed_data": build_node_profile_typed_data(
+                value["chain_id"],
+                value["registry"],
+                value["profile"],
+            ),
+            "signer_required": True,
+        }
+    if args.command == "node" and args.node_command == "connect":
+        signed_profile = read_json(args.profile)
+        node_address = verify_node_profile(signed_profile)
+        if not args.dry_run:
+            if not args.rpc_url or not args.address:
+                raise LoveEngineError(
+                    "local_signer_required",
+                    "live connect requires --rpc-url and --address",
+                    4,
+                )
+            return connect_node(
+                url=args.url,
+                rpc_url=args.rpc_url,
+                address=args.address,
+                profile_path=args.profile,
+                expected_tasks=args.expected_tasks,
+                output=args.output,
+            )
+        return {
+            "connected": False,
+            "dry_run": True,
+            "node": node_address,
+            "url": args.url,
+        }
     if args.command == "fixture" and args.fixture_command == "generate":
         paths = generate_witness_fixtures(args.witnesses, args.output)
         return {"generated": len(paths), "output": str(args.output)}
@@ -121,6 +227,61 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.config:
             read_json(args.config)
         return run_local_loop(args.output)
+    if args.command == "registry" and args.registry_command == "publish":
+        if not args.dry_run:
+            raise LoveEngineError(
+                "local_signer_required",
+                "registry publish requires a local signer adapter",
+                4,
+            )
+        return publish_plan(read_json(args.input))
+    if args.command == "registry" and args.registry_command == "verify":
+        return verify_release(
+            read_json(args.release),
+            args.artifact,
+            expected_chain_id=args.chain_id,
+            expected_registry=args.registry,
+            expected_publisher=args.publisher,
+        )
+    if args.command == "bootstrap" and args.bootstrap_command == "build":
+        value = read_json(args.input)
+        bootstrap = build_bootstrap(
+            value["publisher"],
+            value["nodes"],
+            value["sequence"],
+            value["valid_until"],
+        )
+        bootstrap["signature"] = value.get("signature", "0x")
+        if args.output:
+            write_json(args.output, bootstrap)
+        return bootstrap
+    if args.command == "bootstrap" and args.bootstrap_command == "verify":
+        value = read_json(args.path)
+        verify_bootstrap(value, args.chain_id, args.registry)
+        return {
+            "valid": True,
+            "publisher": value["publisher"],
+            "node_count": len(value["directory"]),
+        }
+    if args.command == "relay" and args.relay_command == "serve":
+        bootstrap = read_json(args.bootstrap)
+        asyncio.run(
+            serve_forever(
+                RelayStore(args.db),
+                bootstrap,
+                args.host,
+                args.port,
+            )
+        )
+        return {"stopped": True}
+    if args.command == "network" and args.network_command == "demo":
+        return run_network_demo(args.output, args.nodes)
+    if (
+        args.command == "network"
+        and args.network_command == "transcript"
+        and args.network_transcript_command == "verify"
+    ):
+        return verify_network_transcript(read_json(args.path))
     raise LoveEngineError("missing_command", "a command and subcommand are required")
 
 
