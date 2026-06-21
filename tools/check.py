@@ -24,6 +24,7 @@ def main() -> None:
     run([python, "tools/validate_loveengine_m0.py", "--tamper-check"])
     run([python, "tools/loveengine_m0_self_check.py"])
     run([python, "tools/validate_sources.py"])
+    run([python, "tools/validate_docs.py"])
 
 
 if __name__ == "__main__":

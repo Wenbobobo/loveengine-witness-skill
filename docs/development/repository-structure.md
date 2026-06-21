@@ -1,85 +1,61 @@
 # Repository structure
 
-本仓库按“GitHub 协作入口 + 原始资料区 + LoveEngine 原型区”组织。这样做是为了让辅助开发团队能快速进入开发，同时保留 DD 原始讨论和早期资料的溯源。
+本文描述独立仓库 `loveengine-witness-skill` 的当前结构。父目录 DAism 中的重复文件不是权威开发源。
 
-## 顶层目录
+## 当前目录
 
 ```text
 .
 ├── README.md
 ├── AGENTS.md
 ├── CONTRIBUTING.md
-├── .github/
 ├── docs/
-├── skills/
+│   ├── api/
+│   ├── archive/
+│   ├── decisions/
+│   ├── development/
+│   ├── kb/
+│   └── specs/
+├── skills/loveengine-witness/
 ├── tools/
-├── LoveEngineSkill/
-├── TG-5.22/
-├── Discuss/
-├── NaturalDAO/
-├── daism-tg-forwarder/
-├── DAism LOGO/
-├── Hackerhouse/
-└── Slidev/
+├── schemas/
+├── src/loveengine_witness/
+├── tests/
+├── contracts/
+└── examples/transcripts/
 ```
+
+`schemas/`、`src/`、`tests/`、`contracts/` 和 `examples/` 随 M1/M2 实现建立。
 
 ## 可维护区
 
-这些目录面向协作开发，可以正常新增文档、规格、fixture 和工具：
+- `docs/`：当前规格、API、指南和历史归档。
+- `skills/loveengine-witness/`：可传播 Skill 包。
+- `tools/`：仓库兼容检查入口。
+- `src/loveengine_witness/`：Python protocol、use case、adapter 和 CLI。
+- `schemas/`：机器可读协议。
+- `contracts/`：Foundry 合约工程。
+- `tests/`：Python 测试。
+- `examples/transcripts/`：脱敏、可复跑的示例。
 
-| 路径 | 内容 |
-| --- | --- |
-| `.github/` | GitHub issue 和 PR 模板 |
-| `docs/api/` | 接口文档 |
-| `docs/development/` | 协作、结构、开发流程 |
-| `docs/specs/` | 开发规格 |
-| `docs/kb/` | 知识库索引和 Telegram 整理层 |
-| `skills/loveengine-witness/` | LoveEngine Witness Skill M0 包 |
-| `tools/` | 校验脚本和未来 CLI |
+## 默认只读源材料
 
-## 源材料区
+- `Love Engine.md`
+- `LoveEngine Skill.md`
+- `NaturalDAO 开发.md`
+- `Skill 模板.md`
+- `UAS 2.md`
+- `UAS 见证方案 2.0.md`
+- `UAS接口文档.md`
 
-这些目录默认只读。不要为了整理仓库而移动、删除或原地重写：
+摘要、推断和新规格必须写入 `docs/`，不能原地覆盖源材料。
 
-| 路径 | 内容 |
-| --- | --- |
-| `LoveEngineSkill/` | LoveEngine、UAS、UHAH、NaturalDAO 早期开发记录 |
-| `TG-5.22/` | Telegram 原始导出和附件 |
-| `Discuss/` | EAP、Alignment、SCC0 早期资料 |
-| `NaturalDAO/` | NaturalDAO 规划、PoL 分章和书稿工作区 |
+## 权威入口
 
-如需摘要或改写，在 `docs/` 下新建整理文档，并标注来源。
+1. `docs/specs/love-engine-master-plan.md`
+2. `docs/specs/love-engine-agent-network-pilot-spec.md`
+3. `docs/specs/love-engine-local-witness-loop-spec.md`
+4. `docs/api/`
+5. `docs/kb/source-inventory.md`
 
-## 独立子项目
-
-`daism-tg-forwarder/` 是独立代码项目，已有自己的 `AGENTS.md`、测试和 Python 包配置。处理它时按该目录规则来，不要把 LoveEngine 的仓库化改动套进去。
-
-## LoveEngine 原型边界
-
-当前 LoveEngine 原型由两部分组成：
-
-```text
-skills/loveengine-witness/
-tools/validate_loveengine_m0.py
-tools/loveengine_m0_self_check.py
-```
-
-下一阶段可以新增：
-
-```text
-tools/loveengine/
-LoveEngineSkill/prototype/
-```
-
-如果建立 Foundry 合约工程，建议优先放在 `LoveEngineSkill/prototype/` 或单独仓库。当前仓库还承担资料库职责，不宜把原始材料和生产代码混在一起。
-
-## Hash 敏感文件
-
-`skills/loveengine-witness/skill-manifest.json` 记录下列文件的 hash：
-
-- `docs/specs/love-engine-skill-spec.md`
-- `LoveEngineSkill/UAS接口文档.md`
-- `LoveEngineSkill/UAS 见证方案 2.0.md`
-- `docs/kb/source-inventory.md`
-
-修改这些文件后，必须更新 manifest 的 `source_hashes`、`package_hash`，并同步更新 `skills/loveengine-witness/fixtures/propagation-task.fixture.json`。
+`docs/archive/` 只用于历史追溯。

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/evidence-bundle-v1.schema.json",
+  "title": "EvidenceBundleV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bundle_id",
+    "session_id",
+    "proposal_type",
+    "subject",
+    "source_refs",
+    "attachments",
+    "summary",
+    "created_at",
+    "artifact_hash",
+    "payload_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "loveengine.evidence-bundle/1"},
+    "bundle_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "proposal_type": {"enum": ["USER_COUNT", "COMPENSATION"]},
+    "subject": {"type": "object", "minProperties": 1},
+    "source_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref", "hash"],
+        "properties": {
+          "kind": {"enum": ["source", "summary", "screenshot", "video", "log"]},
+          "ref": {"type": "string", "minLength": 1},
+          "hash": {
+            "type": "string",
+            "pattern": "^(sha256:[0-9a-f]{64}|0x[0-9a-f]{64})$"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "kind": {"const": "summary"},
+        "text": {"type": "string"}
+      }
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "artifact_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    }
+  }
+}

@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = ROOT / "skills" / "loveengine-witness"
-MANIFEST_PATH = SKILL_DIR / "skill-manifest.json"
+MANIFEST_PATH = SKILL_DIR / "skill-manifest.m0.json"
 ONBOARDING_PATH = SKILL_DIR / "agent-onboarding.md"
 FIXTURE_DIR = SKILL_DIR / "fixtures"
 NODE_PROFILE_PATH = FIXTURE_DIR / "agent-node-profile.fixture.json"
@@ -40,11 +40,14 @@ REQUIRED_PERMISSIONS = {
 }
 
 REQUIRED_SOURCE_REFS = {
-    "docs/specs/love-engine-skill-spec.md",
+    "docs/specs/love-engine-master-plan.md",
+    "docs/specs/love-engine-local-witness-loop-spec.md",
     "UAS接口文档.md",
     "UAS 见证方案 2.0.md",
     "docs/kb/source-inventory.md",
 }
+REQUIRED_VERSION = "0.1.1-m0"
+REQUIRED_SPEC_REF = "docs/specs/love-engine-master-plan.md"
 
 REQUIRED_CONTRACT_PARAMS = {
     "min_valid_votes",
@@ -110,6 +113,8 @@ def validate_manifest(manifest: dict, root: Path = ROOT) -> None:
         fail("manifest skill_id must be loveengine-witness")
     if manifest.get("status") != "draft":
         fail("M0 manifest status must be draft")
+    if manifest.get("version") != REQUIRED_VERSION:
+        fail(f"M0 manifest version must be {REQUIRED_VERSION}")
 
     source_refs = manifest.get("source_refs")
     if not isinstance(source_refs, list):
@@ -130,8 +135,8 @@ def validate_manifest(manifest: dict, root: Path = ROOT) -> None:
             fail(f"source hash mismatch for {rel_path}")
 
     spec_ref = manifest.get("spec_ref")
-    if spec_ref != "docs/specs/love-engine-skill-spec.md":
-        fail("manifest spec_ref must point to docs/specs/love-engine-skill-spec.md")
+    if spec_ref != REQUIRED_SPEC_REF:
+        fail(f"manifest spec_ref must point to {REQUIRED_SPEC_REF}")
     if manifest.get("spec_hash") != source_hashes.get(spec_ref):
         fail("manifest spec_hash must match source_hashes[spec_ref]")
 
@@ -220,7 +225,7 @@ def validate_propagation_task(manifest: dict, propagation_task_path: Path = PROP
     task = load_json(propagation_task_path)
     if task.get("task_type") != "propagate_skill":
         fail("propagation fixture task_type must be propagate_skill")
-    if task.get("manifest_ref") != "skills/loveengine-witness/skill-manifest.json":
+    if task.get("manifest_ref") != "skills/loveengine-witness/skill-manifest.m0.json":
         fail("propagation fixture manifest_ref mismatch")
     if task.get("manifest_hash") != manifest["package_hash"]:
         fail("propagation fixture manifest_hash must match manifest package_hash")
@@ -231,6 +236,8 @@ def validate_propagation_task(manifest: dict, propagation_task_path: Path = PROP
         fail("propagation fixture missing acceptance checks")
     if task.get("assigned_nodes") != []:
         fail("M0 propagation fixture should not preassign nodes")
+    if task.get("status") != "fixture" or task.get("expires_at") is not None:
+        fail("M0 propagation fixture must be static and non-expiring")
 
 
 def validate_package(
@@ -265,10 +272,9 @@ def run_tamper_check() -> None:
 
         tampered_manifest_path = tmp_skill / "skill-manifest.json"
         manifest = json.loads(tampered_manifest_path.read_text(encoding="utf-8"))
+        removed_ref = sorted(REQUIRED_SOURCE_REFS)[0]
         manifest["source_refs"] = [
-            "docs/specs/love-engine-skill-spec.md",
-            "UAS接口文档.md",
-            "docs/kb/source-inventory.md",
+            ref for ref in manifest["source_refs"] if ref != removed_ref
         ]
         tampered_manifest_path.write_text(
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",

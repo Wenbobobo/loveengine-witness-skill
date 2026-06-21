@@ -1,10 +1,36 @@
 [project]
 name = "loveengine-witness-skill"
-version = "0.1.0"
+version = "0.2.0"
 description = "LoveEngine Witness Skill repository and M0 validation tools"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "eth-account>=0.13.7",
+    "eth-hash[pycryptodome]>=0.8.0",
+    "eth-utils>=6.0.0",
+    "jsonschema>=4.26.0",
+    "web3>=7.16.0",
+]
+
+[project.scripts]
+loveengine = "loveengine_witness.cli:main"
 
 [tool.uv]
-package = false
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/loveengine_witness"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires the pinned Foundry toolchain and a local Anvil process",
+]

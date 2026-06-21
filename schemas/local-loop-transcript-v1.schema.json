@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/local-loop-transcript-v1.schema.json",
+  "title": "LocalLoopTranscriptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "manifest_hash",
+    "chain_id",
+    "contracts",
+    "events",
+    "evidence_bundle",
+    "proposal",
+    "votes",
+    "final_state",
+    "transcript_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "loveengine.local-loop-transcript/1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "manifest_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "chain_id": {"type": "string", "pattern": "^[0-9]+$"},
+    "contracts": {"$ref": "#/$defs/safeObject"},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/safeValue"}},
+    "evidence_bundle": {"$ref": "#/$defs/safeObject"},
+    "proposal": {"$ref": "#/$defs/safeObject"},
+    "votes": {"type": "array", "items": {"$ref": "#/$defs/safeValue"}},
+    "final_state": {"$ref": "#/$defs/safeObject"},
+    "transcript_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "safeObject": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "pattern": "(?i)(private[_-]?key|mnemonic|keystore|auth[_-]?token|access[_-]?token)"
+        }
+      },
+      "additionalProperties": {"$ref": "#/$defs/safeValue"}
+    },
+    "safeValue": {
+      "anyOf": [
+        {"type": ["string", "number", "integer", "boolean", "null"]},
+        {"type": "array", "items": {"$ref": "#/$defs/safeValue"}},
+        {"$ref": "#/$defs/safeObject"}
+      ]
+    }
+  }
+}

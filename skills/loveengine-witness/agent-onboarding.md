@@ -4,13 +4,16 @@ This M0 package is for an Agent that wants to join, verify, and propagate the Lo
 
 Read order:
 
-1. `skills/loveengine-witness/skill-manifest.json`
-2. `docs/specs/love-engine-skill-spec.md`
-3. `UAS接口文档.md`
-4. `UAS 见证方案 2.0.md`
-5. `docs/kb/source-inventory.md`
+1. `skills/loveengine-witness/skill-manifest.json` (current)
+2. `skills/loveengine-witness/skill-manifest.m0.json` (M0 compatibility)
+3. `docs/specs/love-engine-master-plan.md`
+4. `docs/specs/love-engine-agent-network-pilot-spec.md`
+5. `docs/specs/love-engine-local-witness-loop-spec.md`
+6. `UAS接口文档.md`
+7. `UAS 见证方案 2.0.md`
+8. `docs/kb/source-inventory.md`
 
-Source rule: `docs/specs/love-engine-skill-spec.md` is the development source of truth. The root Markdown files are original source materials. Do not move, delete, rewrite, or normalize them in place.
+Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source of truth, `docs/specs/love-engine-agent-network-pilot-spec.md` is the active implementation spec, and `docs/specs/love-engine-local-witness-loop-spec.md` records the implemented M1/M2 baseline. The root Markdown files are original source materials. Do not move, delete, rewrite, or normalize them in place.
 
 Install and verify:
 
@@ -47,6 +50,6 @@ Governance parameters:
 - MIN_BROADCAST_INTERVAL is a governance/deployment parameter.
 - PublicSink remains a minimal read-only surface: `getTotalUTO()` only, with no owner mutation backdoor.
 
-Current manifest spec hash:
+M0 compatibility manifest spec hash:
 
-`sha256:056fb68844c8cb4951b1191140b93f2afa3d0a1d4c4eb69cb094679de888e9d7`
+`sha256:abef5428d5fb5ad7de7f5044bf75a265837c60dbc57382fa9a09daf07f03e54e`

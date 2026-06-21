@@ -1,0 +1,140 @@
+{
+  "schema_version": "loveengine.local-loop-transcript/1",
+  "run_id": "local-loop-001",
+  "manifest_hash": "sha256:b69cab5ff9d57882180143034f331c065d1afd940d6b6d2681065b2a2e0bf1a8",
+  "chain_id": "31337",
+  "contracts": {
+    "StreamingEngine": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "PublicSink": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "CorporateSink": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "WitnessDAO": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+  },
+  "events": [
+    {
+      "action": "deploy StreamingEngine",
+      "transaction_hash": "96c304f59666f6eb002894adf1213ae3ee6c0c1b8ab4b37f78bf837eff01aa6c",
+      "block_number": "1",
+      "status": "1"
+    },
+    {
+      "action": "deploy PublicSink",
+      "transaction_hash": "7bf37e46e2a0f0c9186f7d222193de989fe1bd47b6fcf71f81428b94d61465c7",
+      "block_number": "2",
+      "status": "1"
+    },
+    {
+      "action": "deploy CorporateSink",
+      "transaction_hash": "bc9bd310a82e359fdef7146aae01d0ba9be70005e5e65d7435e670fe18e8cae4",
+      "block_number": "3",
+      "status": "1"
+    },
+    {
+      "action": "deploy WitnessDAO",
+      "transaction_hash": "733093e72656326c2c270b970055e5c8683c998211771fac0bb7897ae676a511",
+      "block_number": "4",
+      "status": "1"
+    },
+    {
+      "action": "bind StreamingEngine",
+      "transaction_hash": "b3328f911cba492de28106986603147098b6e8c8efacd15b566805ff367b0eb8",
+      "block_number": "5",
+      "status": "1"
+    },
+    {
+      "action": "bind CorporateSink",
+      "transaction_hash": "791ae088fcb55291c5f3d8530dec6e4272baf27a8c281b567df79c7f043a1ace",
+      "block_number": "6",
+      "status": "1"
+    },
+    {
+      "action": "batchRegister",
+      "transaction_hash": "26ab7741c6aaaaeb6a7f290a4777114cfcacaa72c37bef9010ced94fa71ec77a",
+      "block_number": "7",
+      "status": "1"
+    },
+    {
+      "action": "scheduleBroadcast",
+      "transaction_hash": "acb3b953ef2db495dc206c9fa1f8bafa5fa10de8fca71bdfb61f57fb8cd98842",
+      "block_number": "8",
+      "status": "1"
+    },
+    {
+      "action": "proposeUserCount",
+      "transaction_hash": "565276cf5f528eb423115c4b702f217851adcaa98d3fa52529487c30646894a2",
+      "block_number": "10",
+      "status": "1"
+    },
+    {
+      "action": "batchVote",
+      "transaction_hash": "79612dae8c902c41f45ed364c8d4fe8478730e14fe16a93679af87fd99ca2368",
+      "block_number": "11",
+      "status": "1"
+    }
+  ],
+  "evidence_bundle": {
+    "schema_version": "loveengine.evidence-bundle/1",
+    "bundle_id": "local-loop-evidence-001",
+    "session_id": "local-loop-session-001",
+    "proposal_type": "USER_COUNT",
+    "subject": {
+      "corporate": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "new_user_count": "20"
+    },
+    "source_refs": [
+      "fixture://local-loop-session-001"
+    ],
+    "attachments": [],
+    "summary": {
+      "kind": "summary",
+      "text": "Local deterministic witness-loop fixture."
+    },
+    "created_at": "2026-06-21T09:08:25.637747Z",
+    "payload_hash": "0x079d578c7249d1e892d4e3c7bb62a9ce65d3f73e5c4b48dfcb2e9bf719e39b56",
+    "artifact_hash": "sha256:8083ab456a55a7cd4c4309efc7fa5e0d663d31423ced1a278d803bd8abe28741"
+  },
+  "proposal": {
+    "proposal_id": "1",
+    "payload_hash": "0x907f5802e3cb1a269d030c24e622aded02ee05fe5f030cf69bfe44e13b73c4cc",
+    "total_votes": "5",
+    "support_votes": "5"
+  },
+  "votes": [
+    {
+      "witness": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "support": true,
+      "nonce": "0",
+      "deadline": "1783246105"
+    },
+    {
+      "witness": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "support": true,
+      "nonce": "0",
+      "deadline": "1783246105"
+    },
+    {
+      "witness": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "support": true,
+      "nonce": "0",
+      "deadline": "1783246105"
+    },
+    {
+      "witness": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+      "support": true,
+      "nonce": "0",
+      "deadline": "1783246105"
+    },
+    {
+      "witness": "0x976EA74026E726554dB657fA54763abd0C3a0aa9",
+      "support": true,
+      "nonce": "0",
+      "deadline": "1783246105"
+    }
+  ],
+  "final_state": {
+    "registered_witness_count": "5",
+    "proposal_executed": true,
+    "rate": "20000000000000",
+    "total_uto": "12096000000000000000"
+  },
+  "transcript_hash": "sha256:e78b2b3113adb2f8467781d330b4032975952f73e37fa734ee954bf797762563"
+}

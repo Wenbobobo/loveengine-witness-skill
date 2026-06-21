@@ -6,11 +6,13 @@ These instructions apply to the LoveEngineSkill repository.
 
 1. `README.md`
 2. `docs/development/integration-guide.md`
-3. `docs/specs/love-engine-skill-spec.md`
-4. `docs/specs/love-engine-next-phase-spec.md`
-5. `docs/api/loveengine-contract-api.md`
-6. `docs/api/agent-skill-api.md`
-7. `skills/loveengine-witness/skill-manifest.json`
+3. `docs/specs/love-engine-master-plan.md`
+4. `docs/specs/love-engine-agent-network-pilot-spec.md`
+5. `docs/specs/love-engine-local-witness-loop-spec.md`
+6. `docs/api/loveengine-contract-api.md`
+7. `docs/api/agent-skill-api.md`
+8. `docs/api/agent-network-api.md`
+9. `skills/loveengine-witness/skill-manifest.json`
 
 ## Source material boundary
 
@@ -32,22 +34,21 @@ Keep LoveEngine framed as an Agent-network-first Witness Skill. Do not drift bac
 
 ## Hash-protected files
 
-`skills/loveengine-witness/skill-manifest.json` records hashes for:
+The current manifest is `skills/loveengine-witness/skill-manifest.json`.
+The M0 compatibility manifest is `skills/loveengine-witness/skill-manifest.m0.json`.
+Their `source_refs` and `source_hashes` are authoritative; do not maintain a separate hard-coded list here.
 
-- `docs/specs/love-engine-skill-spec.md`
-- `UAS接口文档.md`
-- `UAS 见证方案 2.0.md`
-- `docs/kb/source-inventory.md`
+If any referenced file changes, update:
 
-If any of these files change, update:
-
-- `skills/loveengine-witness/skill-manifest.json`
-- `skills/loveengine-witness/fixtures/propagation-task.fixture.json`
+- the affected manifest source hash and package hash;
+- the M0 propagation fixture only when the M0 package hash changes;
+- `docs/kb/sources.json` when a public artifact is added or moved.
 
 Then run:
 
 ```powershell
 uv run python .\tools\check.py
+uv run pytest -m "not integration"
 ```
 
 ## Safety invariants
