@@ -75,18 +75,18 @@
     "contracts/src/PublicSink.sol": "sha256:6a3de6d3776a4d2fb8642901050e8b743ce03b89a2e46e084d09ba7424da00fc",
     "contracts/src/SkillRegistry.sol": "sha256:13595c791f345b903a8f8d5771c859f849a97f25b911bd1f2ed07b36ce0325d4",
     "src/loveengine_witness/cli.py": "sha256:3051cc3e6f3058531cfb4dd807db2108cf1f5538599d69c622651dfa18fa6c15",
-    "src/loveengine_witness/manifest.py": "sha256:14328a7414710dd0d5bf615c637c51e4b5838c78e939957dd3918d263747f60d",
+    "src/loveengine_witness/manifest.py": "sha256:e94fa64ba931e8631b450b2a0db4adeb5e64e2dabdacdc7562731f5102460ead",
     "src/loveengine_witness/demo.py": "sha256:83c31826aa5cf57a8c14d254bfae2482eeef7b46a63b835d5dfe00d5749bd14e",
     "src/loveengine_witness/network_typed_data.py": "sha256:ba6dd78fecfaccff514618a8ce044e7bf84597c1f5d40a63c687b72017ee634a",
     "src/loveengine_witness/network_protocol.py": "sha256:dc27330cd1e37a378d67727d4f39a42b59d97010af1130f5e61ca44f7f622aae",
     "src/loveengine_witness/registry.py": "sha256:af66fc3e907fde58dffd531c2efe2648992c19ba95e7b875fea5e4883e937613",
-    "src/loveengine_witness/relay.py": "sha256:54c673ee048cf10bb874c0ce64f5623256511412121741c8a446b214f70fedf1",
-    "src/loveengine_witness/relay_server.py": "sha256:e5b0141eda21704376051b411cf81706b851536c980b4ee34a9412a8e9fa6cfa",
+    "src/loveengine_witness/relay.py": "sha256:0b499233e2af2c1f4a548842abbe5ef7e890164933c2ce59b8157d67c0b27762",
+    "src/loveengine_witness/relay_server.py": "sha256:d847e08b4c5d9f68e6e9db2a762e3a856a9178ff61f9e761f5701ef15527618c",
     "src/loveengine_witness/event_bridge.py": "sha256:0a13192cd9b18597a380a6710cdd11492e09d19dea5c44645af87d2fc053e7be",
     "src/loveengine_witness/network_node.py": "sha256:f4e9af1799b239d326dbc70a62a306ed1a2b7edc12ddce38481b200d511b5554",
     "src/loveengine_witness/transport.py": "sha256:9eb497cf4dc5a6b44b71acb31b989fd885f777de7a895c2eef78d1e06606e5d2",
     "src/loveengine_witness/network_demo.py": "sha256:04ed9dd07449fe105c8d01a2d12dd0cb29cdb58c0a7a621db9bf15d9b2a7d61f",
-    "src/loveengine_witness/network_transcript.py": "sha256:0a35d8949a8e19986ce0e1f8d8f3a7d934f4865bcdbf2939a0a8ff990d2a29b3"
+    "src/loveengine_witness/network_transcript.py": "sha256:9215d437816c92e300c120b216eebb62c0298dc2d9ff0ce4213e12e3c4dfdd75"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -156,5 +156,5 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:715c95d57ce7a6e35df6a3f90decf7fcd43e321ea195e251181b4556c4d321a1"
+  "package_hash": "sha256:be45bec3ad2e7d45c78be781de81b966596c2755147c0b8fc76ab2da13ddc8dd"
 }

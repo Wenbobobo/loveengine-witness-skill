@@ -13,6 +13,7 @@ from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
 from eth_utils import to_checksum_address
 
+from .errors import LoveEngineError
 from .network_protocol import (
     build_receipt,
     verify_node_profile,
@@ -21,6 +22,46 @@ from .network_protocol import (
 )
 from .network_typed_data import build_receipt_typed_data
 from .relay import RelayStore
+
+
+def parse_client_message(value: str) -> dict[str, Any]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise LoveEngineError(
+            "malformed_message",
+            "WebSocket message must be valid JSON",
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise LoveEngineError(
+            "malformed_message",
+            "WebSocket message must be a JSON object",
+        )
+    return parsed
+
+
+def verify_relay_profile_binding(
+    signed_profile: dict[str, Any],
+    bootstrap: dict[str, Any],
+) -> None:
+    if signed_profile.get("chain_id") != bootstrap.get("chain_id"):
+        raise LoveEngineError("wrong_chain_id", "profile chainId mismatch")
+    if to_checksum_address(signed_profile["registry"]) != to_checksum_address(
+        bootstrap["registry"]
+    ):
+        raise LoveEngineError("wrong_registry", "profile Registry mismatch")
+
+
+def verify_task_for_node(
+    task: dict[str, Any],
+    signed_profile: dict[str, Any],
+) -> str:
+    return verify_task(
+        task,
+        expected_chain_id=signed_profile["chain_id"],
+        expected_registry=signed_profile["registry"],
+        expected_recipient=signed_profile["profile"]["node"],
+    )
 
 
 def _signature_hex(value: bytes) -> str:
@@ -114,6 +155,7 @@ class RelayHub:
             await ws.close()
             return ws
         try:
+            verify_relay_profile_binding(auth["profile"], self.bootstrap)
             node = verify_node_profile(auth["profile"])
             recovered = Account.recover_message(
                 encode_defunct(text=challenge),
@@ -128,60 +170,74 @@ class RelayHub:
             return ws
 
         self.connected.add(node)
-        await ws.send_json({"type": "ack", "status": "authenticated", "node": node})
-        starts: dict[str, float] = {}
-        for message in self.store.pending(node):
-            starts[message.task_id] = perf_counter()
+        try:
             await ws.send_json(
-                {
-                    "type": "task",
-                    "attempt": message.attempts,
-                    "task": json.loads(message.payload),
-                }
+                {"type": "ack", "status": "authenticated", "node": node}
             )
+            starts: dict[str, float] = {}
+            for message in self.store.pending(node):
+                starts[message.task_id] = perf_counter()
+                await ws.send_json(
+                    {
+                        "type": "task",
+                        "attempt": message.attempts,
+                        "task": json.loads(message.payload),
+                    }
+                )
 
-        async for message in ws:
-            if message.type != WSMsgType.TEXT:
-                continue
-            value = json.loads(message.data)
-            if value.get("type") == "heartbeat":
-                await ws.send_json({"type": "heartbeat"})
-                continue
-            if value.get("type") != "receipt":
-                self.rejected += 1
-                await ws.send_json({"type": "error", "code": "unsupported_message"})
-                continue
-            try:
-                receipt = value["receipt"]
-                verify_receipt(
-                    receipt,
-                    self.bootstrap["chain_id"],
-                    self.bootstrap["registry"],
-                )
-                self.store.ack(
-                    node,
-                    receipt["task_id"],
-                    json.dumps(receipt, sort_keys=True),
-                )
-                self.receipts.append(receipt)
-                start = starts.get(receipt["task_id"])
-                if start is not None:
-                    self.latencies_ms.append((perf_counter() - start) * 1000)
-                await ws.send_json(
-                    {
-                        "type": "ack",
-                        "task_id": receipt["task_id"],
-                    }
-                )
-            except Exception as exc:
-                self.rejected += 1
-                await ws.send_json(
-                    {
-                        "type": "error",
-                        "code": "invalid_receipt",
-                        "message": str(exc),
-                    }
-                )
+            async for message in ws:
+                if message.type != WSMsgType.TEXT:
+                    continue
+                try:
+                    value = parse_client_message(message.data)
+                except LoveEngineError as exc:
+                    self.rejected += 1
+                    await ws.send_json(
+                        {"type": "error", "code": exc.code, "message": exc.message}
+                    )
+                    continue
+                if value.get("type") == "heartbeat":
+                    await ws.send_json({"type": "heartbeat"})
+                    continue
+                if value.get("type") != "receipt":
+                    self.rejected += 1
+                    await ws.send_json(
+                        {"type": "error", "code": "unsupported_message"}
+                    )
+                    continue
+                try:
+                    receipt = value["receipt"]
+                    verify_receipt(
+                        receipt,
+                        self.bootstrap["chain_id"],
+                        self.bootstrap["registry"],
+                    )
+                    self.store.ack(
+                        node,
+                        receipt["task_id"],
+                        json.dumps(receipt, sort_keys=True),
+                    )
+                    self.receipts.append(receipt)
+                    start = starts.get(receipt["task_id"])
+                    if start is not None:
+                        self.latencies_ms.append((perf_counter() - start) * 1000)
+                    await ws.send_json(
+                        {
+                            "type": "ack",
+                            "task_id": receipt["task_id"],
+                        }
+                    )
+                except Exception as exc:
+                    self.rejected += 1
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "code": "invalid_receipt",
+                            "message": str(exc),
+                        }
+                    )
+        finally:
+            self.connected.discard(node)
         return ws
 
     def metrics(self) -> dict[str, Any]:
@@ -238,12 +294,7 @@ async def run_node_client(
                 if task["task_id"] in completed:
                     rejected += 1
                     continue
-                verify_task(
-                    task,
-                    expected_chain_id=task["chain_id"],
-                    expected_registry=task["registry"],
-                    expected_recipient=node,
-                )
+                verify_task_for_node(task, signed_profile)
                 completed.add(task["task_id"])
                 receipt = build_receipt(
                     chain_id=task["chain_id"],
