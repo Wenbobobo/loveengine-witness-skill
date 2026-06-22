@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/live-event-v1.schema.json",
+  "title": "LiveEventV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "session_id", "sequence", "occurred_at", "category", "source_type", "source_uri", "content", "content_hash", "artifact_hash", "media_url", "media_hash", "previous_event_hash", "event_hash"],
+  "properties": {
+    "schema_version": {"const": "loveengine.live-event/1"},
+    "event_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "sequence": {"type": "string", "pattern": "^[0-9]+$"},
+    "occurred_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "category": {"enum": ["source", "summary", "derived"]},
+    "source_type": {"type": "string", "minLength": 1},
+    "source_uri": {"type": ["string", "null"]},
+    "content": {"type": "string"},
+    "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "media_url": {"type": ["string", "null"]},
+    "media_hash": {"type": ["string", "null"]},
+    "previous_event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"}
+  }
+}

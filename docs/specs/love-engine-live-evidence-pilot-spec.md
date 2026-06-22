@@ -1,6 +1,6 @@
 # LoveEngine M4 Live Evidence Pilot SPEC
 
-状态：`active implementation`  
+状态：`implemented`
 目标版本：`0.4.0-live-evidence-pilot`  
 依赖版本：`0.3.1-demo-ready`
 
@@ -25,13 +25,13 @@ LiveSource
 
 ## 2. M4.1 协议与存储
 
-- [ ] 固定 LiveSessionV1、LiveEventV1、EvidenceBundleV2。
-- [ ] 固定 DisputeCaseV1、DisputeReviewV1。
-- [ ] 新增 V2 node/bootstrap/task/receipt 和 LiveReviewTranscriptV1。
-- [ ] M3 V1 schema 保持不可变；M4 EIP-712 domain version 使用 `2`。
-- [ ] LiveEvent 使用连续 sequence、previousEventHash 和 canonical Keccak hash。
-- [ ] artifact 保存为 `artifacts/sha256/<prefix>/<digest>`。
-- [ ] SQLite 保存 session、event、bundle、dispute、review 和 cursor。
+- [x] 固定 LiveSessionV1、LiveEventV1、EvidenceBundleV2。
+- [x] 固定 DisputeCaseV1、DisputeReviewV1。
+- [x] 新增 V2 node/bootstrap/task/receipt 和 LiveReviewTranscriptV1。
+- [x] M3 V1 schema 保持不可变；M4 EIP-712 domain version 使用 `2`。
+- [x] LiveEvent 使用连续 sequence、previousEventHash 和 canonical Keccak hash。
+- [x] artifact 保存为 `artifacts/sha256/<prefix>/<digest>`。
+- [x] SQLite 保存 session、event、bundle、dispute、review 和 cursor。
 
 验收：精确重复事件幂等；同 ID 不同内容、sequence 缺口、hash-chain 断裂和关闭后写入被拒绝。
 
@@ -47,21 +47,21 @@ GET  /v1/live/sessions/{sessionId}/stream
 GET  /v1/live/sessions/{sessionId}/evidence
 ```
 
-- [ ] 支持单条 JSON 和 NDJSON 输入。
-- [ ] SSE 只用于实时观察，并支持 cursor 恢复。
-- [ ] 默认监听 `127.0.0.1`。
-- [ ] 实现 FixtureLiveSource 和 HttpPushLiveSource。
-- [ ] 视频只记录 URL、hash 和 timestamp 引用。
+- [x] 支持单条 JSON 和 NDJSON 输入。
+- [x] SSE 只用于实时观察，并支持 cursor 恢复。
+- [x] 默认监听 `127.0.0.1`。
+- [x] 实现 FixtureLiveSource 和 HttpPushLiveSource。
+- [x] 视频只记录 URL、hash 和 timestamp 引用。
 
 验收：断线恢复不丢事件；重复输入不重复生成证据；错误使用稳定 JSON error code。
 
 ## 4. M4.3 EvidenceBundleV2
 
-- [ ] 聚合原始文字事件、附件引用、来源类型和内容 hash。
-- [ ] 严格区分 source、summary 和 derived。
-- [ ] finalize 前验证事件连续性和 artifact 完整性。
-- [ ] finalized bundle 不可修改，只能创建新 revision。
-- [ ] 原始 artifact 不上链。
+- [x] 聚合原始文字事件、附件引用、来源类型和内容 hash。
+- [x] 严格区分 source、summary 和 derived。
+- [x] finalize 前验证事件连续性和 artifact 完整性。
+- [x] finalized bundle 不可修改，只能创建新 revision。
+- [x] 原始 artifact 不上链。
 
 CLI：
 
@@ -102,11 +102,11 @@ loveengine proposal gate
 
 ## 6. M4.5 ProposalGate
 
-- [ ] session 必须关闭。
-- [ ] EvidenceBundleV2 必须 finalized。
-- [ ] 所有 critical dispute 必须 dismissed。
-- [ ] 输出只读 proposal execution plan。
-- [ ] 不提交交易，不请求投票签名。
+- [x] session 必须关闭。
+- [x] EvidenceBundleV2 必须 finalized。
+- [x] 所有 critical dispute 必须 dismissed。
+- [x] 输出只读 proposal execution plan。
+- [x] 不提交交易，不请求投票签名。
 
 验收：通过路径生成稳定 payload；upheld、unresolved、缺失复核和 bundle hash mismatch 均阻断。
 
@@ -151,3 +151,7 @@ uv run loveengine live transcript verify <temp>\live-review.fixture.json
 ```
 
 全部日志、artifact、fixture 和 transcript 必须通过秘密扫描。
+
+## 10. 实施说明
+
+固定 E2E 使用三个独立 Agent 进程，经 Relay Hub 的出站 WebSocket 接收任务并产生五份签名回执：首个争议由三个节点返回两票 dismiss、一票 uphold；第二个争议只向两个节点派发任务，以验证缺失第三份复核时 fail-closed。Agent 只通过 Anvil RPC signer 取得签名，任何输出均不包含私钥。

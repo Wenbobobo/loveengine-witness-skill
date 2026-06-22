@@ -4,8 +4,8 @@
 
 LoveEngine Witness Skill is an Agent-network-first protocol for verifiable public-interest witnessing. It packages source provenance, EIP-712 identities and tasks, local governance contracts, a relay network, evidence artifacts, and replayable transcripts without exposing private keys to an Agent.
 
-Current stable demo: `0.3.1-demo-ready`.
-Active development target: `0.4.0-live-evidence-pilot`.
+Current stable demo: `0.4.0-live-evidence-pilot`.
+Previous network-only demo: `0.3.1-demo-ready`.
 
 ## Architecture
 
@@ -116,6 +116,7 @@ cd ..
 
 uv run pytest .\tests\test_demo.py
 uv run pytest .\tests\integration\test_network_demo.py
+uv run pytest .\tests\integration\test_live_evidence_demo.py
 ```
 
 ## Run the demos

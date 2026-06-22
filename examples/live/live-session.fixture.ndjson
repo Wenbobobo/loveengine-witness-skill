@@ -1,0 +1,12 @@
+{"event_id":"live-001","occurred_at":"1770000001","category":"source","source_type":"fixture","content":"Broadcast opened and public observation began."}
+{"event_id":"live-002","occurred_at":"1770000002","category":"source","source_type":"fixture","content":"Corporate representative described the proposed user count."}
+{"event_id":"live-003","occurred_at":"1770000003","category":"source","source_type":"fixture","content":"Witness one requested the underlying calculation."}
+{"event_id":"live-004","occurred_at":"1770000004","category":"source","source_type":"fixture","content":"Corporate representative supplied a public calculation reference."}
+{"event_id":"live-005","occurred_at":"1770000005","category":"summary","source_type":"fixture","content":"Summary: the calculation reference was supplied after a witness request."}
+{"event_id":"live-006","occurred_at":"1770000006","category":"source","source_type":"fixture","content":"Witness two raised a critical completeness dispute."}
+{"event_id":"live-007","occurred_at":"1770000007","category":"source","source_type":"fixture","content":"The referenced total was clarified on the public stream."}
+{"event_id":"live-008","occurred_at":"1770000008","category":"derived","source_type":"fixture","content":"Derived marker: critical dispute requires three-node review."}
+{"event_id":"live-009","occurred_at":"1770000009","category":"source","source_type":"fixture","content":"Witness three confirmed receipt of the clarification."}
+{"event_id":"live-010","occurred_at":"1770000010","category":"summary","source_type":"fixture","content":"Summary: all three witness nodes observed the relevant text."}
+{"event_id":"live-011","occurred_at":"1770000011","category":"derived","source_type":"fixture","content":"Derived marker: evidence sequence is complete through event eleven."}
+{"event_id":"live-012","occurred_at":"1770000012","category":"source","source_type":"fixture","content":"Broadcast closed and no further source events were accepted."}

@@ -21,6 +21,7 @@ REQUIRED_CURRENT_DOCS = {
     "docs/specs/love-engine-live-evidence-pilot-spec.md",
     "README.zh-CN.md",
     "docs/api/extension-interfaces.md",
+    "docs/api/live-evidence-api.md",
     "docs/development/m3-demo-runbook.md",
     "docs/development/m3-acceptance-report.md",
     "docs/api/README.md",

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/evidence-bundle-v2.schema.json",
+  "title": "EvidenceBundleV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "bundle_id", "session_id", "revision", "status", "finalized_at", "event_count", "head_event_hash", "category_counts", "events", "bundle_hash"],
+  "properties": {
+    "schema_version": {"const": "loveengine.evidence-bundle/2"},
+    "bundle_id": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "string", "pattern": "^[0-9]+$"},
+    "status": {"const": "finalized"},
+    "finalized_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "event_count": {"type": "string", "pattern": "^[0-9]+$"},
+    "head_event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "category_counts": {"type": "object"},
+    "events": {"type": "array", "items": {"type": "object"}},
+    "bundle_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"}
+  }
+}

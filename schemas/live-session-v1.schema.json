@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/live-session-v1.schema.json",
+  "title": "LiveSessionV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "source_type", "status", "created_at", "closed_at", "next_sequence", "head_event_hash"],
+  "properties": {
+    "schema_version": {"const": "loveengine.live-session/1"},
+    "session_id": {"type": "string", "minLength": 1},
+    "source_type": {"type": "string", "minLength": 1},
+    "status": {"enum": ["live", "closed", "failed"]},
+    "created_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "closed_at": {"type": ["string", "null"], "pattern": "^[0-9]+$"},
+    "next_sequence": {"type": "string", "pattern": "^[0-9]+$"},
+    "head_event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"}
+  }
+}

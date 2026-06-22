@@ -11,10 +11,19 @@ from typing import Any
 
 from .errors import LoveEngineError
 from .evidence import build_evidence_bundle
+from .dispute import aggregate_reviews, build_dispute, build_proposal_plan
 from .demo import run_local_loop
 from .fixtures import generate_witness_fixtures
 from .jsonio import read_json, write_json
 from .manifest import DEFAULT_MANIFEST, verify_manifest
+from .live_demo import DEFAULT_LIVE_FIXTURE, run_live_evidence_demo
+from .live_evidence import finalize_evidence_bundle
+from .live_gateway import serve_live
+from .live_protocol import build_live_event, build_live_session
+from .live_source import FixtureLiveSource
+from .live_store import LocalArtifactStore, LiveMetadataStore
+from .live_transcript import verify_live_transcript
+from .m4_network import build_task_v2
 from .network_demo import run_network_demo
 from .network_node import connect_node
 from .network_protocol import (
@@ -68,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
     evidence_build = evidence_commands.add_parser("build")
     evidence_build.add_argument("--session", type=Path, required=True)
     evidence_build.add_argument("--output", type=Path, required=True)
+    evidence_finalize = evidence_commands.add_parser("finalize")
+    evidence_finalize.add_argument("--db", type=Path, required=True)
+    evidence_finalize.add_argument("--artifacts", type=Path, required=True)
+    evidence_finalize.add_argument("--session-id", required=True)
+    evidence_finalize.add_argument("--revision", default="1")
+    evidence_finalize.add_argument("--finalized-at", required=True)
+    evidence_finalize.add_argument("--output", type=Path)
 
     transcript = commands.add_parser("transcript")
     transcript_commands = transcript.add_subparsers(dest="transcript_command")
@@ -94,6 +110,10 @@ def build_parser() -> argparse.ArgumentParser:
     local_loop = demo_commands.add_parser("local-loop")
     local_loop.add_argument("--config", type=Path)
     local_loop.add_argument("--output", type=Path, required=True)
+    live_evidence = demo_commands.add_parser("live-evidence")
+    live_evidence.add_argument("--nodes", type=int, default=3)
+    live_evidence.add_argument("--input", type=Path, default=DEFAULT_LIVE_FIXTURE)
+    live_evidence.add_argument("--output", type=Path, required=True)
 
     registry = commands.add_parser("registry")
     registry_commands = registry.add_subparsers(dest="registry_command")
@@ -145,6 +165,57 @@ def build_parser() -> argparse.ArgumentParser:
     )
     network_transcript_verify = network_transcript_commands.add_parser("verify")
     network_transcript_verify.add_argument("path", type=Path)
+
+    live = commands.add_parser("live")
+    live_commands = live.add_subparsers(dest="live_command")
+    live_serve = live_commands.add_parser("serve")
+    live_serve.add_argument("--db", type=Path, required=True)
+    live_serve.add_argument("--artifacts", type=Path, required=True)
+    live_serve.add_argument("--host", default="127.0.0.1")
+    live_serve.add_argument("--port", type=int, default=8780)
+    live_session = live_commands.add_parser("session")
+    live_session_commands = live_session.add_subparsers(dest="live_session_command")
+    live_session_create = live_session_commands.add_parser("create")
+    live_session_create.add_argument("--db", type=Path, required=True)
+    live_session_create.add_argument("--session-id", required=True)
+    live_session_create.add_argument("--source-type", default="fixture")
+    live_session_create.add_argument("--created-at", required=True)
+    live_ingest = live_commands.add_parser("ingest")
+    live_ingest.add_argument("--db", type=Path, required=True)
+    live_ingest.add_argument("--artifacts", type=Path, required=True)
+    live_ingest.add_argument("--session-id", required=True)
+    live_ingest.add_argument("--input", type=Path, required=True)
+    live_close = live_commands.add_parser("close")
+    live_close.add_argument("--db", type=Path, required=True)
+    live_close.add_argument("--session-id", required=True)
+    live_close.add_argument("--closed-at", required=True)
+    live_transcript = live_commands.add_parser("transcript")
+    live_transcript_commands = live_transcript.add_subparsers(
+        dest="live_transcript_command"
+    )
+    live_transcript_verify = live_transcript_commands.add_parser("verify")
+    live_transcript_verify.add_argument("path", type=Path)
+
+    dispute = commands.add_parser("dispute")
+    dispute_commands = dispute.add_subparsers(dest="dispute_command")
+    dispute_open = dispute_commands.add_parser("open")
+    dispute_open.add_argument("--input", type=Path, required=True)
+    dispute_open.add_argument("--output", type=Path)
+
+    review = commands.add_parser("review")
+    review_commands = review.add_subparsers(dest="review_command")
+    review_dispatch = review_commands.add_parser("dispatch")
+    review_dispatch.add_argument("--input", type=Path, required=True)
+    review_dispatch.add_argument("--output", type=Path)
+    review_aggregate = review_commands.add_parser("aggregate")
+    review_aggregate.add_argument("--input", type=Path, required=True)
+    review_aggregate.add_argument("--output", type=Path)
+
+    proposal = commands.add_parser("proposal")
+    proposal_commands = proposal.add_subparsers(dest="proposal_command")
+    proposal_gate = proposal_commands.add_parser("gate")
+    proposal_gate.add_argument("--input", type=Path, required=True)
+    proposal_gate.add_argument("--output", type=Path)
     return parser
 
 
@@ -205,6 +276,17 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         evidence = build_evidence_bundle(read_json(args.session))
         write_json(args.output, evidence)
         return evidence
+    if args.command == "evidence" and args.evidence_command == "finalize":
+        value = finalize_evidence_bundle(
+            LiveMetadataStore(args.db),
+            LocalArtifactStore(args.artifacts),
+            args.session_id,
+            revision=args.revision,
+            finalized_at=args.finalized_at,
+        )
+        if args.output:
+            write_json(args.output, value)
+        return value
     if args.command == "transcript" and args.transcript_command == "verify":
         return verify_transcript(read_json(args.path))
     if args.command == "eip712" and args.eip712_command == "register-message":
@@ -227,6 +309,10 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.config:
             read_json(args.config)
         return run_local_loop(args.output)
+    if args.command == "demo" and args.demo_command == "live-evidence":
+        return run_live_evidence_demo(
+            args.output, nodes=args.nodes, fixture=args.input
+        )
     if args.command == "registry" and args.registry_command == "publish":
         if not args.dry_run:
             raise LoveEngineError(
@@ -282,6 +368,113 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         and args.network_transcript_command == "verify"
     ):
         return verify_network_transcript(read_json(args.path))
+    if args.command == "live" and args.live_command == "serve":
+        serve_live(args.db, args.artifacts, args.host, args.port)
+        return {"stopped": True}
+    if (
+        args.command == "live"
+        and args.live_command == "session"
+        and args.live_session_command == "create"
+    ):
+        return LiveMetadataStore(args.db).create_session(
+            build_live_session(args.session_id, args.source_type, args.created_at)
+        )
+    if args.command == "live" and args.live_command == "ingest":
+        metadata = LiveMetadataStore(args.db)
+        artifacts = LocalArtifactStore(args.artifacts)
+        accepted = duplicates = 0
+        for raw in FixtureLiveSource(args.input).events():
+            session = metadata.get_session(args.session_id)
+            existing = metadata.get_event(raw["event_id"])
+            if existing is not None and existing["content"] == raw["content"]:
+                duplicates += 1
+                continue
+            event = build_live_event(
+                event_id=raw["event_id"],
+                session_id=args.session_id,
+                sequence=raw.get("sequence", session["next_sequence"]),
+                occurred_at=raw["occurred_at"],
+                category=raw["category"],
+                source_type=raw.get("source_type", session["source_type"]),
+                content=raw["content"],
+                artifact_hash=artifacts.put(raw["content"].encode("utf-8")),
+                previous_event_hash=raw.get(
+                    "previous_event_hash", session["head_event_hash"]
+                ),
+                source_uri=raw.get("source_uri"),
+                media_url=raw.get("media_url"),
+                media_hash=raw.get("media_hash"),
+            )
+            accepted += int(not metadata.append_event(event)["duplicate"])
+        return {"accepted": accepted, "duplicates": duplicates}
+    if args.command == "live" and args.live_command == "close":
+        return LiveMetadataStore(args.db).close_session(
+            args.session_id, args.closed_at
+        )
+    if (
+        args.command == "live"
+        and args.live_command == "transcript"
+        and args.live_transcript_command == "verify"
+    ):
+        return verify_live_transcript(read_json(args.path))
+    if args.command == "dispute" and args.dispute_command == "open":
+        item = read_json(args.input)
+        result = build_dispute(
+            item["dispute_id"],
+            item["bundle_hash"],
+            item["severity"],
+            item["reason_hash"],
+            item["deadline"],
+        )
+        if args.output:
+            write_json(args.output, result)
+        return result
+    if args.command == "review" and args.review_command == "dispatch":
+        item = read_json(args.input)
+        tasks = []
+        for index, recipient in enumerate(item["recipients"]):
+            tasks.append(
+                build_task_v2(
+                    chain_id=item["chain_id"],
+                    registry=item["registry"],
+                    task_id=f"{item['dispute']['dispute_id']}:{index + 1}",
+                    task_type="review_dispute",
+                    issuer=item["issuer"],
+                    recipient=recipient,
+                    manifest_hash=item["manifest_hash"],
+                    payload={
+                        "dispute_id": item["dispute"]["dispute_id"],
+                        "bundle_hash": item["dispute"]["bundle_hash"],
+                    },
+                    nonce=str(int(item.get("nonce_start", "0")) + index),
+                    deadline=item["deadline"],
+                )
+            )
+        result = {"tasks": tasks, "signer_required": True}
+        if args.output:
+            write_json(args.output, result)
+        return result
+    if args.command == "review" and args.review_command == "aggregate":
+        item = read_json(args.input)
+        result = aggregate_reviews(
+            item["dispute"],
+            item["reviews"],
+            expected_nodes=set(item["expected_nodes"]),
+        )
+        if args.output:
+            write_json(args.output, result)
+        return result
+    if args.command == "proposal" and args.proposal_command == "gate":
+        item = read_json(args.input)
+        result = build_proposal_plan(
+            session=item["session"],
+            bundle=item["bundle"],
+            disputes=item["disputes"],
+            proposal=item["proposal"],
+        )
+        if args.output:
+            write_json(args.output, result)
+        return result
     raise LoveEngineError("missing_command", "a command and subcommand are required")
 
 

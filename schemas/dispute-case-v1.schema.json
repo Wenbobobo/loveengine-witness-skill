@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/dispute-case-v1.schema.json",
+  "title": "DisputeCaseV1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "dispute_id", "bundle_hash", "severity", "reason_hash", "deadline", "status"],
+  "properties": {
+    "schema_version": {"const": "loveengine.dispute-case/1"},
+    "dispute_id": {"type": "string", "minLength": 1},
+    "bundle_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "severity": {"enum": ["critical", "noncritical"]},
+    "reason_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "deadline": {"type": "string", "pattern": "^[0-9]+$"},
+    "status": {"enum": ["open", "reviewing", "dismissed", "upheld", "unresolved"]}
+  }
+}

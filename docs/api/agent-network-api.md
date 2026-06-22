@@ -1,7 +1,7 @@
 # LoveEngine Agent Network API
 
 状态：`M3 local implemented`
-稳定演示版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）
+M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）；M4 V2 扩展见 `live-evidence-api.md`。
 
 本文定义 SkillRegistry、节点身份、Bootstrap、网络任务、任务回执和中心 Relay Hub 的公开接口。M3 只实现中心 Relay；P2P 和节点直连不在本阶段范围内。
 
