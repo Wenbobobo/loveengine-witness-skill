@@ -1,88 +1,53 @@
 # Source inventory
 
-This inventory describes the LoveEngineSkill repository. It does not rewrite the original source materials.
+This inventory distinguishes active engineering authority from preserved source provenance.
 
-## Source materials
+## Current source constraints
 
-| File | Status | Use |
-| --- | --- | --- |
-| `UAS接口文档.md` | current source | Collaborator contract API notes; calibrates WitnessDAO, CorporateSink, PublicSink, StreamingEngine |
-| `UAS 见证方案 2.0.md` | current source | Latest witness plan: open registration, Agent-assisted witness process, vote-count-based 90% threshold |
-| `UAS 2.md` | previous source | Earlier product spec for UAS / UHAH and four-contract architecture |
-| `LoveEngine Skill.md` | early source | Early notes on LoveEngine Skill as witness and public-opinion collector |
-| `Love Engine.md` | early source | LoveEngine, UAS, UHAH, UTO and transitional implementation ideas |
-| `NaturalDAO 开发.md` | background source | NaturalDAO, EAP, Skills, Memory Lib and upper-level engineering background |
-| `Skill 模板.md` | working source | Early LoveEngine Witness module template |
+| Path | Role |
+| --- | --- |
+| `docs/reference/source-materials/current/UAS接口文档.md` | Contract collaborator source |
+| `docs/reference/source-materials/current/UAS 见证方案 2.0.md` | Current witness-plan source |
 
-## Developer docs
+## Archived source materials
 
-| File | Status | Use |
-| --- | --- | --- |
-| `README.md` | current | Repository entrypoint |
-| `AGENTS.md` | current | Agent working rules |
-| `CONTRIBUTING.md` | current | Developer contribution guide |
-| `docs/README.md` | current | Documentation entrypoint |
-| `docs/development/integration-guide.md` | current | Auxiliary development handoff guide |
-| `docs/development/repository-structure.md` | current | Repository layout and source boundary |
-| `docs/development/contract-team-handoff.md` | current | Contract implementation mapping, evidence, and open integration decisions |
-| `docs/specs/love-engine-master-plan.md` | current plan | Engineering goals, boundaries, progress and milestones |
-| `docs/specs/love-engine-local-witness-loop-spec.md` | implemented spec | M1/M2 protocol, CLI, contracts and local-loop acceptance |
-| `docs/specs/love-engine-agent-network-pilot-spec.md` | implemented spec | M2 release closeout and M3 three-process Relay Hub pilot |
-| `docs/api/README.md` | current | API documentation entrypoint |
-| `docs/api/loveengine-contract-api.md` | current | Four-contract API and EIP-712 constraints |
-| `docs/api/agent-skill-api.md` | current | Skill and Agent adapter API |
-| `docs/api/agent-network-api.md` | M3 implemented | SkillRegistry, signed network messages, and Relay Hub API |
-| `docs/decisions/0001-onchain-skill-registry.md` | accepted | On-chain Skill version trust-root decision |
-| `docs/archive/planning/2026-06-21/README.md` | archive index | Superseded planning documents and milestone mapping |
+All files below are preserved verbatim under `docs/archive/source-materials/2026-06-22/`:
 
-## M0 implementation
+- `Love Engine.md`
+- `LoveEngine Skill.md`
+- `NaturalDAO 开发.md`
+- `Skill 模板.md`
+- `UAS 2.md`
 
-| File | Status | Use |
-| --- | --- | --- |
-| `skills/loveengine-witness/skill-manifest.m0.json` | M0 implemented | Preserved `0.1.1-m0` manifest and source protection |
-| `skills/loveengine-witness/agent-onboarding.md` | M0 implemented | Minimal onboarding for a new Agent |
-| `skills/loveengine-witness/fixtures/agent-node-profile.fixture.json` | M0 fixture | Node capability and signer-boundary declaration |
-| `skills/loveengine-witness/fixtures/propagation-task.fixture.json` | M0 fixture | Skill propagation task fixture |
-| `tools/validate_loveengine_m0.py` | M0 implemented | Manifest, source, fixture, safety and tamper validation |
-| `tools/loveengine_m0_self_check.py` | M0 implemented | Capability self-check summary |
-| `tools/validate_sources.py` | repository validation | Validates `docs/kb/sources.json` paths and duplicate IDs |
+## Active engineering docs
 
-## M1/M2 implementation
+| Path | Role |
+| --- | --- |
+| `README.md` | English repository entrypoint |
+| `README.zh-CN.md` | Chinese repository entrypoint |
+| `docs/specs/love-engine-master-plan.md` | Authoritative roadmap |
+| `docs/specs/love-engine-live-evidence-pilot-spec.md` | Active M4 specification |
+| `docs/api/extension-interfaces.md` | Replaceable infrastructure ports |
+| `docs/development/m3-demo-runbook.md` | Presentation procedure |
+| `docs/development/m3-acceptance-report.md` | Verified baseline evidence |
 
-| File | Status | Use |
-| --- | --- | --- |
-| `skills/loveengine-witness/skill-manifest.json` | current | Current `0.3.0-network-pilot` manifest; M1/M2 interfaces remain compatible |
-| `schemas/` | M1 implemented | Manifest, node, evidence and transcript JSON Schema |
-| `src/loveengine_witness/` | M1/M2 implemented | Protocol domain, CLI, typed data, relayer and Anvil demo |
-| `contracts/src/` | M2 implemented | Four-contract local implementation |
-| `contracts/test/LocalWitnessLoop.t.sol` | M2 implemented | Security, threshold, window and 69-signature tests |
-| `examples/transcripts/local-loop.fixture.json` | M2 fixture | Verifiable five-witness Anvil transcript |
-| `tests/` | current | Python unit, CLI, compatibility and integration tests |
+## Implemented specifications
 
-## M3 implementation
+- `docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md`
+- `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
 
-| File | Status | Use |
-| --- | --- | --- |
-| `contracts/src/SkillRegistry.sol` | M3 implemented | Publisher-scoped release and status trust root |
-| `schemas/*network*.schema.json` and signed profile/bootstrap/receipt schemas | M3 implemented | Network protocol data contracts |
-| `src/loveengine_witness/network_protocol.py` | M3 implemented | Signed profile, bootstrap, task and receipt validation |
-| `src/loveengine_witness/relay.py` | M3 implemented | SQLite at-least-once queue and ack state |
-| `src/loveengine_witness/relay_server.py` | M3 implemented | Relay HTTP/WebSocket service |
-| `src/loveengine_witness/event_bridge.py` | M3 implemented | Chain event idempotency and task mapping |
-| `src/loveengine_witness/network_demo.py` | M3 implemented | Anvil plus three independent node process E2E |
-| `examples/transcripts/network-pilot.fixture.json` | M3 fixture | Verifiable network release, task, receipt and metrics transcript |
+## Implementation layers
 
-## Version priority
+- M0: compatibility manifest, onboarding and tamper validation.
+- M1: schemas, canonical hashes and CLI.
+- M2: four contracts, EIP-712 local loop and LocalLoopTranscript.
+- M3: SkillRegistry, Relay, signed tasks/receipts and NetworkTranscript.
+- M4: live evidence, dispute review, ProposalGate and read-only dashboard.
 
-For development:
+## Authority order
 
 1. `docs/specs/love-engine-master-plan.md`
-2. `docs/specs/love-engine-agent-network-pilot-spec.md`
-3. `docs/specs/love-engine-local-witness-loop-spec.md`
-4. `docs/api/loveengine-contract-api.md`
-5. `docs/api/agent-skill-api.md`
-6. `docs/api/agent-network-api.md`
-7. `UAS接口文档.md`
-8. `UAS 见证方案 2.0.md`
-
-If source files conflict, newer source notes beat older product drafts, but developer specs may add safety constraints that are not explicit in the original notes.
+2. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+3. `docs/api/`
+4. `docs/reference/source-materials/current/`
+5. implemented specs and archived sources

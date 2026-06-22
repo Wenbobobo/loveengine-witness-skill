@@ -7,13 +7,13 @@ Read order:
 1. `skills/loveengine-witness/skill-manifest.json` (current)
 2. `skills/loveengine-witness/skill-manifest.m0.json` (M0 compatibility)
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-agent-network-pilot-spec.md`
-5. `docs/specs/love-engine-local-witness-loop-spec.md`
-6. `UAS接口文档.md`
-7. `UAS 见证方案 2.0.md`
+4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+5. `docs/api/extension-interfaces.md`
+6. `docs/reference/source-materials/current/UAS接口文档.md`
+7. `docs/reference/source-materials/current/UAS 见证方案 2.0.md`
 8. `docs/kb/source-inventory.md`
 
-Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source of truth, `docs/specs/love-engine-agent-network-pilot-spec.md` is the active implementation spec, and `docs/specs/love-engine-local-witness-loop-spec.md` records the implemented M1/M2 baseline. The root Markdown files are original source materials. Do not move, delete, rewrite, or normalize them in place.
+Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source of truth and `docs/specs/love-engine-live-evidence-pilot-spec.md` is the active implementation spec. Implemented specs and preserved source materials remain under `docs/archive/` and `docs/reference/`; do not rewrite them in place.
 
 Install and verify:
 
@@ -52,4 +52,4 @@ Governance parameters:
 
 M0 compatibility manifest spec hash:
 
-`sha256:8190d4cf0b0bec6ceca38d0e333c9ef26997a0c249fae7c7f36ac66cf7088c7b`
+`sha256:1b40dce6c0fe229d5d7cdb974e502401cac097602b7a158f3d8f9669d5c65399`

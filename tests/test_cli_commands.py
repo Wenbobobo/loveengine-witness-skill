@@ -35,7 +35,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.3.0-network-pilot"
+    assert output["version"] == "0.3.1-demo-ready"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:

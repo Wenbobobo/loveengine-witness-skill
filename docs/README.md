@@ -1,34 +1,29 @@
 # LoveEngine documentation
 
-This directory contains developer-facing documentation for LoveEngine Witness Skill.
+## Active specifications
+
+- `specs/love-engine-master-plan.md`: authoritative roadmap and status.
+- `specs/love-engine-live-evidence-pilot-spec.md`: active M4 implementation specification.
 
 ## API
 
-- `docs/api/loveengine-contract-api.md`: contract ABI and integration rules.
-- `docs/api/agent-skill-api.md`: Agent and Skill data structures.
-- `docs/api/agent-network-api.md`: M3 SkillRegistry, signed task, receipt, and Relay Hub interfaces.
+- `api/loveengine-contract-api.md`: four UAS core contracts.
+- `api/agent-skill-api.md`: package, node, evidence and local-loop interfaces.
+- `api/agent-network-api.md`: SkillRegistry, Relay and M3 network protocol.
+- `api/extension-interfaces.md`: replaceable transport, signer, live, storage and read-model ports.
 
 ## Development
 
-- `docs/development/integration-guide.md`: onboarding and task split for auxiliary developers.
-- `docs/development/repository-structure.md`: repository layout and source-material boundary.
-- `docs/development/contract-team-handoff.md`: implemented ABI changes, test evidence, and contract-team questions.
+- `development/integration-guide.md`: developer onboarding and verification.
+- `development/repository-structure.md`: current layout and authority boundaries.
+- `development/contract-team-handoff.md`: contract mapping and governance questions.
+- `development/m3-demo-runbook.md`: presentation sequence.
+- `development/m3-acceptance-report.md`: verified M3 evidence.
 
-## Specs
+## Sources and archive
 
-- `docs/specs/love-engine-master-plan.md`: current engineering roadmap and milestone status.
-- `docs/specs/love-engine-local-witness-loop-spec.md`: implemented M1/M2 specification.
-- `docs/specs/love-engine-agent-network-pilot-spec.md`: implemented M2-closeout/M3 specification.
-
-## Decisions
-
-- `docs/decisions/0001-onchain-skill-registry.md`: why M3 uses an on-chain hash/status registry.
-
-## Archive
-
-- `docs/archive/planning/2026-06-21/`: superseded planning documents retained for provenance.
-
-## Knowledge base
-
-- `docs/kb/source-inventory.md`: local inventory of source materials, specs, APIs, Skill package, and tools.
-- `docs/kb/sources.json`: machine-readable inventory.
+- `reference/source-materials/current/`: current preserved source constraints.
+- `archive/source-materials/2026-06-22/`: historical source materials.
+- `archive/specs/implemented/`: implemented M1/M2/M3 specifications.
+- `archive/planning/2026-06-21/`: superseded plans.
+- `kb/source-inventory.md` and `kb/sources.json`: inventories.

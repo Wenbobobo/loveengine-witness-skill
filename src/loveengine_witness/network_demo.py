@@ -46,7 +46,7 @@ from .relay_server import RelayHub
 from .toolchain import foundry_binary
 
 
-NETWORK_VERSION = "0.3.0-network-pilot"
+NETWORK_VERSION = "0.3.1-demo-ready"
 
 
 def _rpc_sign_typed_data(

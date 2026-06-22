@@ -110,7 +110,7 @@
   {
     "id": "love-engine-local-witness-loop-spec",
     "title": "LoveEngine M1/M2 Local Witness Loop SPEC",
-    "path": "docs/specs/love-engine-local-witness-loop-spec.md",
+    "path": "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md",
     "source_group": "docs/specs",
     "layer": "spec",
     "domain_tags": [
@@ -262,7 +262,7 @@
   {
     "id": "uas-api-doc",
     "title": "UAS Smart Contracts API 文档",
-    "path": "UAS接口文档.md",
+    "path": "docs/reference/source-materials/current/UAS接口文档.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -278,7 +278,7 @@
   {
     "id": "uas-witness-2",
     "title": "UAS 见证方案 2.0",
-    "path": "UAS 见证方案 2.0.md",
+    "path": "docs/reference/source-materials/current/UAS 见证方案 2.0.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -294,7 +294,7 @@
   {
     "id": "uas-2",
     "title": "UAS 2",
-    "path": "UAS 2.md",
+    "path": "docs/archive/source-materials/2026-06-22/UAS 2.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -309,7 +309,7 @@
   {
     "id": "loveengine-skill-notes",
     "title": "LoveEngine Skill notes",
-    "path": "LoveEngine Skill.md",
+    "path": "docs/archive/source-materials/2026-06-22/LoveEngine Skill.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -324,7 +324,7 @@
   {
     "id": "love-engine-notes",
     "title": "Love Engine",
-    "path": "Love Engine.md",
+    "path": "docs/archive/source-materials/2026-06-22/Love Engine.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -340,7 +340,7 @@
   {
     "id": "naturaldao-dev",
     "title": "NaturalDAO 开发",
-    "path": "NaturalDAO 开发.md",
+    "path": "docs/archive/source-materials/2026-06-22/NaturalDAO 开发.md",
     "source_group": "source",
     "layer": "NaturalDAO",
     "domain_tags": [
@@ -356,7 +356,7 @@
   {
     "id": "skill-template",
     "title": "Skill 模板",
-    "path": "Skill 模板.md",
+    "path": "docs/archive/source-materials/2026-06-22/Skill 模板.md",
     "source_group": "source",
     "layer": "LoveEngine",
     "domain_tags": [
@@ -399,7 +399,7 @@
     ],
     "status": "current",
     "canonical_role": "Current network-pilot Skill manifest",
-    "summary": "0.3.0-network-pilot manifest with M1/M2 compatibility plus SkillRegistry, Relay Hub and signed network protocol bindings."
+    "summary": "0.3.1-demo-ready manifest with M1/M2 compatibility plus SkillRegistry, Relay Hub and signed network protocol bindings."
   },
   {
     "id": "protocol-schemas",
@@ -572,7 +572,7 @@
   {
     "id": "love-engine-agent-network-pilot-spec",
     "title": "LoveEngine M2 收口与 M3 Agent 网络试点 SPEC",
-    "path": "docs/specs/love-engine-agent-network-pilot-spec.md",
+    "path": "docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md",
     "source_group": "docs/specs",
     "layer": "spec",
     "domain_tags": [
@@ -670,5 +670,60 @@
     "status": "current",
     "canonical_role": "Auditable three-process network fixture",
     "summary": "Secret-free transcript linking SkillRegistry release, broadcast event, six signed tasks, six receipts, recovery behavior, and delivery metrics."
+  },
+  {
+    "id": "readme-zh-cn",
+    "title": "LoveEngine Witness Skill Chinese README",
+    "path": "README.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "entrypoint",
+    "domain_tags": ["M3", "M4", "README"],
+    "status": "current",
+    "canonical_role": "Chinese repository entrypoint",
+    "summary": "Chinese architecture, workflow, commands, safety rules, and documentation navigation."
+  },
+  {
+    "id": "live-evidence-pilot-spec",
+    "title": "LoveEngine M4 Live Evidence Pilot SPEC",
+    "path": "docs/specs/love-engine-live-evidence-pilot-spec.md",
+    "source_group": "developer-docs",
+    "layer": "specification",
+    "domain_tags": ["M4", "live evidence", "dispute review"],
+    "status": "current",
+    "canonical_role": "Active implementation specification",
+    "summary": "Provider-neutral live text, content-addressed evidence, three-node review, ProposalGate, dashboard, and E2E acceptance."
+  },
+  {
+    "id": "extension-interfaces",
+    "title": "LoveEngine extension interfaces",
+    "path": "docs/api/extension-interfaces.md",
+    "source_group": "developer-docs",
+    "layer": "api",
+    "domain_tags": ["ports", "adapters", "M4"],
+    "status": "current",
+    "canonical_role": "Replaceable infrastructure contracts",
+    "summary": "Transport, signer, live source, artifact store, metadata store, chain event and dashboard boundaries."
+  },
+  {
+    "id": "m3-demo-runbook",
+    "title": "M3 demo runbook",
+    "path": "docs/development/m3-demo-runbook.md",
+    "source_group": "developer-docs",
+    "layer": "development",
+    "domain_tags": ["M3", "demo", "operations"],
+    "status": "current",
+    "canonical_role": "External demonstration procedure",
+    "summary": "Preparation, command sequence, narrative order, and safety boundaries for the M3 demo."
+  },
+  {
+    "id": "m3-acceptance-report",
+    "title": "M3 acceptance report",
+    "path": "docs/development/m3-acceptance-report.md",
+    "source_group": "developer-docs",
+    "layer": "verification",
+    "domain_tags": ["M3", "acceptance", "E2E"],
+    "status": "current",
+    "canonical_role": "Verified presentation baseline",
+    "summary": "Python, Foundry, local-loop, network-loop, GitHub delivery, and known-warning evidence."
   }
 ]

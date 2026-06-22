@@ -1,6 +1,6 @@
 # LoveEngine contract API
 
-本文是 LoveEngine Witness Skill 的合约对接文档。它参考 `UAS接口文档.md`，并按当前规格修正了签名安全边界。状态：M2 local implementation。
+本文是 LoveEngine Witness Skill 的合约对接文档。它参考 `docs/reference/source-materials/current/UAS接口文档.md`，并按当前规格修正了签名安全边界。状态：M2 local implementation。
 
 原接口到当前实现的完整映射、测试证据和待协作团队确认事项见 `docs/development/contract-team-handoff.md`。
 

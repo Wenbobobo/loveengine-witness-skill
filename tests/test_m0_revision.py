@@ -40,9 +40,9 @@ def test_m0_revision_points_to_current_plan_and_spec() -> None:
     assert manifest["spec_ref"] == "docs/specs/love-engine-master-plan.md"
     assert set(manifest["source_refs"]) == {
         "docs/specs/love-engine-master-plan.md",
-        "docs/specs/love-engine-local-witness-loop-spec.md",
-        "UAS接口文档.md",
-        "UAS 见证方案 2.0.md",
+        "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md",
+        "docs/reference/source-materials/current/UAS接口文档.md",
+        "docs/reference/source-materials/current/UAS 见证方案 2.0.md",
         "docs/kb/source-inventory.md",
     }
 
@@ -63,7 +63,7 @@ def test_current_manifest_is_network_pilot_v3() -> None:
     manifest = load(MANIFEST)
 
     assert manifest["schema_version"] == "loveengine.skill-manifest/0.3"
-    assert manifest["version"] == "0.3.0-network-pilot"
+    assert manifest["version"] == "0.3.1-demo-ready"
     assert manifest["registry_binding"]["chain_id"] == "31337"
     assert manifest["network"]["task_types"] == [
         "propagate_skill",
