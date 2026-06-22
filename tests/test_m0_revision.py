@@ -5,6 +5,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from loveengine_witness.errors import LoveEngineError
+from loveengine_witness.manifest import verify_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "skills" / "loveengine-witness" / "skill-manifest.json"
@@ -87,3 +91,20 @@ def test_m0_validator_accepts_revision_and_rejects_tampering() -> None:
     assert validation.returncode == 0, validation.stdout + validation.stderr
     assert tamper.returncode == 0, tamper.stdout + tamper.stderr
     assert "tamper check rejected modified manifest" in tamper.stdout
+
+
+def test_manifest_rejects_unknown_or_missing_schema_version(tmp_path: Path) -> None:
+    path = tmp_path / "skills" / "loveengine-witness" / "manifest.json"
+    path.parent.mkdir(parents=True)
+    manifest = load(MANIFEST)
+
+    for schema_version in ("loveengine.skill-manifest/9.9", None):
+        changed = dict(manifest)
+        if schema_version is None:
+            changed.pop("schema_version")
+        else:
+            changed["schema_version"] = schema_version
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        with pytest.raises(LoveEngineError) as error:
+            verify_manifest(path)
+        assert error.value.code == "unsupported_schema_version"

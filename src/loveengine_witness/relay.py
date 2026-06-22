@@ -25,8 +25,8 @@ class RelayStore:
             CREATE TABLE IF NOT EXISTS messages (
                 recipient TEXT NOT NULL,
                 task_id TEXT NOT NULL,
-                issuer TEXT NOT NULL DEFAULT '',
-                nonce TEXT NOT NULL DEFAULT '',
+                issuer TEXT,
+                nonce TEXT,
                 payload TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0,
                 acked INTEGER NOT NULL DEFAULT 0,
@@ -52,7 +52,13 @@ class RelayStore:
                 INSERT INTO messages(recipient, task_id, issuer, nonce, payload)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (recipient, task_id, issuer, nonce, payload),
+                (
+                    recipient,
+                    task_id,
+                    issuer or None,
+                    nonce or None,
+                    payload,
+                ),
             )
             self.connection.commit()
             return True

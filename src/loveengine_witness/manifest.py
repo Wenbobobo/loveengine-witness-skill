@@ -20,10 +20,16 @@ def verify_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
     manifest = read_json(path)
     source_root = ROOT if path == DEFAULT_MANIFEST else path.resolve().parents[2]
 
-    if manifest.get("schema_version") == "loveengine.skill-manifest/0.2":
+    schema_version = manifest.get("schema_version")
+    if schema_version == "loveengine.skill-manifest/0.2":
         validate_schema(manifest, "skill-manifest-v2.schema.json")
-    if manifest.get("schema_version") == "loveengine.skill-manifest/0.3":
+    elif schema_version == "loveengine.skill-manifest/0.3":
         validate_schema(manifest, "skill-manifest-v3.schema.json")
+    else:
+        raise LoveEngineError(
+            "unsupported_schema_version",
+            str(schema_version),
+        )
 
     refs = manifest.get("source_refs")
     hashes = manifest.get("source_hashes")

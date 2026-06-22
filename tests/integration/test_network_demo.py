@@ -5,8 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.network_demo import run_network_demo
-from loveengine_witness.network_transcript import verify_network_transcript
+from loveengine_witness.network_transcript import (
+    network_transcript_hash,
+    verify_network_transcript,
+)
 
 
 @pytest.mark.integration
@@ -17,6 +21,7 @@ def test_three_node_network_demo_is_auditable(tmp_path: Path) -> None:
     assert result["node_processes"] == 3
     assert result["task_types"] == ["observe_broadcast", "propagate_skill"]
     assert result["metrics"]["acked"] == 6
+    assert result["metrics"]["connected"] == 0
     assert result["metrics"]["rejected"] >= 3
 
     transcript = json.loads(Path(result["transcript_path"]).read_text())
@@ -27,3 +32,20 @@ def test_three_node_network_demo_is_auditable(tmp_path: Path) -> None:
     assert transcript["recovery"]["offline_redelivery"] is True
     assert transcript["recovery"]["duplicate_suppressed"] is True
     assert transcript["release"]["status"] == "deprecated"
+
+
+def test_network_transcript_rejects_tampered_bootstrap_profile() -> None:
+    transcript = json.loads(
+        (
+            Path(__file__).parents[2]
+            / "examples"
+            / "transcripts"
+            / "network-pilot.fixture.json"
+        ).read_text(encoding="utf-8")
+    )
+    transcript["bootstrap"]["directory"][0]["profile"]["sequence"] = "999"
+    transcript["nodes"] = transcript["bootstrap"]["directory"]
+
+    transcript["transcript_hash"] = network_transcript_hash(transcript)
+    with pytest.raises(LoveEngineError, match="directory|signature"):
+        verify_network_transcript(transcript)

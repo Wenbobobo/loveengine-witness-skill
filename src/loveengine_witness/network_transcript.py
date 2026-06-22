@@ -7,7 +7,7 @@ from typing import Any
 from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
 from .hashes import sha256_prefixed
-from .network_protocol import verify_receipt, verify_task
+from .network_protocol import verify_bootstrap, verify_receipt, verify_task
 from .schema import validate_schema
 from .secrets import reject_secret_fields
 
@@ -24,7 +24,25 @@ def verify_network_transcript(value: dict[str, Any]) -> dict[str, Any]:
     expected = network_transcript_hash(value)
     if value.get("transcript_hash") != expected:
         raise LoveEngineError("transcript_hash_mismatch", expected)
-    nodes = {item["profile"]["node"] for item in value["nodes"]}
+    bootstrap = value["bootstrap"]
+    if bootstrap["publisher"] != value["release"]["publisher"]:
+        raise LoveEngineError(
+            "wrong_publisher",
+            "bootstrap Publisher does not match release Publisher",
+        )
+    verify_bootstrap(
+        bootstrap,
+        value["chain_id"],
+        value["contracts"]["SkillRegistry"],
+    )
+    if canonical_json_bytes(value["nodes"]) != canonical_json_bytes(
+        bootstrap["directory"]
+    ):
+        raise LoveEngineError(
+            "directory_mismatch",
+            "transcript nodes must match the signed bootstrap directory",
+        )
+    nodes = {item["profile"]["node"] for item in bootstrap["directory"]}
     for task in value["tasks"]:
         verify_task(
             task,
