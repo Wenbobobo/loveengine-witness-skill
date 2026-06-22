@@ -7,26 +7,18 @@ These instructions apply to the LoveEngineSkill repository.
 1. `README.md`
 2. `docs/development/integration-guide.md`
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-agent-network-pilot-spec.md`
-5. `docs/specs/love-engine-local-witness-loop-spec.md`
-6. `docs/api/loveengine-contract-api.md`
-7. `docs/api/agent-skill-api.md`
-8. `docs/api/agent-network-api.md`
+4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+5. `docs/api/loveengine-contract-api.md`
+6. `docs/api/agent-skill-api.md`
+7. `docs/api/agent-network-api.md`
+8. `docs/api/extension-interfaces.md`
 9. `skills/loveengine-witness/skill-manifest.json`
 
 ## Source material boundary
 
-The root Markdown files are source materials:
-
-- `Love Engine.md`
-- `LoveEngine Skill.md`
-- `NaturalDAO 开发.md`
-- `Skill 模板.md`
-- `UAS 2.md`
-- `UAS 见证方案 2.0.md`
-- `UAS接口文档.md`
-
-Do not move, delete, rename, or rewrite these files unless the user explicitly asks. New summaries, specs, and interface documents go under `docs/`.
+Preserved source materials live under `docs/reference/source-materials/` and
+`docs/archive/source-materials/`. Do not rewrite them in place. New summaries,
+specs, and interface documents go under the active `docs/` directories.
 
 ## Current direction
 
@@ -56,6 +48,7 @@ uv run pytest tests/integration/test_network_demo.py
 
 - Raw private keys never enter Agent context, prompts, logs, fixtures, or transcripts.
 - Network tasks are limited to `propagate_skill` and `observe_broadcast`; M3 never requests vote signatures.
+- M4 tasks may use `observe_live_text` and `review_dispute`, but never request vote signatures.
 - Agent nodes verify chainId, SkillRegistry, Publisher, release status, package hash, recipient, nonce, and deadline.
 - `VoteSignature` must bind `proposalId`, nonce, deadline, and payload hash.
 - `PublicSink` stays read-only.

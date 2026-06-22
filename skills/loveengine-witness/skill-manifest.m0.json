@@ -5,21 +5,21 @@
   "status": "draft",
   "spec_version": "2026-06-21",
   "spec_ref": "docs/specs/love-engine-master-plan.md",
-  "spec_hash": "sha256:8190d4cf0b0bec6ceca38d0e333c9ef26997a0c249fae7c7f36ac66cf7088c7b",
-  "package_hash": "sha256:a18478e03fe89a02b643c49f78cf9bad639bb08756bdbd7e3beab3fd22bed309",
+  "spec_hash": "sha256:1b40dce6c0fe229d5d7cdb974e502401cac097602b7a158f3d8f9669d5c65399",
+  "package_hash": "sha256:824741735bb3f24dfed948d598c6cd2592e54f26d1e7eb933ce601a454a4867d",
   "source_refs": [
     "docs/specs/love-engine-master-plan.md",
-    "docs/specs/love-engine-local-witness-loop-spec.md",
-    "UAS接口文档.md",
-    "UAS 见证方案 2.0.md",
+    "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md",
+    "docs/reference/source-materials/current/UAS接口文档.md",
+    "docs/reference/source-materials/current/UAS 见证方案 2.0.md",
     "docs/kb/source-inventory.md"
   ],
   "source_hashes": {
-    "docs/specs/love-engine-master-plan.md": "sha256:8190d4cf0b0bec6ceca38d0e333c9ef26997a0c249fae7c7f36ac66cf7088c7b",
-    "docs/specs/love-engine-local-witness-loop-spec.md": "sha256:8516603ae3a74799be464fc73de13449995ca337f117ae1c3465fec67d7c1675",
-    "UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
-    "UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
-    "docs/kb/source-inventory.md": "sha256:c0e16fd14329f6d14d7ce55de8a440142f3544c594edbcd2518af18a83cceefc"
+    "docs/specs/love-engine-master-plan.md": "sha256:1b40dce6c0fe229d5d7cdb974e502401cac097602b7a158f3d8f9669d5c65399",
+    "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md": "sha256:8516603ae3a74799be464fc73de13449995ca337f117ae1c3465fec67d7c1675",
+    "docs/reference/source-materials/current/UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
+    "docs/reference/source-materials/current/UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
+    "docs/kb/source-inventory.md": "sha256:4ee01552c38c574ec75d0607dc0c66c1e6a151567c39782da8e4c5cb364c9a5f"
   },
   "network": {
     "compatible_protocol": "loveengine-witness-net/0.1",

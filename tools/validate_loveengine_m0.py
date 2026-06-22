@@ -41,9 +41,9 @@ REQUIRED_PERMISSIONS = {
 
 REQUIRED_SOURCE_REFS = {
     "docs/specs/love-engine-master-plan.md",
-    "docs/specs/love-engine-local-witness-loop-spec.md",
-    "UAS接口文档.md",
-    "UAS 见证方案 2.0.md",
+    "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md",
+    "docs/reference/source-materials/current/UAS接口文档.md",
+    "docs/reference/source-materials/current/UAS 见证方案 2.0.md",
     "docs/kb/source-inventory.md",
 }
 REQUIRED_VERSION = "0.1.1-m0"

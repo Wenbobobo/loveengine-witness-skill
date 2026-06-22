@@ -2,7 +2,7 @@
 
 状态：`M2 closeout`  
 适用版本：`0.2.0-local-loop`  
-原始接口来源：`UAS接口文档.md`  
+原始接口来源：`docs/reference/source-materials/current/UAS接口文档.md`
 当前实现：`contracts/src/`  
 当前对外接口：`docs/api/loveengine-contract-api.md`
 
@@ -212,7 +212,7 @@ Python/Anvil E2E 还验证：
 
 ## 5. 后续接口协作规则
 
-- 原始 `UAS接口文档.md` 保持只读。
+- 原始 `docs/reference/source-materials/current/UAS接口文档.md` 保持只读。
 - 已实现 ABI 以 `docs/api/loveengine-contract-api.md` 和 Solidity interface 为准。
 - 任何 ABI、event、typehash 或治理语义变更必须同时更新：
   - Solidity interface 和测试；
@@ -220,4 +220,3 @@ Python/Anvil E2E 还验证：
   - API 文档和当前 SPEC；
   - Skill manifest source hash。
 - 兼容性破坏必须提升协议/Skill 版本，并提供旧 transcript 的解释路径。
-

@@ -16,15 +16,15 @@ uv run python .\tools\check.py
 
 1. `README.md`
 2. `docs/specs/love-engine-master-plan.md`
-3. `docs/specs/love-engine-agent-network-pilot-spec.md`
-4. `docs/specs/love-engine-local-witness-loop-spec.md`
+3. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+4. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
 5. `docs/api/README.md`
 6. `skills/loveengine-witness/skill-manifest.json`
 
 查原始约束时再读：
 
-- `UAS接口文档.md`
-- `UAS 见证方案 2.0.md`
+- `docs/reference/source-materials/current/UAS接口文档.md`
+- `docs/reference/source-materials/current/UAS 见证方案 2.0.md`
 
 ## 3. 开发顺序
 
@@ -46,7 +46,7 @@ M2：
 M3：
 
 1. 先为 SkillRegistry 状态迁移、签名篡改和 Relay 重投递编写失败测试。
-2. 实现 Registry 与 `0.3.0-network-pilot` manifest。
+2. 实现 Registry 与 `0.3.x` manifest。
 3. 实现节点 profile、bootstrap、task 和 receipt 的 EIP-712 校验。
 4. 实现只使用出站连接的 RelayTransport 和 SQLite 队列。
 5. 接入 Registry 与 `BroadcastScheduled` 事件，最后运行三节点 Anvil E2E。
@@ -58,6 +58,13 @@ uv run pytest .\tests\integration\test_network_demo.py
 uv run loveengine network demo --nodes 3 --output .\examples\transcripts
 uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
 ```
+
+M4：
+
+1. 先写 LiveEvent、ArtifactStore、EvidenceBundleV2 和 dispute 的失败测试。
+2. domain/use-case 只依赖端口，不依赖 aiohttp 或 SQLite。
+3. LiveGateway、SQLite、文件系统和 dashboard 作为 adapters 接入。
+4. 最后运行三节点 live-evidence E2E 和 transcript 验证。
 
 ## 4. 接口规则
 

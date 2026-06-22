@@ -1,64 +1,42 @@
 # Repository structure
 
-本文描述独立仓库 `loveengine-witness-skill` 的当前结构。父目录 DAism 中的重复文件不是权威开发源。
-
-## 当前目录
-
 ```text
 .
 ├── README.md
+├── README.zh-CN.md
 ├── AGENTS.md
 ├── CONTRIBUTING.md
+├── contracts/
 ├── docs/
 │   ├── api/
 │   ├── archive/
 │   ├── decisions/
 │   ├── development/
 │   ├── kb/
+│   ├── reference/
 │   └── specs/
-├── skills/loveengine-witness/
-├── tools/
+├── examples/
 ├── schemas/
+├── skills/loveengine-witness/
 ├── src/loveengine_witness/
 ├── tests/
-├── contracts/
-└── examples/transcripts/
+└── tools/
 ```
 
-`schemas/`、`src/`、`tests/`、`contracts/` 和 `examples/` 随 M1/M2 实现建立。
+## Active development
 
-## 可维护区
+- `docs/specs/`: master plan and active M4 SPEC only.
+- `docs/api/`: public protocol and replaceable port contracts.
+- `src/loveengine_witness/`: framework-independent domain/use cases plus adapters.
+- `schemas/`: versioned wire contracts.
+- `contracts/`: four UAS contracts and SkillRegistry.
+- `examples/`: secret-free fixtures and transcripts.
 
-- `docs/`：当前规格、API、指南和历史归档。
-- `skills/loveengine-witness/`：可传播 Skill 包。
-- `tools/`：仓库兼容检查入口。
-- `src/loveengine_witness/`：Python protocol、use case、adapter 和 CLI。
-- `schemas/`：机器可读协议。
-- `contracts/`：Foundry 合约工程。
-- `src/loveengine_witness/relay*.py`：Relay Hub、SQLite 队列和出站节点连接。
-- `src/loveengine_witness/network_*.py`：M3 签名协议、三进程 demo 和 transcript。
-- `contracts/src/SkillRegistry.sol`：Publisher 命名空间版本事实层。
-- `tests/`：Python 测试。
-- `examples/transcripts/`：脱敏、可复跑的示例。
+## Preserved provenance
 
-## 默认只读源材料
+- `docs/reference/source-materials/current/`: current source constraints.
+- `docs/archive/source-materials/`: historical original material.
+- `docs/archive/specs/implemented/`: completed implementation specifications.
+- `docs/archive/planning/`: superseded plans.
 
-- `Love Engine.md`
-- `LoveEngine Skill.md`
-- `NaturalDAO 开发.md`
-- `Skill 模板.md`
-- `UAS 2.md`
-- `UAS 见证方案 2.0.md`
-- `UAS接口文档.md`
-
-摘要、推断和新规格必须写入 `docs/`，不能原地覆盖源材料。
-
-## 权威入口
-
-1. `docs/specs/love-engine-master-plan.md`
-2. `docs/specs/love-engine-agent-network-pilot-spec.md`
-3. `docs/specs/love-engine-local-witness-loop-spec.md`
-4. `docs/api/`
-5. `docs/kb/source-inventory.md`
-
-`docs/archive/` 只用于历史追溯。
+Preserved materials are not rewritten. Their path and SHA-256 remain tracked in the source inventory.
