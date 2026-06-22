@@ -1,9 +1,9 @@
 {
-  "schema_version": "loveengine.skill-manifest/0.2",
+  "schema_version": "loveengine.skill-manifest/0.3",
   "skill_id": "loveengine-witness",
-  "version": "0.2.0-local-loop",
-  "status": "draft",
-  "protocol": "loveengine-witness-net/0.2",
+  "version": "0.3.0-network-pilot",
+  "status": "pilot",
+  "protocol": "loveengine-witness-net/0.3",
   "source_refs": [
     "docs/specs/love-engine-master-plan.md",
     "docs/specs/love-engine-agent-network-pilot-spec.md",
@@ -17,38 +17,76 @@
     "UAS接口文档.md",
     "UAS 见证方案 2.0.md",
     "schemas/skill-manifest-v2.schema.json",
+    "schemas/skill-manifest-v3.schema.json",
     "schemas/agent-node-profile-v2.schema.json",
     "schemas/evidence-bundle-v1.schema.json",
     "schemas/local-loop-transcript-v1.schema.json",
+    "schemas/skill-release-v1.schema.json",
+    "schemas/signed-agent-node-profile-v1.schema.json",
+    "schemas/bootstrap-bundle-v1.schema.json",
+    "schemas/network-task-v1.schema.json",
+    "schemas/task-receipt-v1.schema.json",
+    "schemas/network-transcript-v1.schema.json",
     "contracts/src/WitnessDAO.sol",
     "contracts/src/CorporateSink.sol",
     "contracts/src/StreamingEngine.sol",
     "contracts/src/PublicSink.sol",
+    "contracts/src/SkillRegistry.sol",
     "src/loveengine_witness/cli.py",
-    "src/loveengine_witness/demo.py"
+    "src/loveengine_witness/manifest.py",
+    "src/loveengine_witness/demo.py",
+    "src/loveengine_witness/network_typed_data.py",
+    "src/loveengine_witness/network_protocol.py",
+    "src/loveengine_witness/registry.py",
+    "src/loveengine_witness/relay.py",
+    "src/loveengine_witness/relay_server.py",
+    "src/loveengine_witness/event_bridge.py",
+    "src/loveengine_witness/network_node.py",
+    "src/loveengine_witness/transport.py",
+    "src/loveengine_witness/network_demo.py",
+    "src/loveengine_witness/network_transcript.py"
   ],
   "source_hashes": {
-    "docs/specs/love-engine-master-plan.md": "sha256:abef5428d5fb5ad7de7f5044bf75a265837c60dbc57382fa9a09daf07f03e54e",
-    "docs/specs/love-engine-agent-network-pilot-spec.md": "sha256:56ff1065ea241dec9efa5e96817f4fb0e8d3056e267ae17444f759136c6e8f61",
+    "docs/specs/love-engine-master-plan.md": "sha256:8190d4cf0b0bec6ceca38d0e333c9ef26997a0c249fae7c7f36ac66cf7088c7b",
+    "docs/specs/love-engine-agent-network-pilot-spec.md": "sha256:010f8c1f885c7126e9657c4c50000967a5b510ac3030a2ad0ec33084d3c72a01",
     "docs/specs/love-engine-local-witness-loop-spec.md": "sha256:8516603ae3a74799be464fc73de13449995ca337f117ae1c3465fec67d7c1675",
     "docs/development/contract-team-handoff.md": "sha256:7c5dd7983fb25fd81ecd40a43b03e02742b42fe3897ea33d2a77edb38fb4e3f1",
     "docs/decisions/0001-onchain-skill-registry.md": "sha256:afdafa491d0ab218e43162d0b199f9957bf28b5701bfbec603b4583b19a5eb5a",
-    "docs/api/agent-network-api.md": "sha256:9e70e613d7d7818a9e17390f0f6018841e81c572a19682403029d03cc9f9b7e1",
+    "docs/api/agent-network-api.md": "sha256:84cb85d51520fe05b5123173f03c427346729ee34ae11d787523b1db0d808278",
     "docs/api/agent-skill-api.md": "sha256:54844e8cdf59597dc1427a2a8dafa49a9327534772766c8a41e77d982a304cf9",
     "docs/api/loveengine-contract-api.md": "sha256:fb645002aea6f1d2653e9aebacf7a13447f25c5fb777741958218ff42b3a0ffe",
-    "docs/kb/source-inventory.md": "sha256:b2cc3b48d540e3b54ea64f59c2183646f4a247fcc945dfe7a25f55b8bec269c1",
+    "docs/kb/source-inventory.md": "sha256:c0e16fd14329f6d14d7ce55de8a440142f3544c594edbcd2518af18a83cceefc",
     "UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
     "UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
     "schemas/skill-manifest-v2.schema.json": "sha256:65faa3916293c8ac4ff94af7b5d7475c40720cb07671cec371f269a0533c1718",
+    "schemas/skill-manifest-v3.schema.json": "sha256:098ed6a664f47862b63fb72d9fd2d65cdc9ada485cde577259477668ee12839e",
     "schemas/agent-node-profile-v2.schema.json": "sha256:8b336bf2074b8e7fac66aaf794cb1248faeb5fdc96d79ead7661ba94dc4568fb",
     "schemas/evidence-bundle-v1.schema.json": "sha256:51f6944aa53de056e8d5766eefc3cf78f7542451953e3dde11718818714f0817",
     "schemas/local-loop-transcript-v1.schema.json": "sha256:e52199341907cec8f45339cf5a739b65722c5f04956b5ce01314fbfe878a5d78",
+    "schemas/skill-release-v1.schema.json": "sha256:ffe3a89f1c4c5c8c4920c27b742dc80c375c14de5ec4219e1b41e4817fa5ee66",
+    "schemas/signed-agent-node-profile-v1.schema.json": "sha256:36e499d4e362ba7a659920c73ad52a4e44ca927a14c573e36e65606e824e2f0a",
+    "schemas/bootstrap-bundle-v1.schema.json": "sha256:f091dbaa6232ee84aae220bd6c5ae08d6178408b3e8fbc44016bc20210f6164a",
+    "schemas/network-task-v1.schema.json": "sha256:847792cfc74c795c5a738fe7203f3d831e76e78098b16a49cbe07bd7e23317f1",
+    "schemas/task-receipt-v1.schema.json": "sha256:4360e9523ef1b87f13855b905495633278c1581a10d99a02018c0d9cca0770f5",
+    "schemas/network-transcript-v1.schema.json": "sha256:0e52ed1828e896cade3eba47d5f9ebbb8c51f0a721d13863041d83872568d7eb",
     "contracts/src/WitnessDAO.sol": "sha256:e8ddfcfc2563d6d36f73331381a0bbc5b1f43ccea12e93e24cd3e6d4c1aef900",
     "contracts/src/CorporateSink.sol": "sha256:e86f745e2648c704ec08b00c7f536e05ecdadd1608dbea831cdd9ea0d0f9fecc",
     "contracts/src/StreamingEngine.sol": "sha256:8d63e4c1d193a1df32fcbc306e26cc7145e9b0b2c64628b33687bbdf71305073",
     "contracts/src/PublicSink.sol": "sha256:6a3de6d3776a4d2fb8642901050e8b743ce03b89a2e46e084d09ba7424da00fc",
-    "src/loveengine_witness/cli.py": "sha256:c2e83cb197df7dd40406b0eb1e3f003a51b06bb91dc92b0135ca006ceffca2a4",
-    "src/loveengine_witness/demo.py": "sha256:83c31826aa5cf57a8c14d254bfae2482eeef7b46a63b835d5dfe00d5749bd14e"
+    "contracts/src/SkillRegistry.sol": "sha256:13595c791f345b903a8f8d5771c859f849a97f25b911bd1f2ed07b36ce0325d4",
+    "src/loveengine_witness/cli.py": "sha256:3051cc3e6f3058531cfb4dd807db2108cf1f5538599d69c622651dfa18fa6c15",
+    "src/loveengine_witness/manifest.py": "sha256:14328a7414710dd0d5bf615c637c51e4b5838c78e939957dd3918d263747f60d",
+    "src/loveengine_witness/demo.py": "sha256:83c31826aa5cf57a8c14d254bfae2482eeef7b46a63b835d5dfe00d5749bd14e",
+    "src/loveengine_witness/network_typed_data.py": "sha256:ba6dd78fecfaccff514618a8ce044e7bf84597c1f5d40a63c687b72017ee634a",
+    "src/loveengine_witness/network_protocol.py": "sha256:dc27330cd1e37a378d67727d4f39a42b59d97010af1130f5e61ca44f7f622aae",
+    "src/loveengine_witness/registry.py": "sha256:af66fc3e907fde58dffd531c2efe2648992c19ba95e7b875fea5e4883e937613",
+    "src/loveengine_witness/relay.py": "sha256:54c673ee048cf10bb874c0ce64f5623256511412121741c8a446b214f70fedf1",
+    "src/loveengine_witness/relay_server.py": "sha256:e5b0141eda21704376051b411cf81706b851536c980b4ee34a9412a8e9fa6cfa",
+    "src/loveengine_witness/event_bridge.py": "sha256:0a13192cd9b18597a380a6710cdd11492e09d19dea5c44645af87d2fc053e7be",
+    "src/loveengine_witness/network_node.py": "sha256:f4e9af1799b239d326dbc70a62a306ed1a2b7edc12ddce38481b200d511b5554",
+    "src/loveengine_witness/transport.py": "sha256:9eb497cf4dc5a6b44b71acb31b989fd885f777de7a895c2eef78d1e06606e5d2",
+    "src/loveengine_witness/network_demo.py": "sha256:04ed9dd07449fe105c8d01a2d12dd0cb29cdb58c0a7a621db9bf15d9b2a7d61f",
+    "src/loveengine_witness/network_transcript.py": "sha256:0a35d8949a8e19986ce0e1f8d8f3a7d934f4865bcdbf2939a0a8ff990d2a29b3"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -60,19 +98,51 @@
     "batch_register": "loveengine relayer batch-register --dry-run",
     "batch_vote": "loveengine relayer batch-vote --dry-run",
     "local_loop": "loveengine demo local-loop",
-    "transcript_verify": "loveengine transcript verify"
+    "local_transcript_verify": "loveengine transcript verify",
+    "registry_publish": "loveengine registry publish --dry-run",
+    "registry_verify": "loveengine registry verify",
+    "node_profile_sign": "loveengine node profile sign",
+    "bootstrap_build": "loveengine bootstrap build",
+    "bootstrap_verify": "loveengine bootstrap verify",
+    "relay_serve": "loveengine relay serve",
+    "node_connect": "loveengine node connect",
+    "network_demo": "loveengine network demo --nodes 3",
+    "network_transcript_verify": "loveengine network transcript verify"
   },
   "contracts": {
     "WitnessDAO": "contracts/src/WitnessDAO.sol",
     "CorporateSink": "contracts/src/CorporateSink.sol",
     "StreamingEngine": "contracts/src/StreamingEngine.sol",
-    "PublicSink": "contracts/src/PublicSink.sol"
+    "PublicSink": "contracts/src/PublicSink.sol",
+    "SkillRegistry": "contracts/src/SkillRegistry.sol"
+  },
+  "registry_binding": {
+    "chain_id": "31337",
+    "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "publisher": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "skill_id_hash": "0x27bf4cd8b515d09b31d982b5cb856fb155b181b13183a45abdeaa58b953d5bff",
+    "version_hash": "0xc859ca4f507d4c9a4df9dad0bc7151aacda1fc47888cab796c5a900157ba7c9c",
+    "artifact_package_hash": "0x969cd5bb7c396af1ceeb9f7786b6e0d63238a31a4f3f83cbbe0c9dd0dc87f258",
+    "hash_algorithm": "keccak256",
+    "environment": "anvil-only"
+  },
+  "network": {
+    "task_types": [
+      "propagate_skill",
+      "observe_broadcast"
+    ],
+    "delivery": "at-least-once",
+    "transport": "outbound-websocket",
+    "relay_is_trust_root": false,
+    "end_to_end_encryption": false
   },
   "eip712": {
-    "domain_name": "LoveEngine WitnessDAO",
+    "domain_name": "LoveEngine Agent Network",
     "domain_version": "1",
-    "register_type": "Register(address witness,uint256 nonce,uint256 deadline)",
-    "vote_type": "Vote(address witness,uint256 proposalId,bool support,bytes32 reasonHash,bytes32 payloadHash,uint256 nonce,uint256 deadline)"
+    "node_profile_type": "NodeProfile(address node,bytes32 profileHash,uint256 sequence,uint256 validUntil)",
+    "bootstrap_type": "Bootstrap(address publisher,bytes32 directoryHash,uint256 sequence,uint256 validUntil)",
+    "network_task_type": "NetworkTask(bytes32 taskId,bytes32 taskType,address issuer,address recipient,bytes32 manifestHash,bytes32 payloadHash,uint256 nonce,uint256 deadline)",
+    "task_receipt_type": "TaskReceipt(bytes32 taskId,address node,bytes32 status,bytes32 resultHash,uint256 nonce,uint256 completedAt)"
   },
   "evidence": {
     "schema": "schemas/evidence-bundle-v1.schema.json",
@@ -81,7 +151,10 @@
     "raw_evidence_on_chain": false
   },
   "security": {
-    "private_keys_in_agent_context": false
+    "private_keys_in_agent_context": false,
+    "private_keys_in_cli_arguments": false,
+    "private_keys_in_transcripts": false,
+    "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:53a3a727cbf325cb00fb7159db962c2c6a8a529d8882fcbf863a1fadb96f8269"
+  "package_hash": "sha256:715c95d57ce7a6e35df6a3f90decf7fcd43e321ea195e251181b4556c4d321a1"
 }

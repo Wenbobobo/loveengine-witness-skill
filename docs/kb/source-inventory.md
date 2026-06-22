@@ -27,11 +27,11 @@ This inventory describes the LoveEngineSkill repository. It does not rewrite the
 | `docs/development/contract-team-handoff.md` | current | Contract implementation mapping, evidence, and open integration decisions |
 | `docs/specs/love-engine-master-plan.md` | current plan | Engineering goals, boundaries, progress and milestones |
 | `docs/specs/love-engine-local-witness-loop-spec.md` | implemented spec | M1/M2 protocol, CLI, contracts and local-loop acceptance |
-| `docs/specs/love-engine-agent-network-pilot-spec.md` | active spec | M2 release closeout and M3 three-node Relay Hub pilot |
+| `docs/specs/love-engine-agent-network-pilot-spec.md` | implemented spec | M2 release closeout and M3 three-process Relay Hub pilot |
 | `docs/api/README.md` | current | API documentation entrypoint |
 | `docs/api/loveengine-contract-api.md` | current | Four-contract API and EIP-712 constraints |
 | `docs/api/agent-skill-api.md` | current | Skill and Agent adapter API |
-| `docs/api/agent-network-api.md` | M3 target | SkillRegistry, signed network messages, and Relay Hub API |
+| `docs/api/agent-network-api.md` | M3 implemented | SkillRegistry, signed network messages, and Relay Hub API |
 | `docs/decisions/0001-onchain-skill-registry.md` | accepted | On-chain Skill version trust-root decision |
 | `docs/archive/planning/2026-06-21/README.md` | archive index | Superseded planning documents and milestone mapping |
 
@@ -51,13 +51,26 @@ This inventory describes the LoveEngineSkill repository. It does not rewrite the
 
 | File | Status | Use |
 | --- | --- | --- |
-| `skills/loveengine-witness/skill-manifest.json` | M1/M2 implemented | Current `0.2.0-local-loop` manifest |
+| `skills/loveengine-witness/skill-manifest.json` | current | Current `0.3.0-network-pilot` manifest; M1/M2 interfaces remain compatible |
 | `schemas/` | M1 implemented | Manifest, node, evidence and transcript JSON Schema |
 | `src/loveengine_witness/` | M1/M2 implemented | Protocol domain, CLI, typed data, relayer and Anvil demo |
 | `contracts/src/` | M2 implemented | Four-contract local implementation |
 | `contracts/test/LocalWitnessLoop.t.sol` | M2 implemented | Security, threshold, window and 69-signature tests |
 | `examples/transcripts/local-loop.fixture.json` | M2 fixture | Verifiable five-witness Anvil transcript |
 | `tests/` | current | Python unit, CLI, compatibility and integration tests |
+
+## M3 implementation
+
+| File | Status | Use |
+| --- | --- | --- |
+| `contracts/src/SkillRegistry.sol` | M3 implemented | Publisher-scoped release and status trust root |
+| `schemas/*network*.schema.json` and signed profile/bootstrap/receipt schemas | M3 implemented | Network protocol data contracts |
+| `src/loveengine_witness/network_protocol.py` | M3 implemented | Signed profile, bootstrap, task and receipt validation |
+| `src/loveengine_witness/relay.py` | M3 implemented | SQLite at-least-once queue and ack state |
+| `src/loveengine_witness/relay_server.py` | M3 implemented | Relay HTTP/WebSocket service |
+| `src/loveengine_witness/event_bridge.py` | M3 implemented | Chain event idempotency and task mapping |
+| `src/loveengine_witness/network_demo.py` | M3 implemented | Anvil plus three independent node process E2E |
+| `examples/transcripts/network-pilot.fixture.json` | M3 fixture | Verifiable network release, task, receipt and metrics transcript |
 
 ## Version priority
 

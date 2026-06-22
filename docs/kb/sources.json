@@ -394,11 +394,12 @@
       "Skill",
       "M1",
       "M2",
+      "M3",
       "manifest"
     ],
     "status": "current",
-    "canonical_role": "Current local-loop Skill manifest",
-    "summary": "0.2.0-local-loop manifest with schemas, commands, contracts, EIP-712 and evidence boundaries."
+    "canonical_role": "Current network-pilot Skill manifest",
+    "summary": "0.3.0-network-pilot manifest with M1/M2 compatibility plus SkillRegistry, Relay Hub and signed network protocol bindings."
   },
   {
     "id": "protocol-schemas",
@@ -408,12 +409,13 @@
     "layer": "schema",
     "domain_tags": [
       "M1",
+      "M3",
       "JSON Schema",
       "protocol"
     ],
     "status": "current",
     "canonical_role": "Machine-readable protocol schemas",
-    "summary": "Draft 2020-12 schemas for manifest, node profile, evidence bundle, and transcript."
+    "summary": "Draft 2020-12 schemas for manifest, local loop, Skill release, signed node/bootstrap, network task/receipt, and transcripts."
   },
   {
     "id": "python-protocol-package",
@@ -424,12 +426,13 @@
     "domain_tags": [
       "M1",
       "M2",
+      "M3",
       "CLI",
       "EIP-712"
     ],
     "status": "current",
-    "canonical_role": "Protocol, CLI and local-loop implementation",
-    "summary": "Canonical JSON, hashes, schemas, CLI, typed data, relayer, signer boundary and Anvil demo."
+    "canonical_role": "Protocol, CLI, local-loop and network implementation",
+    "summary": "Canonical JSON, hashes, schemas, CLI, typed data, relayer, Relay Hub, event bridge, signer boundary and Anvil demos."
   },
   {
     "id": "foundry-contracts",
@@ -439,12 +442,13 @@
     "layer": "contracts",
     "domain_tags": [
       "M2",
+      "M3",
       "Foundry",
       "WitnessDAO"
     ],
     "status": "current",
-    "canonical_role": "Four-contract local implementation",
-    "summary": "WitnessDAO, CorporateSink, StreamingEngine and read-only PublicSink."
+    "canonical_role": "Four core contracts and auxiliary Registry",
+    "summary": "WitnessDAO, CorporateSink, StreamingEngine, read-only PublicSink, and publisher-scoped SkillRegistry."
   },
   {
     "id": "local-loop-transcript-fixture",
@@ -578,8 +582,8 @@
       "Agent network"
     ],
     "status": "current",
-    "canonical_role": "Active M3 implementation spec",
-    "summary": "Defines M2 closeout and the SkillRegistry, signed-node, Relay Hub, event bridge, and three-node network pilot."
+    "canonical_role": "Implemented M3 specification",
+    "summary": "Defines and records acceptance for M2 closeout, SkillRegistry, signed-node protocol, Relay Hub, event bridge, and three-process network pilot."
   },
   {
     "id": "agent-network-api",
@@ -611,5 +615,60 @@
     "status": "accepted",
     "canonical_role": "Skill release trust decision",
     "summary": "Chooses an on-chain publisher-scoped registry while keeping artifact transport independent from GitHub."
+  },
+  {
+    "id": "skill-registry-contract",
+    "title": "SkillRegistry contract",
+    "path": "contracts/src/SkillRegistry.sol",
+    "source_group": "implementation",
+    "layer": "contracts",
+    "domain_tags": ["M3", "SkillRegistry", "release"],
+    "status": "current",
+    "canonical_role": "Publisher-scoped release trust root",
+    "summary": "Publishes immutable release hashes and manages active, deprecated, revoked, current, and replacement state per Publisher."
+  },
+  {
+    "id": "agent-network-schemas",
+    "title": "Agent network JSON Schemas",
+    "path": "schemas/network-transcript-v1.schema.json",
+    "source_group": "implementation",
+    "layer": "schema",
+    "domain_tags": ["M3", "JSON Schema", "Agent network"],
+    "status": "current",
+    "canonical_role": "Network protocol schema set",
+    "summary": "Entry in the Draft 2020-12 schema set for releases, signed profiles, bootstrap, tasks, receipts, and network transcripts."
+  },
+  {
+    "id": "relay-hub-implementation",
+    "title": "Relay Hub implementation",
+    "path": "src/loveengine_witness/relay_server.py",
+    "source_group": "implementation",
+    "layer": "transport",
+    "domain_tags": ["M3", "Relay Hub", "WebSocket", "SQLite"],
+    "status": "current",
+    "canonical_role": "Central outbound-only network transport",
+    "summary": "HTTP artifact/bootstrap endpoints, WebSocket challenge-response, signed task delivery, receipts, ack, and metrics."
+  },
+  {
+    "id": "event-task-bridge",
+    "title": "Chain event task bridge",
+    "path": "src/loveengine_witness/event_bridge.py",
+    "source_group": "implementation",
+    "layer": "application",
+    "domain_tags": ["M3", "events", "idempotency"],
+    "status": "current",
+    "canonical_role": "Chain event to NetworkTask mapping",
+    "summary": "Maps release and broadcast events to the two allowed task types and deduplicates by chainId, transaction hash, and log index."
+  },
+  {
+    "id": "network-pilot-transcript-fixture",
+    "title": "Network pilot transcript fixture",
+    "path": "examples/transcripts/network-pilot.fixture.json",
+    "source_group": "implementation",
+    "layer": "fixture",
+    "domain_tags": ["M3", "Anvil", "Relay Hub", "transcript"],
+    "status": "current",
+    "canonical_role": "Auditable three-process network fixture",
+    "summary": "Secret-free transcript linking SkillRegistry release, broadcast event, six signed tasks, six receipts, recovery behavior, and delivery metrics."
   }
 ]

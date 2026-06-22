@@ -1,0 +1,117 @@
+"""SQLite-backed at-least-once Relay Hub storage."""
+
+from __future__ import annotations
+
+import sqlite3
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class RelayMessage:
+    recipient: str
+    task_id: str
+    payload: str
+    attempts: int
+
+
+class RelayStore:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.connection = sqlite3.connect(path)
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS messages (
+                recipient TEXT NOT NULL,
+                task_id TEXT NOT NULL,
+                issuer TEXT NOT NULL DEFAULT '',
+                nonce TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                acked INTEGER NOT NULL DEFAULT 0,
+                receipt TEXT,
+                PRIMARY KEY (recipient, task_id),
+                UNIQUE (recipient, issuer, nonce)
+            )
+            """
+        )
+        self.connection.commit()
+
+    def enqueue(
+        self,
+        recipient: str,
+        task_id: str,
+        payload: str,
+        issuer: str = "",
+        nonce: str = "",
+    ) -> bool:
+        try:
+            self.connection.execute(
+                """
+                INSERT INTO messages(recipient, task_id, issuer, nonce, payload)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (recipient, task_id, issuer, nonce, payload),
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def pending(self, recipient: str) -> list[RelayMessage]:
+        rows = self.connection.execute(
+            """
+            SELECT task_id, payload, attempts
+            FROM messages
+            WHERE recipient = ? AND acked = 0
+            ORDER BY rowid
+            """,
+            (recipient,),
+        ).fetchall()
+        result = []
+        for task_id, payload, attempts in rows:
+            attempts += 1
+            self.connection.execute(
+                """
+                UPDATE messages SET attempts = ?
+                WHERE recipient = ? AND task_id = ?
+                """,
+                (attempts, recipient, task_id),
+            )
+            result.append(RelayMessage(recipient, task_id, payload, attempts))
+        self.connection.commit()
+        return result
+
+    def ack(self, recipient: str, task_id: str, receipt: str) -> None:
+        self.connection.execute(
+            """
+            UPDATE messages SET acked = 1, receipt = ?
+            WHERE recipient = ? AND task_id = ?
+            """,
+            (receipt, recipient, task_id),
+        )
+        self.connection.commit()
+
+    def receipt(self, recipient: str, task_id: str) -> str | None:
+        row = self.connection.execute(
+            """
+            SELECT receipt FROM messages
+            WHERE recipient = ? AND task_id = ?
+            """,
+            (recipient, task_id),
+        ).fetchone()
+        return None if row is None else row[0]
+
+    def metrics(self) -> dict[str, int]:
+        queued, delivered, acked = self.connection.execute(
+            """
+            SELECT COUNT(*), COALESCE(SUM(attempts), 0), COALESCE(SUM(acked), 0)
+            FROM messages
+            """
+        ).fetchone()
+        return {
+            "acked": int(acked),
+            "delivered": int(delivered),
+            "queued": int(queued),
+        }

@@ -55,11 +55,16 @@ def test_m0_fixtures_match_revision_and_are_static() -> None:
     assert propagation["payload_hash"] == manifest["package_hash"]
 
 
-def test_current_manifest_is_local_loop_v2() -> None:
+def test_current_manifest_is_network_pilot_v3() -> None:
     manifest = load(MANIFEST)
 
-    assert manifest["schema_version"] == "loveengine.skill-manifest/0.2"
-    assert manifest["version"] == "0.2.0-local-loop"
+    assert manifest["schema_version"] == "loveengine.skill-manifest/0.3"
+    assert manifest["version"] == "0.3.0-network-pilot"
+    assert manifest["registry_binding"]["chain_id"] == "31337"
+    assert manifest["network"]["task_types"] == [
+        "propagate_skill",
+        "observe_broadcast",
+    ]
     assert manifest["security"]["private_keys_in_agent_context"] is False
 
 

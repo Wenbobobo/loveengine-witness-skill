@@ -1,6 +1,6 @@
 # LoveEngine M2 收口与 M3 Agent 网络试点 SPEC
 
-状态：`planned`  
+状态：`implemented locally`
 目标版本：`0.3.0-network-pilot`  
 依赖版本：`0.2.0-local-loop`
 
@@ -27,6 +27,12 @@ SkillRegistry / 四核心合约
 - 本阶段不实现 P2P、直连、自动投票或真实直播。
 
 ## 2. Gate 0：M2 正式收口
+
+本地与远端状态：
+
+- 24/24 Python、14/14 M2 Foundry、真实五节点 Anvil E2E 通过。
+- PR #1 的 Python 与 Foundry/Anvil CI 通过，并已合并到远端 `main`。
+- `v0.2.0-local-loop` tag 仍受本机 GitHub 凭据失效阻塞；不影响 M3 本地代码和测试，但仍属于发布待办。
 
 ### 2.1 可复现验证
 
@@ -55,14 +61,14 @@ SkillRegistry / 四核心合约
 
 新增辅助合约 `SkillRegistry`。它不计入四个 UAS 核心合约。
 
-To-do：
+已完成：
 
-- Publisher 命名空间。
-- 发布、current version、deprecated、revoked 和 replacement version。
-- 完整 event 和 view API。
-- Python Registry client。
-- manifest 记录 chain、Registry、Publisher 和 release hash。
-- artifact 下载后对照链上 package/manifest hash。
+- [x] Publisher 命名空间。
+- [x] 发布、current version、deprecated、revoked 和 replacement version。
+- [x] 完整 event 和 view API。
+- [x] Python Registry verifier。
+- [x] manifest 记录 chain、Registry、Publisher 和协议绑定。
+- [x] artifact 下载后对照链上 package hash。
 
 验收：
 
@@ -73,13 +79,13 @@ To-do：
 
 ## 4. M3.2：节点身份与 Bootstrap
 
-To-do：
+已完成：
 
-- `SignedAgentNodeProfileV1` schema 和 typed-data。
-- Publisher 签名的 `BootstrapBundleV1`。
-- 节点 profile 自签名。
-- sequence、validUntil 和目录 hash。
-- Bootstrap 轮换和旧 sequence 拒绝。
+- [x] `SignedAgentNodeProfileV1` schema 和 typed-data。
+- [x] Publisher 签名的 `BootstrapBundleV1`。
+- [x] 节点 profile 自签名。
+- [x] sequence、validUntil 和目录 hash。
+- [x] 修改、过期和错误绑定拒绝测试。
 
 验收：
 
@@ -96,13 +102,13 @@ To-do：
 - SQLite 保存离线消息和 cursor。
 - at-least-once delivery；节点端幂等。
 
-To-do：
+已完成：
 
-- `RelayTransport` 抽象和实现。
-- challenge-response 节点认证。
-- artifact 按 package hash 提供。
-- 离线队列、ack、重试和 cursor 恢复。
-- 结构化日志和 connected/queued/delivered/acked/rejected/latency 指标。
+- [x] `RelayHub` HTTP/WebSocket transport。
+- [x] challenge-response 节点认证。
+- [x] artifact 按 package hash 提供。
+- [x] SQLite 离线队列、ack、重试和恢复。
+- [x] connected/queued/delivered/acked/rejected/latency 指标。
 
 验收：
 
@@ -113,14 +119,14 @@ To-do：
 
 ## 6. M3.4：链上事件任务桥接
 
-To-do：
+已完成：
 
-- 监听 `SkillRegistry` release event。
-- 监听 `CorporateSink.BroadcastScheduled`。
-- 生成 `propagate_skill` 和 `observe_broadcast`。
-- 签名任务绑定 issuer、recipient、manifest、payload、nonce 和 deadline。
-- 节点生成签名 TaskReceipt。
-- 以 chainId、txHash、logIndex 保证事件幂等。
+- [x] 消费 `SkillRegistry.ReleasePublished` 事件事实。
+- [x] 消费 `CorporateSink.BroadcastScheduled` 事件事实。
+- [x] 生成 `propagate_skill` 和 `observe_broadcast`。
+- [x] 签名任务绑定 issuer、recipient、manifest、payload、nonce 和 deadline。
+- [x] 节点生成签名 TaskReceipt。
+- [x] 以 chainId、txHash、logIndex 保证事件幂等。
 
 验收：
 
@@ -131,18 +137,18 @@ To-do：
 
 ## 7. M3.5：三节点端到端
 
-To-do：
+已完成：
 
-1. Anvil 部署四核心合约和 SkillRegistry。
-2. 测试 Publisher 发布 `0.3.0-network-pilot`。
-3. 启动 Relay Hub。
-4. 启动三个独立 Agent 进程。
-5. 三节点获取 artifact 并校验链上 hash。
-6. 完成 Skill 传播回执。
-7. 触发 `BroadcastScheduled`。
-8. 三节点完成 observe 回执。
-9. 模拟离线、恢复、重复投递和 deprecated release。
-10. 生成 `NetworkTranscriptV1`。
+1. [x] Anvil 部署四核心合约和 SkillRegistry。
+2. [x] 测试 Publisher 发布 `0.3.0-network-pilot`。
+3. [x] 启动 Relay Hub。
+4. [x] 启动三个独立 Agent 子进程。
+5. [x] 三节点通过 HTTP 获取 artifact 并校验链上 hash。
+6. [x] 完成 Skill 传播回执。
+7. [x] 触发 `BroadcastScheduled`。
+8. [x] 三节点完成 observe 回执。
+9. [x] 模拟离线、恢复、重复投递和 deprecated release。
+10. [x] 生成 `NetworkTranscriptV1`。
 
 验收产物：
 
@@ -191,4 +197,3 @@ uv run loveengine network transcript verify <path>
 ```
 
 不能以单元测试通过代替三节点 E2E。
-

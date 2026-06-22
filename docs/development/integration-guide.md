@@ -51,6 +51,14 @@ M3：
 4. 实现只使用出站连接的 RelayTransport 和 SQLite 队列。
 5. 接入 Registry 与 `BroadcastScheduled` 事件，最后运行三节点 Anvil E2E。
 
+M3 验收：
+
+```powershell
+uv run pytest .\tests\integration\test_network_demo.py
+uv run loveengine network demo --nodes 3 --output .\examples\transcripts
+uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
+```
+
 ## 4. 接口规则
 
 - 新增或修改公开字段时同步更新 `schemas/` 和 `docs/api/`。

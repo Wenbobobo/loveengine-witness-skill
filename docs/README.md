@@ -18,7 +18,7 @@ This directory contains developer-facing documentation for LoveEngine Witness Sk
 
 - `docs/specs/love-engine-master-plan.md`: current engineering roadmap and milestone status.
 - `docs/specs/love-engine-local-witness-loop-spec.md`: implemented M1/M2 specification.
-- `docs/specs/love-engine-agent-network-pilot-spec.md`: active M2-closeout/M3 specification.
+- `docs/specs/love-engine-agent-network-pilot-spec.md`: implemented M2-closeout/M3 specification.
 
 ## Decisions
 

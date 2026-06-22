@@ -49,11 +49,14 @@ Then run:
 ```powershell
 uv run python .\tools\check.py
 uv run pytest -m "not integration"
+uv run pytest tests/integration/test_network_demo.py
 ```
 
 ## Safety invariants
 
 - Raw private keys never enter Agent context, prompts, logs, fixtures, or transcripts.
+- Network tasks are limited to `propagate_skill` and `observe_broadcast`; M3 never requests vote signatures.
+- Agent nodes verify chainId, SkillRegistry, Publisher, release status, package hash, recipient, nonce, and deadline.
 - `VoteSignature` must bind `proposalId`, nonce, deadline, and payload hash.
 - `PublicSink` stays read-only.
 - Governance values such as min valid votes, broadcast window, and interval stay configurable.

@@ -1,6 +1,6 @@
 # LoveEngine Agent Network API
 
-状态：`M3 target`  
+状态：`M3 local implemented`
 目标版本：`0.3.0-network-pilot`
 
 本文定义 SkillRegistry、节点身份、Bootstrap、网络任务、任务回执和中心 Relay Hub 的公开接口。M3 只实现中心 Relay；P2P 和节点直连不在本阶段范围内。
@@ -62,11 +62,15 @@ function getRelease(
 
 ```json
 {
-  "schema_version": "loveengine.signed-node-profile/1",
-  "profile": {},
-  "profile_hash": "0x...",
-  "sequence": "1",
-  "valid_until": "1780000000",
+  "schema_version": "loveengine.signed-agent-node-profile/1",
+  "chain_id": "31337",
+  "registry": "0x...",
+  "profile": {
+    "node": "0x...",
+    "capabilities": ["propagate_skill", "observe_broadcast"],
+    "sequence": "1",
+    "valid_until": "4102444800"
+  },
   "signature": "0x..."
 }
 ```
@@ -90,17 +94,11 @@ Bootstrap 由测试 Publisher 签名，列出 Relay Hub 和节点目录：
 
 ```json
 {
-  "schema_version": "loveengine.bootstrap/1",
+  "schema_version": "loveengine.bootstrap-bundle/1",
+  "chain_id": "31337",
+  "registry": "0x...",
   "publisher": "0x...",
-  "registry": {
-    "chain_id": "31337",
-    "address": "0x..."
-  },
-  "relay": {
-    "http_url": "http://127.0.0.1:...",
-    "websocket_url": "ws://127.0.0.1:.../v1/ws"
-  },
-  "nodes": [],
+  "directory": [],
   "directory_hash": "0x...",
   "sequence": "1",
   "valid_until": "1780000000",
@@ -135,7 +133,7 @@ NetworkTask(
 约束：
 
 - 绑定 chainId 和 SkillRegistry。
-- recipient 可为具体节点或零地址广播任务。
+- M3 每条任务绑定一个具体 recipient；广播由 Relay 为每个节点生成独立任务。
 - 节点以 issuer+nonce 和 taskId 双重去重。
 - `observe_broadcast` payload 必须引用 chainId、CorporateSink、txHash 和 logIndex。
 - M3 不允许 `sign_vote` 或自动投票任务。
@@ -155,10 +153,8 @@ TaskReceipt(
 
 状态：
 
-- `accepted`
 - `completed`
 - `rejected`
-- `expired`
 
 回执只提交结果 hash 和结构化摘要，不包含私钥、token 或原始敏感证据。
 
@@ -196,6 +192,8 @@ GET /v1/ws
 - at-least-once delivery。
 - taskId 和 nonce 保证节点端幂等。
 - Relay Hub 不替 issuer 或 node 签名。
+- 本地 pilot 的节点通过 Anvil RPC signer 完成签名；私钥不进入 CLI 参数、环境变量、日志或 transcript。
+- `loveengine node connect` 是可单独启动的出站节点进程入口。
 
 ## 7. CLI
 
@@ -212,4 +210,3 @@ loveengine network transcript verify <path>
 ```
 
 成功输出 JSON；错误使用现有结构化 stderr 和稳定退出码。
-
