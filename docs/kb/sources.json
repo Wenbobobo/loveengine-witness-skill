@@ -395,11 +395,12 @@
       "M1",
       "M2",
       "M3",
+      "M4",
       "manifest"
     ],
     "status": "current",
-    "canonical_role": "Current network-pilot Skill manifest",
-    "summary": "0.3.1-demo-ready manifest with M1/M2 compatibility plus SkillRegistry, Relay Hub and signed network protocol bindings."
+    "canonical_role": "Current live-evidence Skill manifest",
+    "summary": "0.4.0-live-evidence-pilot manifest with M1-M3 compatibility and M4 V2 live evidence bindings."
   },
   {
     "id": "protocol-schemas",
@@ -410,12 +411,13 @@
     "domain_tags": [
       "M1",
       "M3",
+      "M4",
       "JSON Schema",
       "protocol"
     ],
     "status": "current",
     "canonical_role": "Machine-readable protocol schemas",
-    "summary": "Draft 2020-12 schemas for manifest, local loop, Skill release, signed node/bootstrap, network task/receipt, and transcripts."
+    "summary": "Draft 2020-12 schemas for manifest, local loop, releases, V1/V2 network messages, live evidence, disputes and transcripts."
   },
   {
     "id": "python-protocol-package",
@@ -725,5 +727,104 @@
     "status": "current",
     "canonical_role": "Verified presentation baseline",
     "summary": "Python, Foundry, local-loop, network-loop, GitHub delivery, and known-warning evidence."
+  },
+  {
+    "id": "live-evidence-api",
+    "title": "Live evidence API",
+    "path": "docs/api/live-evidence-api.md",
+    "source_group": "developer-docs",
+    "layer": "api",
+    "domain_tags": ["M4", "LiveGateway", "ProposalGate"],
+    "status": "current",
+    "canonical_role": "M4 public interface contract",
+    "summary": "HTTP, SSE, CLI, artifact, signed review, dashboard and stable error semantics."
+  },
+  {
+    "id": "live-protocol-implementation",
+    "title": "Live event protocol implementation",
+    "path": "src/loveengine_witness/live_protocol.py",
+    "source_group": "implementation",
+    "layer": "domain",
+    "domain_tags": ["M4", "hash chain", "events"],
+    "status": "current",
+    "canonical_role": "LiveSession and LiveEvent domain rules",
+    "summary": "Builds and verifies append-only canonical Keccak event chains."
+  },
+  {
+    "id": "live-store-implementation",
+    "title": "Live evidence stores",
+    "path": "src/loveengine_witness/live_store.py",
+    "source_group": "implementation",
+    "layer": "adapter",
+    "domain_tags": ["M4", "SQLite", "content addressing"],
+    "status": "current",
+    "canonical_role": "ArtifactStore and MetadataStore adapters",
+    "summary": "Stores SHA-256 addressed artifacts and live protocol metadata."
+  },
+  {
+    "id": "live-gateway-implementation",
+    "title": "LiveGateway implementation",
+    "path": "src/loveengine_witness/live_gateway.py",
+    "source_group": "implementation",
+    "layer": "application",
+    "domain_tags": ["M4", "HTTP", "SSE", "dashboard"],
+    "status": "current",
+    "canonical_role": "Provider-neutral live HTTP boundary",
+    "summary": "Accepts JSON and NDJSON, streams SSE and exposes read-only dashboard data."
+  },
+  {
+    "id": "live-dispute-implementation",
+    "title": "Dispute review and ProposalGate",
+    "path": "src/loveengine_witness/dispute.py",
+    "source_group": "implementation",
+    "layer": "domain",
+    "domain_tags": ["M4", "review", "gate"],
+    "status": "current",
+    "canonical_role": "Fail-closed dispute aggregation",
+    "summary": "Requires three distinct nodes and only permits dismissed critical disputes."
+  },
+  {
+    "id": "live-demo-implementation",
+    "title": "Live evidence end-to-end demo",
+    "path": "src/loveengine_witness/live_demo.py",
+    "source_group": "implementation",
+    "layer": "integration",
+    "domain_tags": ["M4", "Anvil", "E2E"],
+    "status": "current",
+    "canonical_role": "Auditable local M4 trial",
+    "summary": "Deploys five contracts, ingests twelve events and runs signed reviews in independent processes."
+  },
+  {
+    "id": "live-session-fixture",
+    "title": "Live session NDJSON fixture",
+    "path": "examples/live/live-session.fixture.ndjson",
+    "source_group": "implementation",
+    "layer": "fixture",
+    "domain_tags": ["M4", "NDJSON", "live text"],
+    "status": "current",
+    "canonical_role": "Deterministic twelve-event input",
+    "summary": "Ordered source, summary and derived text events for M4 acceptance."
+  },
+  {
+    "id": "live-review-transcript-schema",
+    "title": "LiveReviewTranscriptV1 schema",
+    "path": "schemas/live-review-transcript-v1.schema.json",
+    "source_group": "implementation",
+    "layer": "schema",
+    "domain_tags": ["M4", "transcript", "verification"],
+    "status": "current",
+    "canonical_role": "M4 audit artifact contract",
+    "summary": "Defines the secret-free end-to-end live evidence transcript."
+  },
+  {
+    "id": "live-review-transcript-fixture",
+    "title": "Live evidence review transcript fixture",
+    "path": "examples/transcripts/live-review.fixture.json",
+    "source_group": "implementation",
+    "layer": "fixture",
+    "domain_tags": ["M4", "Anvil", "transcript"],
+    "status": "current",
+    "canonical_role": "Auditable live evidence result",
+    "summary": "Links five contract addresses, twelve events, evidence hash, five signed receipts, resolved and unresolved disputes, and both gate outcomes."
   }
 ]

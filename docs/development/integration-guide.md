@@ -1,6 +1,6 @@
 # Integration guide
 
-本文给参与 LoveEngine Witness Skill M2 收口和 M3 Agent 网络试点的开发者和 Agent 使用。
+本文给参与 LoveEngine Witness Skill M4 直播证据试点及后续升级的开发者和 Agent 使用。
 
 ## 1. 初始化
 
@@ -65,6 +65,14 @@ M4：
 2. domain/use-case 只依赖端口，不依赖 aiohttp 或 SQLite。
 3. LiveGateway、SQLite、文件系统和 dashboard 作为 adapters 接入。
 4. 最后运行三节点 live-evidence E2E 和 transcript 验证。
+
+M4 验收：
+
+```powershell
+uv run pytest .\tests\integration\test_live_evidence_demo.py
+uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
+uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
+```
 
 ## 4. 接口规则
 

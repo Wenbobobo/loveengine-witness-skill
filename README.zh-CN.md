@@ -4,8 +4,8 @@
 
 LoveEngine Witness Skill 是面向 Agent 网络的公共利益见证协议。它将资料溯源、EIP-712 身份与任务、本地治理合约、Relay 网络、证据产物和可重放 transcript 组合成可验证 Skill，同时保证私钥不进入 Agent 上下文。
 
-当前稳定演示版本：`0.3.1-demo-ready`。  
-当前开发目标：`0.4.0-live-evidence-pilot`。
+当前稳定演示版本：`0.4.0-live-evidence-pilot`。
+上一版纯网络演示：`0.3.1-demo-ready`。
 
 ## 系统架构
 
@@ -116,6 +116,7 @@ cd ..
 
 uv run pytest .\tests\test_demo.py
 uv run pytest .\tests\integration\test_network_demo.py
+uv run pytest .\tests\integration\test_live_evidence_demo.py
 ```
 
 ## 运行演示

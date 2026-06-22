@@ -1,0 +1,685 @@
+{
+  "schema_version": "loveengine.live-review-transcript/1",
+  "run_id": "live-evidence-pilot-001",
+  "chain_id": "31337",
+  "contracts": {
+    "StreamingEngine": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "PublicSink": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "CorporateSink": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "WitnessDAO": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    "SkillRegistry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+  },
+  "bootstrap": {
+    "schema_version": "loveengine.bootstrap-bundle/2",
+    "chain_id": "31337",
+    "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+    "publisher": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "directory": [
+      {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "31337",
+        "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+        "profile": {
+          "node": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+          "capabilities": [
+            "observe_live_text",
+            "review_dispute"
+          ],
+          "sequence": "1",
+          "valid_until": "4102444800"
+        },
+        "signature": "0x3af1fcb9ca05fb978ca623be9e971f6803a7cf9a21f9086b4f2b3f11f454c8bc3676559f241d5121abdb19adbed190379eb99d89825ef5289ea36548b4ff4ba21b"
+      },
+      {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "31337",
+        "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+        "profile": {
+          "node": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+          "capabilities": [
+            "observe_live_text",
+            "review_dispute"
+          ],
+          "sequence": "2",
+          "valid_until": "4102444800"
+        },
+        "signature": "0x0f30b6dd2060ea91a473a33b202140b664fdf9475501fefa8e4c551ad2e2aa3b2e0dac0477bc28c1b7a4ace5b38742e76b3cc5ba30a67cee43b3d8ebcc1a332f1b"
+      },
+      {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "31337",
+        "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+        "profile": {
+          "node": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+          "capabilities": [
+            "observe_live_text",
+            "review_dispute"
+          ],
+          "sequence": "3",
+          "valid_until": "4102444800"
+        },
+        "signature": "0xce31af25a0c16b0d3013caa92386f4cc5086138745e3d2b841ae981d57733cc233a5dfe5993bae91d6c28461d9f246e1ac8598ef8d823c3d020d99ba1b21cb331c"
+      }
+    ],
+    "directory_hash": "0xca19ea185be5826ee769a2107c371669fe7feac118e8f6a7dd65bbd1fcbbcc9e",
+    "sequence": "1",
+    "valid_until": "4102444800",
+    "signature": "0x9f64e77b255325e108c57087db529e73f02ab8bdaa52ce1ad9edc5882780678714ef8ff0797e62025a74fc46e2742237a21077570b5b3174f3546cf0279a00451b"
+  },
+  "session": {
+    "closed_at": "1770000020",
+    "created_at": "1770000000",
+    "head_event_hash": "0xe50dbd497cd3654b0bb565fe11d224ba0e27db6d185336f7ddb5e07cdfa23f9b",
+    "next_sequence": "13",
+    "schema_version": "loveengine.live-session/1",
+    "session_id": "live-evidence-session-001",
+    "source_type": "fixture",
+    "status": "closed"
+  },
+  "events": [
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-001",
+      "session_id": "live-evidence-session-001",
+      "sequence": "1",
+      "occurred_at": "1770000001",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Broadcast opened and public observation began.",
+      "content_hash": "sha256:dd64565ddaf2a41943d6b08618923f8d5a9635165a2c6d79069a859303b51ab0",
+      "artifact_hash": "sha256:dd64565ddaf2a41943d6b08618923f8d5a9635165a2c6d79069a859303b51ab0",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "event_hash": "0x8bf92e3f1acf0a997620a105d38d8da4e054c3d2084a48d956a81899fa5d3c41"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-002",
+      "session_id": "live-evidence-session-001",
+      "sequence": "2",
+      "occurred_at": "1770000002",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Corporate representative described the proposed user count.",
+      "content_hash": "sha256:c9e5bf7a0db5f7c69754025d4fa16147d05be01819032bae441c98991da8b608",
+      "artifact_hash": "sha256:c9e5bf7a0db5f7c69754025d4fa16147d05be01819032bae441c98991da8b608",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x8bf92e3f1acf0a997620a105d38d8da4e054c3d2084a48d956a81899fa5d3c41",
+      "event_hash": "0x7da6e97611a087ea277d74172a1f439d963c620320943bea955f829ba38050ea"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-003",
+      "session_id": "live-evidence-session-001",
+      "sequence": "3",
+      "occurred_at": "1770000003",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Witness one requested the underlying calculation.",
+      "content_hash": "sha256:8970d65e1b713fcb8691716f8dd2d3ede0ec4620c71808fa529650b0d4db72f3",
+      "artifact_hash": "sha256:8970d65e1b713fcb8691716f8dd2d3ede0ec4620c71808fa529650b0d4db72f3",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x7da6e97611a087ea277d74172a1f439d963c620320943bea955f829ba38050ea",
+      "event_hash": "0x174839ea909dbfec7520a944555f60d09d60e7294909c0b96e3e3cb000b6761e"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-004",
+      "session_id": "live-evidence-session-001",
+      "sequence": "4",
+      "occurred_at": "1770000004",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Corporate representative supplied a public calculation reference.",
+      "content_hash": "sha256:d450c0be0e32169906c7f1a0192aac973d8c7af6c37fca9049907f5e08b82aab",
+      "artifact_hash": "sha256:d450c0be0e32169906c7f1a0192aac973d8c7af6c37fca9049907f5e08b82aab",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x174839ea909dbfec7520a944555f60d09d60e7294909c0b96e3e3cb000b6761e",
+      "event_hash": "0xfff7aa61bc8d133638657572758e18f9378111299f3d27c038e54660432115ae"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-005",
+      "session_id": "live-evidence-session-001",
+      "sequence": "5",
+      "occurred_at": "1770000005",
+      "category": "summary",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Summary: the calculation reference was supplied after a witness request.",
+      "content_hash": "sha256:0484d9a54dba4d3fb8c7dad1bf1bb1b8c2a71f8024928a87c1a727c8836b0115",
+      "artifact_hash": "sha256:0484d9a54dba4d3fb8c7dad1bf1bb1b8c2a71f8024928a87c1a727c8836b0115",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0xfff7aa61bc8d133638657572758e18f9378111299f3d27c038e54660432115ae",
+      "event_hash": "0x8703e4a73e296d06a858fd00f82b78e551d4adcd483f870ac7a7d42a0c992a38"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-006",
+      "session_id": "live-evidence-session-001",
+      "sequence": "6",
+      "occurred_at": "1770000006",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Witness two raised a critical completeness dispute.",
+      "content_hash": "sha256:3019c977d7d9af5137bc28d1a4d593be3ceaa53b7a076562a0d6f3cf352e7a17",
+      "artifact_hash": "sha256:3019c977d7d9af5137bc28d1a4d593be3ceaa53b7a076562a0d6f3cf352e7a17",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x8703e4a73e296d06a858fd00f82b78e551d4adcd483f870ac7a7d42a0c992a38",
+      "event_hash": "0x05574217e8c6ac2f2a2e2daf8e6c6d000f3d641967c95141a1429f2d6949e415"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-007",
+      "session_id": "live-evidence-session-001",
+      "sequence": "7",
+      "occurred_at": "1770000007",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "The referenced total was clarified on the public stream.",
+      "content_hash": "sha256:5e6d4fdf5fb9e05e1b09d1160fefdc7173da745bfed57858c68e0ae7be33c8aa",
+      "artifact_hash": "sha256:5e6d4fdf5fb9e05e1b09d1160fefdc7173da745bfed57858c68e0ae7be33c8aa",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x05574217e8c6ac2f2a2e2daf8e6c6d000f3d641967c95141a1429f2d6949e415",
+      "event_hash": "0xe9cfd64cfa409eee55a30fa120e2bce82253b8792d19117d85809de0cfda73dd"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-008",
+      "session_id": "live-evidence-session-001",
+      "sequence": "8",
+      "occurred_at": "1770000008",
+      "category": "derived",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Derived marker: critical dispute requires three-node review.",
+      "content_hash": "sha256:d3a97c3fc2abdc9c6d88ece348103e54e9f4a7df7d5f8d86a7f6346e1f961755",
+      "artifact_hash": "sha256:d3a97c3fc2abdc9c6d88ece348103e54e9f4a7df7d5f8d86a7f6346e1f961755",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0xe9cfd64cfa409eee55a30fa120e2bce82253b8792d19117d85809de0cfda73dd",
+      "event_hash": "0xf7cff0d0bd68867b3e5535fb23471bd2f6e9202143bcfef84b1b2cb158ddefc3"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-009",
+      "session_id": "live-evidence-session-001",
+      "sequence": "9",
+      "occurred_at": "1770000009",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Witness three confirmed receipt of the clarification.",
+      "content_hash": "sha256:0c058933aa322c80d65f4c1c6ac5e4206db145319a6a6e35b6181f0d47572a72",
+      "artifact_hash": "sha256:0c058933aa322c80d65f4c1c6ac5e4206db145319a6a6e35b6181f0d47572a72",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0xf7cff0d0bd68867b3e5535fb23471bd2f6e9202143bcfef84b1b2cb158ddefc3",
+      "event_hash": "0xd9ce82399f1b42d93a6be540b4ae766f0c43a2a122584c61f6cfaed416335d59"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-010",
+      "session_id": "live-evidence-session-001",
+      "sequence": "10",
+      "occurred_at": "1770000010",
+      "category": "summary",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Summary: all three witness nodes observed the relevant text.",
+      "content_hash": "sha256:845fa08f2d14047fc83b35cd85096edeae46cc61da2885515b1a8a760dad62a5",
+      "artifact_hash": "sha256:845fa08f2d14047fc83b35cd85096edeae46cc61da2885515b1a8a760dad62a5",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0xd9ce82399f1b42d93a6be540b4ae766f0c43a2a122584c61f6cfaed416335d59",
+      "event_hash": "0xd643d440cecb32cc21e321cea54a4f7a7fa1e0bb2e3a5f485bf73ac91a8d0d8c"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-011",
+      "session_id": "live-evidence-session-001",
+      "sequence": "11",
+      "occurred_at": "1770000011",
+      "category": "derived",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Derived marker: evidence sequence is complete through event eleven.",
+      "content_hash": "sha256:a68c96892fe1ebfc453a986b35b0f4b8687da274a73b6ef75b839521eace53a6",
+      "artifact_hash": "sha256:a68c96892fe1ebfc453a986b35b0f4b8687da274a73b6ef75b839521eace53a6",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0xd643d440cecb32cc21e321cea54a4f7a7fa1e0bb2e3a5f485bf73ac91a8d0d8c",
+      "event_hash": "0x4711b79e8fab88b2c65afb06457dfb780fcc98bea1d2431340da0c529a90a06b"
+    },
+    {
+      "schema_version": "loveengine.live-event/1",
+      "event_id": "live-012",
+      "session_id": "live-evidence-session-001",
+      "sequence": "12",
+      "occurred_at": "1770000012",
+      "category": "source",
+      "source_type": "fixture",
+      "source_uri": null,
+      "content": "Broadcast closed and no further source events were accepted.",
+      "content_hash": "sha256:522cbdc1fb1059d568b254326395f671d29e15309035e63e5209b5c01c8f18d7",
+      "artifact_hash": "sha256:522cbdc1fb1059d568b254326395f671d29e15309035e63e5209b5c01c8f18d7",
+      "media_url": null,
+      "media_hash": null,
+      "previous_event_hash": "0x4711b79e8fab88b2c65afb06457dfb780fcc98bea1d2431340da0c529a90a06b",
+      "event_hash": "0xe50dbd497cd3654b0bb565fe11d224ba0e27db6d185336f7ddb5e07cdfa23f9b"
+    }
+  ],
+  "evidence_bundle": {
+    "schema_version": "loveengine.evidence-bundle/2",
+    "bundle_id": "live-evidence-session-001:r1",
+    "session_id": "live-evidence-session-001",
+    "revision": "1",
+    "status": "finalized",
+    "finalized_at": "1770000021",
+    "event_count": "12",
+    "head_event_hash": "0xe50dbd497cd3654b0bb565fe11d224ba0e27db6d185336f7ddb5e07cdfa23f9b",
+    "category_counts": {
+      "source": "8",
+      "summary": "2",
+      "derived": "2"
+    },
+    "events": [
+      {
+        "event_id": "live-001",
+        "sequence": "1",
+        "category": "source",
+        "event_hash": "0x8bf92e3f1acf0a997620a105d38d8da4e054c3d2084a48d956a81899fa5d3c41",
+        "artifact_hash": "sha256:dd64565ddaf2a41943d6b08618923f8d5a9635165a2c6d79069a859303b51ab0"
+      },
+      {
+        "event_id": "live-002",
+        "sequence": "2",
+        "category": "source",
+        "event_hash": "0x7da6e97611a087ea277d74172a1f439d963c620320943bea955f829ba38050ea",
+        "artifact_hash": "sha256:c9e5bf7a0db5f7c69754025d4fa16147d05be01819032bae441c98991da8b608"
+      },
+      {
+        "event_id": "live-003",
+        "sequence": "3",
+        "category": "source",
+        "event_hash": "0x174839ea909dbfec7520a944555f60d09d60e7294909c0b96e3e3cb000b6761e",
+        "artifact_hash": "sha256:8970d65e1b713fcb8691716f8dd2d3ede0ec4620c71808fa529650b0d4db72f3"
+      },
+      {
+        "event_id": "live-004",
+        "sequence": "4",
+        "category": "source",
+        "event_hash": "0xfff7aa61bc8d133638657572758e18f9378111299f3d27c038e54660432115ae",
+        "artifact_hash": "sha256:d450c0be0e32169906c7f1a0192aac973d8c7af6c37fca9049907f5e08b82aab"
+      },
+      {
+        "event_id": "live-005",
+        "sequence": "5",
+        "category": "summary",
+        "event_hash": "0x8703e4a73e296d06a858fd00f82b78e551d4adcd483f870ac7a7d42a0c992a38",
+        "artifact_hash": "sha256:0484d9a54dba4d3fb8c7dad1bf1bb1b8c2a71f8024928a87c1a727c8836b0115"
+      },
+      {
+        "event_id": "live-006",
+        "sequence": "6",
+        "category": "source",
+        "event_hash": "0x05574217e8c6ac2f2a2e2daf8e6c6d000f3d641967c95141a1429f2d6949e415",
+        "artifact_hash": "sha256:3019c977d7d9af5137bc28d1a4d593be3ceaa53b7a076562a0d6f3cf352e7a17"
+      },
+      {
+        "event_id": "live-007",
+        "sequence": "7",
+        "category": "source",
+        "event_hash": "0xe9cfd64cfa409eee55a30fa120e2bce82253b8792d19117d85809de0cfda73dd",
+        "artifact_hash": "sha256:5e6d4fdf5fb9e05e1b09d1160fefdc7173da745bfed57858c68e0ae7be33c8aa"
+      },
+      {
+        "event_id": "live-008",
+        "sequence": "8",
+        "category": "derived",
+        "event_hash": "0xf7cff0d0bd68867b3e5535fb23471bd2f6e9202143bcfef84b1b2cb158ddefc3",
+        "artifact_hash": "sha256:d3a97c3fc2abdc9c6d88ece348103e54e9f4a7df7d5f8d86a7f6346e1f961755"
+      },
+      {
+        "event_id": "live-009",
+        "sequence": "9",
+        "category": "source",
+        "event_hash": "0xd9ce82399f1b42d93a6be540b4ae766f0c43a2a122584c61f6cfaed416335d59",
+        "artifact_hash": "sha256:0c058933aa322c80d65f4c1c6ac5e4206db145319a6a6e35b6181f0d47572a72"
+      },
+      {
+        "event_id": "live-010",
+        "sequence": "10",
+        "category": "summary",
+        "event_hash": "0xd643d440cecb32cc21e321cea54a4f7a7fa1e0bb2e3a5f485bf73ac91a8d0d8c",
+        "artifact_hash": "sha256:845fa08f2d14047fc83b35cd85096edeae46cc61da2885515b1a8a760dad62a5"
+      },
+      {
+        "event_id": "live-011",
+        "sequence": "11",
+        "category": "derived",
+        "event_hash": "0x4711b79e8fab88b2c65afb06457dfb780fcc98bea1d2431340da0c529a90a06b",
+        "artifact_hash": "sha256:a68c96892fe1ebfc453a986b35b0f4b8687da274a73b6ef75b839521eace53a6"
+      },
+      {
+        "event_id": "live-012",
+        "sequence": "12",
+        "category": "source",
+        "event_hash": "0xe50dbd497cd3654b0bb565fe11d224ba0e27db6d185336f7ddb5e07cdfa23f9b",
+        "artifact_hash": "sha256:522cbdc1fb1059d568b254326395f671d29e15309035e63e5209b5c01c8f18d7"
+      }
+    ],
+    "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+  },
+  "nodes": [
+    {
+      "schema_version": "loveengine.signed-agent-node-profile/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "profile": {
+        "node": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "capabilities": [
+          "observe_live_text",
+          "review_dispute"
+        ],
+        "sequence": "1",
+        "valid_until": "4102444800"
+      },
+      "signature": "0x3af1fcb9ca05fb978ca623be9e971f6803a7cf9a21f9086b4f2b3f11f454c8bc3676559f241d5121abdb19adbed190379eb99d89825ef5289ea36548b4ff4ba21b"
+    },
+    {
+      "schema_version": "loveengine.signed-agent-node-profile/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "profile": {
+        "node": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+        "capabilities": [
+          "observe_live_text",
+          "review_dispute"
+        ],
+        "sequence": "2",
+        "valid_until": "4102444800"
+      },
+      "signature": "0x0f30b6dd2060ea91a473a33b202140b664fdf9475501fefa8e4c551ad2e2aa3b2e0dac0477bc28c1b7a4ace5b38742e76b3cc5ba30a67cee43b3d8ebcc1a332f1b"
+    },
+    {
+      "schema_version": "loveengine.signed-agent-node-profile/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "profile": {
+        "node": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+        "capabilities": [
+          "observe_live_text",
+          "review_dispute"
+        ],
+        "sequence": "3",
+        "valid_until": "4102444800"
+      },
+      "signature": "0xce31af25a0c16b0d3013caa92386f4cc5086138745e3d2b841ae981d57733cc233a5dfe5993bae91d6c28461d9f246e1ac8598ef8d823c3d020d99ba1b21cb331c"
+    }
+  ],
+  "tasks": [
+    {
+      "schema_version": "loveengine.network-task/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:4293BC",
+      "task_type": "review_dispute",
+      "issuer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "manifest_hash": "0x5e325619b887d4115ea513cbf17226301828ff94b4010781ca189ba3a00175ef",
+      "payload": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+      },
+      "payload_hash": "0x8c617ddd8f8584186b742b44c00494c78a3835a4d6e46e9c295082f7126d129e",
+      "nonce": "1",
+      "deadline": "4102444700",
+      "signature": "0x2af9283092b4936c035d78bf221badc9d55cbb49718831f4e4af22444e11ce4c3b5ce2081f3838219f726552a856066439e478ea364ab9a21ae4abc80b76719f1c"
+    },
+    {
+      "schema_version": "loveengine.network-task/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:93b906",
+      "task_type": "review_dispute",
+      "issuer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "recipient": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "manifest_hash": "0x5e325619b887d4115ea513cbf17226301828ff94b4010781ca189ba3a00175ef",
+      "payload": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+      },
+      "payload_hash": "0x8c617ddd8f8584186b742b44c00494c78a3835a4d6e46e9c295082f7126d129e",
+      "nonce": "2",
+      "deadline": "4102444700",
+      "signature": "0x10e3e1ed43c3b82afd37e4a15dffdf6d61750e6f630eaa697860cd3e211ac47a448a448f6c791d1339cf4d625702abee1f51b0c0d5a3af3ea7b47e3bc6eefa1a1b"
+    },
+    {
+      "schema_version": "loveengine.network-task/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:2C6A65",
+      "task_type": "review_dispute",
+      "issuer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "recipient": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "manifest_hash": "0x5e325619b887d4115ea513cbf17226301828ff94b4010781ca189ba3a00175ef",
+      "payload": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+      },
+      "payload_hash": "0x8c617ddd8f8584186b742b44c00494c78a3835a4d6e46e9c295082f7126d129e",
+      "nonce": "3",
+      "deadline": "4102444700",
+      "signature": "0x7cdc8d833d0ac845fabe02d1195911cf90f3badb20f1239a011d45878128a9c21ac70f88f09c5893994e5fbb8489d16bd7ecaef80adb9d321c845f428d0e9c571c"
+    },
+    {
+      "schema_version": "loveengine.network-task/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-2:4293BC",
+      "task_type": "review_dispute",
+      "issuer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "manifest_hash": "0x5e325619b887d4115ea513cbf17226301828ff94b4010781ca189ba3a00175ef",
+      "payload": {
+        "dispute_id": "critical-2",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+      },
+      "payload_hash": "0x5034810abff004e1507361a964e71a0892a8addd60861116fdf1f783b8b51323",
+      "nonce": "4",
+      "deadline": "4102444700",
+      "signature": "0x360f7b968f3b127db7a524a29f128efd14465604e804cb833d7c346984fc102f28cc0bf2f896d7911c4ad41c363aa21b83e86ca670582af02f17f2cca901c4431b"
+    },
+    {
+      "schema_version": "loveengine.network-task/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-2:93b906",
+      "task_type": "review_dispute",
+      "issuer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      "recipient": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "manifest_hash": "0x5e325619b887d4115ea513cbf17226301828ff94b4010781ca189ba3a00175ef",
+      "payload": {
+        "dispute_id": "critical-2",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01"
+      },
+      "payload_hash": "0x5034810abff004e1507361a964e71a0892a8addd60861116fdf1f783b8b51323",
+      "nonce": "5",
+      "deadline": "4102444700",
+      "signature": "0x048763cd85ab0fbbc8162d10685ee6f4f856e9b2f0859329ef0f992c6a977c3c3adac6c691f3db3b2661432e60681d2d4f4a15b5fd85c6995c26a960084f010d1b"
+    }
+  ],
+  "reviews": [
+    {
+      "schema_version": "loveengine.task-receipt/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:4293BC",
+      "node": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "status": "completed",
+      "result": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+        "verdict": "dismiss",
+        "reason_hash": "0x1fcc7b261431bf6d2e00daa17652d3d5712eab6b3ec42a11ec0bdc227fb6e932"
+      },
+      "result_hash": "0x036ef39f81b85c71ed128e6e109c2467b407f0af386e3844f11baea9900f5ec8",
+      "nonce": "1",
+      "completed_at": "4102444699",
+      "signature": "0x5d1f9c428added8b843197aa6ed1ca9560bc30c75edb3f5ab743c373d7f2ea3c084bd42c350116aff93df794fe3149fc8a198a34da74293fbff5a67bb0c1e9731b"
+    },
+    {
+      "schema_version": "loveengine.task-receipt/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:2C6A65",
+      "node": "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65",
+      "status": "completed",
+      "result": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+        "verdict": "uphold",
+        "reason_hash": "0x086d7ca8156354c337493ad78e078876d3a2446441f7422a9164393b80397c2b"
+      },
+      "result_hash": "0x9d04783fa5c0da8835c995a129c5a1aec9978185a9860986e38b76ef8bf48959",
+      "nonce": "3",
+      "completed_at": "4102444699",
+      "signature": "0x798e46ff746739d488b1a8f4e5b9b0c6e74245af673c99c57a966de6a19f4c373b306b941b1ed64f379e62e09f3f80d1019787f40a814fbbf09389a02170c9e01c"
+    },
+    {
+      "schema_version": "loveengine.task-receipt/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-2:4293BC",
+      "node": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "status": "completed",
+      "result": {
+        "dispute_id": "critical-2",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+        "verdict": "dismiss",
+        "reason_hash": "0x61e9b4c1e8b61becad21cb7b395d3308e3b4a3ddeb7aca27b95774323a73db97"
+      },
+      "result_hash": "0x79711d5451f903af6161a7b8956b1087cdbd2428384adb3eaa31f8792df4e9c9",
+      "nonce": "4",
+      "completed_at": "4102444699",
+      "signature": "0xb31c2ad329224622fe4795dd90597bd72efc275385eb8a80dd1fcf413b3dc34738ba3a775e262a283ba75b55506fdd96caabd056e2ea737f2184910eb5d5cd1a1b"
+    },
+    {
+      "schema_version": "loveengine.task-receipt/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-1:93b906",
+      "node": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "status": "completed",
+      "result": {
+        "dispute_id": "critical-1",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+        "verdict": "dismiss",
+        "reason_hash": "0x1fcc7b261431bf6d2e00daa17652d3d5712eab6b3ec42a11ec0bdc227fb6e932"
+      },
+      "result_hash": "0x036ef39f81b85c71ed128e6e109c2467b407f0af386e3844f11baea9900f5ec8",
+      "nonce": "2",
+      "completed_at": "4102444699",
+      "signature": "0x146330ffbe30a2d7f89d6372d173508fc751e25a64038ae98022bfc21becb2693e4ea1fe0cf9ce1a103f8272a98b264bed28b4ae453a26c1c7fcf605001dc4a21b"
+    },
+    {
+      "schema_version": "loveengine.task-receipt/2",
+      "chain_id": "31337",
+      "registry": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "task_id": "critical-2:93b906",
+      "node": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+      "status": "completed",
+      "result": {
+        "dispute_id": "critical-2",
+        "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+        "verdict": "dismiss",
+        "reason_hash": "0x61e9b4c1e8b61becad21cb7b395d3308e3b4a3ddeb7aca27b95774323a73db97"
+      },
+      "result_hash": "0x79711d5451f903af6161a7b8956b1087cdbd2428384adb3eaa31f8792df4e9c9",
+      "nonce": "5",
+      "completed_at": "4102444699",
+      "signature": "0x9630124d02402cebfd6525e60160039e08d396a6306c94a5972db4192d06fcdf2cfd1c7275454925bb960fd544a78655e98fc97b36c76f272c448b156712ca611b"
+    }
+  ],
+  "disputes": [
+    {
+      "schema_version": "loveengine.dispute-case/1",
+      "dispute_id": "critical-1",
+      "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+      "severity": "critical",
+      "reason_hash": "0x659f882fef3dfbd0172e4c144407f80a06211b59c26f0929cf0778d7b3d64188",
+      "deadline": "4102444700",
+      "status": "dismissed",
+      "valid_review_count": "3",
+      "review_ids": [
+        "critical-1:4293BC",
+        "critical-1:2C6A65",
+        "critical-1:93b906"
+      ]
+    },
+    {
+      "schema_version": "loveengine.dispute-case/1",
+      "dispute_id": "critical-2",
+      "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+      "severity": "critical",
+      "reason_hash": "0xb4f10c540469af85678ae6b0c450af619d78713207a3acf7761698ff1f0fb9f1",
+      "deadline": "4102444700",
+      "status": "unresolved",
+      "valid_review_count": "2",
+      "review_ids": [
+        "critical-2:4293BC",
+        "critical-2:93b906"
+      ]
+    }
+  ],
+  "proposal_gate": {
+    "accepted": {
+      "schema_version": "loveengine.proposal-plan/1",
+      "ready": true,
+      "session_id": "live-evidence-session-001",
+      "bundle_hash": "0x2de0dbb661751cca0288c8423576fb9d759e4b634b9e1196ddbae00d1f715c01",
+      "proposal": {
+        "action": "set_total_uto",
+        "value": "100"
+      },
+      "critical_disputes": [
+        "critical-1"
+      ],
+      "proposal_hash": "0xa14ed8ea853d67fc6bd74dfe5fe206fb01317ebd2d66d7b719673096e66c621f"
+    },
+    "blocked": {
+      "ready": false,
+      "error": "proposal_gate_blocked",
+      "message": "critical_dispute_blocked:critical-2"
+    }
+  },
+  "metrics": {
+    "connected": 0,
+    "queued": 5,
+    "delivered": 5,
+    "acked": 5,
+    "rejected": 2,
+    "duplicate_events": 1,
+    "stream_lag_seconds": 0,
+    "latency_ms": {
+      "count": 5,
+      "max": 109.768
+    },
+    "node_processes": 3
+  },
+  "transcript_hash": "sha256:a26cf2ce590af08a46691c82e1bf52b29498e12dae019b75c793c0ecbd4d27bb"
+}

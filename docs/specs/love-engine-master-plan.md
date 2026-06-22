@@ -24,8 +24,8 @@ LoveEngine 首先是可被 Agent 网络验证、安装、传播和运行的 UAS 
 - **M1**：完成。JSON Schema、canonical JSON、hash、CLI 和稳定错误码已实现。
 - **M2**：完成，标签 `v0.2.0-local-loop`。四合约、五见证者 E2E 和 69 签名测试已实现。
 - **M3**：完成，标签 `v0.3.0-network-pilot`。SkillRegistry、Relay、三节点任务与 transcript 已实现。
-- **M3.1**：实施中，目标 `v0.3.1-demo-ready`。清理 Git、文档、演示入口和扩展接口。
-- **M4**：实施中，目标 `v0.4.0-live-evidence-pilot`。通用文字流、证据、争议复核、ProposalGate 和只读面板。
+- **M3.1**：完成，标签 `v0.3.1-demo-ready`。Git、双语 README、演示入口和扩展接口已收口。
+- **M4**：完成，目标标签 `v0.4.0-live-evidence-pilot`。通用文字流、证据、三节点争议复核、ProposalGate、只读面板和 E2E 已实现。
 - **M5**：未来。企业补偿申请、表决、记录和公开查询。
 
 ## M4 acceptance

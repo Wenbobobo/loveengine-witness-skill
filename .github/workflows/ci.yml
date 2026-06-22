@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  python:
+  repository-python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,13 +15,13 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
-        run: uv sync
+        run: uv sync --frozen
       - name: Repository checks
         run: uv run python tools/check.py
       - name: Python tests
         run: uv run pytest -m "not integration"
 
-  foundry:
+  foundry-local-loop:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
-        run: uv sync
+        run: uv sync --frozen
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
@@ -44,7 +44,7 @@ jobs:
       - name: Local-loop integration
         run: uv run pytest tests/test_demo.py
 
-  network:
+  m3-network:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
-        run: uv sync
+        run: uv sync --frozen
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
@@ -63,3 +63,23 @@ jobs:
           forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
       - name: Three-node network integration
         run: uv run pytest tests/integration/test_network_demo.py
+
+  m4-live-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync --frozen
+      - name: Install pinned contract dependencies
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std@v1.9.7 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+      - name: Live evidence integration
+        run: uv run pytest tests/integration/test_live_evidence_demo.py

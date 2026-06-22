@@ -35,7 +35,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.3.1-demo-ready"
+    assert output["version"] == "0.4.0-live-evidence-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -244,3 +244,68 @@ def test_network_transcript_cli_verifies_committed_fixture() -> None:
     assert output["valid"] is True
     assert output["node_count"] == 3
     assert output["receipt_count"] == 6
+
+
+def test_live_cli_session_ingest_close_and_finalize(tmp_path: Path) -> None:
+    database = tmp_path / "live.sqlite"
+    artifacts = tmp_path / "artifacts"
+    bundle = tmp_path / "bundle.json"
+
+    created = run_cli(
+        "live",
+        "session",
+        "create",
+        "--db",
+        str(database),
+        "--session-id",
+        "cli-live-1",
+        "--created-at",
+        "1770000000",
+    )
+    assert created.returncode == 0, created.stderr
+
+    ingested = run_cli(
+        "live",
+        "ingest",
+        "--db",
+        str(database),
+        "--artifacts",
+        str(artifacts),
+        "--session-id",
+        "cli-live-1",
+        "--input",
+        str(ROOT / "examples" / "live" / "live-session.fixture.ndjson"),
+    )
+    assert ingested.returncode == 0, ingested.stderr
+    assert json.loads(ingested.stdout)["accepted"] == 12
+
+    closed = run_cli(
+        "live",
+        "close",
+        "--db",
+        str(database),
+        "--session-id",
+        "cli-live-1",
+        "--closed-at",
+        "1770000020",
+    )
+    assert closed.returncode == 0, closed.stderr
+
+    finalized = run_cli(
+        "evidence",
+        "finalize",
+        "--db",
+        str(database),
+        "--artifacts",
+        str(artifacts),
+        "--session-id",
+        "cli-live-1",
+        "--finalized-at",
+        "1770000021",
+        "--output",
+        str(bundle),
+    )
+    assert finalized.returncode == 0, finalized.stderr
+    value = json.loads(bundle.read_text(encoding="utf-8"))
+    load_schema("evidence-bundle-v2.schema.json").validate(value)
+    assert value["event_count"] == "12"

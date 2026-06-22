@@ -21,6 +21,14 @@ from .network_protocol import (
     verify_task,
 )
 from .network_typed_data import build_receipt_typed_data
+from .hashes import keccak256_hex
+from .m4_network import (
+    build_receipt_v2,
+    verify_node_profile_v2,
+    verify_receipt_v2,
+    verify_task_v2,
+)
+from .m4_typed_data import build_receipt_v2_typed_data
 from .relay import RelayStore
 
 
@@ -62,6 +70,20 @@ def verify_task_for_node(
         expected_registry=signed_profile["registry"],
         expected_recipient=signed_profile["profile"]["node"],
     )
+
+
+def verify_profile(signed_profile: dict[str, Any]) -> str:
+    if signed_profile.get("schema_version") == "loveengine.signed-agent-node-profile/2":
+        return verify_node_profile_v2(signed_profile)
+    return verify_node_profile(signed_profile)
+
+
+def verify_relay_receipt(
+    receipt: dict[str, Any], chain_id: str, registry: str
+) -> str:
+    if receipt.get("schema_version") == "loveengine.task-receipt/2":
+        return verify_receipt_v2(receipt, chain_id, registry)
+    return verify_receipt(receipt, chain_id, registry)
 
 
 def _signature_hex(value: bytes) -> str:
@@ -156,7 +178,7 @@ class RelayHub:
             return ws
         try:
             verify_relay_profile_binding(auth["profile"], self.bootstrap)
-            node = verify_node_profile(auth["profile"])
+            node = verify_profile(auth["profile"])
             recovered = Account.recover_message(
                 encode_defunct(text=challenge),
                 signature=auth["challenge_signature"],
@@ -207,7 +229,7 @@ class RelayHub:
                     continue
                 try:
                     receipt = value["receipt"]
-                    verify_receipt(
+                    verify_relay_receipt(
                         receipt,
                         self.bootstrap["chain_id"],
                         self.bootstrap["registry"],
@@ -333,6 +355,92 @@ async def run_node_client(
         "receipts": receipts,
         "rejected": rejected,
     }
+
+
+async def run_v2_review_client(
+    url: str,
+    node_address: str,
+    signed_profile: dict[str, Any],
+    expected_tasks: int,
+    verdicts: dict[str, str],
+    sign_challenge: Callable[[str], str],
+    sign_typed_data: Callable[[dict[str, Any]], str],
+) -> dict[str, Any]:
+    node = to_checksum_address(node_address)
+    completed: set[str] = set()
+    receipts: list[dict[str, Any]] = []
+    pending_messages: list[dict[str, Any]] = []
+    async with ClientSession() as session:
+        async with session.ws_connect(url) as ws:
+            challenge = await ws.receive_json()
+            await ws.send_json(
+                {
+                    "type": "authenticate",
+                    "profile": signed_profile,
+                    "challenge_signature": sign_challenge(challenge["challenge"]),
+                }
+            )
+            authenticated = await ws.receive_json()
+            if authenticated.get("status") != "authenticated":
+                raise RuntimeError("relay authentication failed")
+            while len(receipts) < expected_tasks:
+                message = (
+                    pending_messages.pop(0)
+                    if pending_messages
+                    else await ws.receive_json(timeout=10)
+                )
+                if message.get("type") != "task":
+                    continue
+                task = message["task"]
+                if task["task_id"] in completed:
+                    continue
+                verify_task_v2(
+                    task,
+                    expected_chain_id=signed_profile["chain_id"],
+                    expected_registry=signed_profile["registry"],
+                    expected_recipient=node,
+                )
+                completed.add(task["task_id"])
+                dispute_id = task["payload"]["dispute_id"]
+                verdict = verdicts[dispute_id]
+                result = {
+                    "dispute_id": dispute_id,
+                    "bundle_hash": task["payload"]["bundle_hash"],
+                    "verdict": verdict,
+                    "reason_hash": keccak256_hex(
+                        f"{dispute_id}:{verdict}".encode()
+                    ),
+                }
+                receipt = build_receipt_v2(
+                    chain_id=task["chain_id"],
+                    registry=task["registry"],
+                    task_id=task["task_id"],
+                    node=node,
+                    status="completed",
+                    result=result,
+                    nonce=task["nonce"],
+                    completed_at=str(int(task["deadline"]) - 1),
+                )
+                receipt["signature"] = sign_typed_data(
+                    build_receipt_v2_typed_data(receipt)
+                )
+                await ws.send_json({"type": "receipt", "receipt": receipt})
+                while True:
+                    ack = await ws.receive_json(timeout=10)
+                    if (
+                        ack.get("type") == "ack"
+                        and ack.get("task_id") == receipt["task_id"]
+                    ):
+                        break
+                    if ack.get("type") == "task":
+                        pending_messages.append(ack)
+                        continue
+                    raise RuntimeError(
+                        "relay did not acknowledge receipt: "
+                        + json.dumps(ack, sort_keys=True)
+                    )
+                receipts.append(receipt)
+    return {"node": node, "receipts": receipts}
 
 
 async def serve_forever(

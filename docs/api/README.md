@@ -9,6 +9,7 @@
 | `docs/api/loveengine-contract-api.md` | 四合约接口、EIP-712 约束、事件和集成顺序 |
 | `docs/api/agent-skill-api.md` | Skill manifest、Agent 节点声明、传播任务、证据包、transcript |
 | `docs/api/agent-network-api.md` | SkillRegistry、签名节点身份、bootstrap、网络任务、回执和 Relay Hub |
+| `docs/api/live-evidence-api.md` | LiveGateway、事件哈希链、EvidenceBundleV2、争议复核、ProposalGate 和只读面板 |
 
 ## 状态标记
 
@@ -21,7 +22,7 @@
 | M1 implemented | schema / CLI 已实现并有自动测试 |
 | M2 local implemented | 本地链、合约、relayer 或 transcript 已实现 |
 | M3 local implemented | 本地 Anvil、Relay Hub 和三节点进程试点已实现 |
-| M4+ target | 后续真实证据和争议闭环目标 |
+| M4 local implemented | 本地直播证据、三节点复核和只读面板已实现 |
 | Open | 仍需决策 |
 
 ## 关键约束

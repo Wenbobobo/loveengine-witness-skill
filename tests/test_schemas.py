@@ -100,3 +100,22 @@ def test_transcript_rejects_secret_fields_recursively() -> None:
 
     with pytest.raises(ValidationError):
         validator("local-loop-transcript-v1.schema.json").validate(value)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "live-session-v1.schema.json",
+        "live-event-v1.schema.json",
+        "evidence-bundle-v2.schema.json",
+        "dispute-case-v1.schema.json",
+        "dispute-review-v1.schema.json",
+        "signed-agent-node-profile-v2.schema.json",
+        "bootstrap-bundle-v2.schema.json",
+        "network-task-v2.schema.json",
+        "task-receipt-v2.schema.json",
+        "live-review-transcript-v1.schema.json",
+    ],
+)
+def test_m4_schemas_are_valid_draft_2020_12(name: str) -> None:
+    validator(name)

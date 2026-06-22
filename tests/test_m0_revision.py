@@ -59,16 +59,19 @@ def test_m0_fixtures_match_revision_and_are_static() -> None:
     assert propagation["payload_hash"] == manifest["package_hash"]
 
 
-def test_current_manifest_is_network_pilot_v3() -> None:
+def test_current_manifest_is_live_evidence_pilot() -> None:
     manifest = load(MANIFEST)
 
     assert manifest["schema_version"] == "loveengine.skill-manifest/0.3"
-    assert manifest["version"] == "0.3.1-demo-ready"
+    assert manifest["version"] == "0.4.0-live-evidence-pilot"
     assert manifest["registry_binding"]["chain_id"] == "31337"
     assert manifest["network"]["task_types"] == [
         "propagate_skill",
         "observe_broadcast",
+        "observe_live_text",
+        "review_dispute",
     ]
+    assert manifest["eip712"]["domain_version"] == "2"
     assert manifest["security"]["private_keys_in_agent_context"] is False
 
 
