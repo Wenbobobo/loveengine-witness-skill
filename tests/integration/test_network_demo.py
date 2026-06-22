@@ -34,9 +34,15 @@ def test_three_node_network_demo_is_auditable(tmp_path: Path) -> None:
     assert transcript["release"]["status"] == "deprecated"
 
 
-def test_network_transcript_rejects_tampered_bootstrap_profile(tmp_path: Path) -> None:
-    result = run_network_demo(tmp_path, nodes=3)
-    transcript = json.loads(Path(result["transcript_path"]).read_text())
+def test_network_transcript_rejects_tampered_bootstrap_profile() -> None:
+    transcript = json.loads(
+        (
+            Path(__file__).parents[2]
+            / "examples"
+            / "transcripts"
+            / "network-pilot.fixture.json"
+        ).read_text(encoding="utf-8")
+    )
     transcript["bootstrap"]["directory"][0]["profile"]["sequence"] = "999"
     transcript["nodes"] = transcript["bootstrap"]["directory"]
 
