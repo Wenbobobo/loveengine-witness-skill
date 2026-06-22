@@ -826,5 +826,16 @@
     "status": "current",
     "canonical_role": "Auditable live evidence result",
     "summary": "Links five contract addresses, twelve events, evidence hash, five signed receipts, resolved and unresolved disputes, and both gate outcomes."
+  },
+  {
+    "id": "m4-skill-supervision-next-stage-gaps",
+    "title": "M4 Skill supervision and next-stage gaps",
+    "path": "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
+    "source_group": "developer-docs",
+    "layer": "supervision",
+    "domain_tags": ["M4", "Skill packaging", "distribution", "E2E"],
+    "status": "current",
+    "canonical_role": "Next-stage SPEC supervision baseline",
+    "summary": "Explains the protocol-package Skill model, current workflow, six known gaps, and the required direction for packaging, distribution, live-source and local/public-testnet E2E."
   }
 ]

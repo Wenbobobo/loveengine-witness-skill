@@ -16,10 +16,11 @@ uv run python .\tools\check.py
 
 1. `README.md`
 2. `docs/specs/love-engine-master-plan.md`
-3. `docs/specs/love-engine-live-evidence-pilot-spec.md`
-4. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
-5. `docs/api/README.md`
-6. `skills/loveengine-witness/skill-manifest.json`
+3. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
+4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+5. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
+6. `docs/api/README.md`
+7. `skills/loveengine-witness/skill-manifest.json`
 
 查原始约束时再读：
 

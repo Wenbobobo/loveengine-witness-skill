@@ -7,12 +7,13 @@ These instructions apply to the LoveEngineSkill repository.
 1. `README.md`
 2. `docs/development/integration-guide.md`
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
-5. `docs/api/loveengine-contract-api.md`
-6. `docs/api/agent-skill-api.md`
-7. `docs/api/agent-network-api.md`
-8. `docs/api/extension-interfaces.md`
-9. `skills/loveengine-witness/skill-manifest.json`
+4. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
+5. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+6. `docs/api/loveengine-contract-api.md`
+7. `docs/api/agent-skill-api.md`
+8. `docs/api/agent-network-api.md`
+9. `docs/api/extension-interfaces.md`
+10. `skills/loveengine-witness/skill-manifest.json`
 
 ## Source material boundary
 

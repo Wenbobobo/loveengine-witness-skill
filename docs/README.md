@@ -19,6 +19,7 @@
 - `development/contract-team-handoff.md`: contract mapping and governance questions.
 - `development/m3-demo-runbook.md`: presentation sequence.
 - `development/m3-acceptance-report.md`: verified M3 evidence.
+- `development/m4-skill-supervision-and-next-stage-gaps.md`: M4 architecture review, missing pieces and next-stage supervision baseline.
 
 ## Sources and archive
 

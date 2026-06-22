@@ -31,6 +31,7 @@ All files below are preserved verbatim under `docs/archive/source-materials/2026
 | `docs/api/live-evidence-api.md` | LiveGateway, evidence and dispute API |
 | `docs/development/m3-demo-runbook.md` | Presentation procedure |
 | `docs/development/m3-acceptance-report.md` | Verified baseline evidence |
+| `docs/development/m4-skill-supervision-and-next-stage-gaps.md` | M4 supervision baseline and next-stage gaps |
 
 ## Implemented specifications
 

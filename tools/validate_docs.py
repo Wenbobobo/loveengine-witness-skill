@@ -24,6 +24,7 @@ REQUIRED_CURRENT_DOCS = {
     "docs/api/live-evidence-api.md",
     "docs/development/m3-demo-runbook.md",
     "docs/development/m3-acceptance-report.md",
+    "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
     "docs/api/README.md",
     "docs/api/loveengine-contract-api.md",
     "docs/api/agent-skill-api.md",

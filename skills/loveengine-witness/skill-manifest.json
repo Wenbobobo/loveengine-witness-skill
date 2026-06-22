@@ -18,6 +18,7 @@
     "docs/api/extension-interfaces.md",
     "docs/development/m3-demo-runbook.md",
     "docs/development/m3-acceptance-report.md",
+    "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
     "docs/reference/source-materials/current/UAS接口文档.md",
     "docs/reference/source-materials/current/UAS 见证方案 2.0.md",
     "schemas/skill-manifest-v2.schema.json",
@@ -83,10 +84,11 @@
     "docs/api/agent-network-api.md": "sha256:24cc3c14dd5ff1a36934f3211bf17e1f4b6d24ac4407aab81cffd3831528bbf8",
     "docs/api/agent-skill-api.md": "sha256:54844e8cdf59597dc1427a2a8dafa49a9327534772766c8a41e77d982a304cf9",
     "docs/api/loveengine-contract-api.md": "sha256:be2f9cd9347c09f52445e054878f25a5d0658c96f513a59887c945450fa0324a",
-    "docs/kb/source-inventory.md": "sha256:0b9df421fad92e79d1664a9b7417bcb52cfb94fc57b070d4d5dc595b743cf885",
+    "docs/kb/source-inventory.md": "sha256:32941f161faeccaa46a5d8c6e14a3276b28552a86f9a52d917ad74d97417f49e",
     "docs/api/extension-interfaces.md": "sha256:357f574efe922f0295646540caeb819070c7f2e8e0188c17551ba0f0db6cf87f",
     "docs/development/m3-demo-runbook.md": "sha256:deeb1165e9261058f00031fff919369d04ea14bbbd50b83b975aee2b7a88cc26",
     "docs/development/m3-acceptance-report.md": "sha256:fe77bc4d3407cf66d335272d6b93d8358c4387e20465b8149ff828893658f731",
+    "docs/development/m4-skill-supervision-and-next-stage-gaps.md": "sha256:cea7bbb76148ae194b7351a355372ecffa5f97348e0d3cdd2556812c18293d62",
     "docs/reference/source-materials/current/UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
     "docs/reference/source-materials/current/UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
     "schemas/skill-manifest-v2.schema.json": "sha256:65faa3916293c8ac4ff94af7b5d7475c40720cb07671cec371f269a0533c1718",
@@ -223,5 +225,5 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:b2fc549c6330f1decba4273c872743f7db5eb736b03e8dcc44c0bd22056b3d1f"
+  "package_hash": "sha256:1d263a06b3cc2989139cca26abe2e042456702b33ee9876e8a9a05bae51b1022"
 }
