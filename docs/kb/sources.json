@@ -874,6 +874,17 @@
     "summary": "Separates automated accelerated acceptance from the required real four-hour release run."
   },
   {
+    "id": "m5-release-closeout-plan",
+    "title": "M5 release closeout execution plan",
+    "path": "docs/development/m5-release-closeout-plan.md",
+    "source_group": "developer-docs",
+    "layer": "execution-plan",
+    "domain_tags": ["M5", "CLI", "soak", "UI", "release"],
+    "status": "current",
+    "canonical_role": "Active release closeout plan",
+    "summary": "Defines the testable milestones for CLI diagnosis, background soak, observable UI, SCC0 documentation, long-run evidence, PR delivery and Git cleanup."
+  },
+  {
     "id": "standard-skill-entry",
     "title": "LoveEngine standard Skill entry",
     "path": "skills/loveengine-witness/SKILL.md",

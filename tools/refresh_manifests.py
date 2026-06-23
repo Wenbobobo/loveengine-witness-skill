@@ -20,6 +20,7 @@ M5_REFS = [
     "docs/specs/love-engine-lan-pilot-spec.md",
     "docs/api/lan-pilot-api.md",
     "docs/development/m5-acceptance-report.md",
+    "docs/development/m5-release-closeout-plan.md",
     "skills/loveengine-witness/SKILL.md",
     "skills/loveengine-witness/agents/openai.yaml",
     "schemas/pilot-config-v1.schema.json",

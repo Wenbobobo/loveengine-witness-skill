@@ -94,7 +94,8 @@
     "src/loveengine_witness/pilot_transcript.py",
     "src/loveengine_witness/pilot_demo.py",
     "src/loveengine_witness/pilot_soak.py",
-    "tools/refresh_manifests.py"
+    "tools/refresh_manifests.py",
+    "docs/development/m5-release-closeout-plan.md"
   ],
   "source_hashes": {
     "docs/specs/love-engine-master-plan.md": "sha256:b8595cf3d8ea432ae25073528ba4a94843e35a33f28bf2e6451b354720825c90",
@@ -106,7 +107,7 @@
     "docs/api/agent-network-api.md": "sha256:24cc3c14dd5ff1a36934f3211bf17e1f4b6d24ac4407aab81cffd3831528bbf8",
     "docs/api/agent-skill-api.md": "sha256:27ffa6eeec27c62b67d226e38f2a3e6f3117e27ab9fa82e900362b0b973cc831",
     "docs/api/loveengine-contract-api.md": "sha256:be2f9cd9347c09f52445e054878f25a5d0658c96f513a59887c945450fa0324a",
-    "docs/kb/source-inventory.md": "sha256:2a8c93a7d983348790941f033671b423df302aa1d346da0fa569b56bf54bf46f",
+    "docs/kb/source-inventory.md": "sha256:1c87cd13f009a96ddcdba2ad9f110388f5b2e1032c12a62574ba2d77931aef4e",
     "docs/api/extension-interfaces.md": "sha256:357f574efe922f0295646540caeb819070c7f2e8e0188c17551ba0f0db6cf87f",
     "docs/development/m3-demo-runbook.md": "sha256:deeb1165e9261058f00031fff919369d04ea14bbbd50b83b975aee2b7a88cc26",
     "docs/development/m3-acceptance-report.md": "sha256:fe77bc4d3407cf66d335272d6b93d8358c4387e20465b8149ff828893658f731",
@@ -186,7 +187,8 @@
     "src/loveengine_witness/pilot_transcript.py": "sha256:fea1df8755493326d457780c169af97eff81f18ebe1621d0a2a4c70f44285b0a",
     "src/loveengine_witness/pilot_demo.py": "sha256:7c7ac030da01e11b479c0d8faac805a20729f545d7c75499905f13516c3d1616",
     "src/loveengine_witness/pilot_soak.py": "sha256:ce159e1882f52241e86843e41284748577dcc53404bd26a22fc33cb451a1a642",
-    "tools/refresh_manifests.py": "sha256:1fe6cc703acd7936c11f6d11c9f4c64cee8fea6669cf5ed67ac9ddb3f5358e28"
+    "tools/refresh_manifests.py": "sha256:4a6e315e21052c83579fa474169acdaff750f89237e8e5421ddfe92b52ab7fef",
+    "docs/development/m5-release-closeout-plan.md": "sha256:bab75e634488b33dce5663598381fe9531c87d502920a928e71e1fbed2f94fb8"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -279,7 +281,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:b46b5e7b0063334710ac804e9811847e9d7746de80ddca7a2d143cf2e108e6e6",
+  "package_hash": "sha256:aa67b838d813807dd51f26b7fad1f72d33f785a1f66a064753badf2b2bdc1221",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,
