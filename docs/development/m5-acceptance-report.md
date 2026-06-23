@@ -68,5 +68,21 @@ loaded the resulting audit file into memory. The measured output was
 
 Successful read requests are now metrics-only, SSE empty reads use bounded
 long-polling instead of busy polling, and audit verification is streaming.
-Another one-hour run is required before merge; the four-hour tag gate is
-unchanged.
+
+The third run completed the full one-hour wall-clock preflight and passed every
+gate:
+
+- 60 committed events, three signed Agent receipts and ten observers.
+- One Pilot Server restart, one Anvil restart and three Agent disconnects.
+- Recovery: 2.160 seconds.
+- Task acceptance ACK p95/max: 59.635 ms.
+- Output: 2,257,727 bytes; peak RSS: 160,002,048 bytes.
+- Transcript SHA-256:
+  `c7bcd1c76e427f3427a8c1d573ce8048736e2c101eafe3b3b5ea354dd9fc7717`.
+- Report SHA-256:
+  `c24fb2b6f5e7fc58524a7d3af814b755178732456443f6bbcbaa6729900b6a81`.
+- Transcript verification returned 60 events, three observation receipts, five
+  explicit vote approvals and `valid: true`; secret scan returned zero.
+
+The one-hour merge gate is therefore satisfied. The separate four-hour tag gate
+is unchanged.

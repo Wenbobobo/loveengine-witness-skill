@@ -173,7 +173,7 @@
     "examples/live/live-session.fixture.ndjson": "sha256:aad96844e46acab362a1f7af65e7629db054cba1046deae3723f254c5515eaeb",
     "docs/specs/love-engine-lan-pilot-spec.md": "sha256:707bad4114e6fa823165e4ac0bd9b1a684a308bbca9ce055e571f41278797419",
     "docs/api/lan-pilot-api.md": "sha256:10b2df7f3c282f705f890e7774630c3e4515037cad9167297f1c52e7c11800ef",
-    "docs/development/m5-acceptance-report.md": "sha256:152482959af724ed1c1a99293b5002ed721e96539c62bc4ff0eabefe9dc40c4b",
+    "docs/development/m5-acceptance-report.md": "sha256:53287a19aefb5d01721483c5a9663120d8b6f8d26e65cb7da3b2191b424ff96c",
     "skills/loveengine-witness/SKILL.md": "sha256:43cc90b491ffe0708115178dad0cffefde218c81b315a9c06abc98e9131392a1",
     "skills/loveengine-witness/agents/openai.yaml": "sha256:1cc410633e91256ebb7b48c536734d76afce72df0276a6268257ece8e911524c",
     "schemas/pilot-config-v1.schema.json": "sha256:536b4ff7f944570db2bba6ffd5ee0036dde88f036c9f93a8006365ba22deeae6",
@@ -291,7 +291,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:35199f8496f516303b50cf92a9c8eb0bf1cae398dadd719a8ae6caf5eaee2225",
+  "package_hash": "sha256:36149e7f3a48ab1bde5db31dcb2b02cb0d054f78ec179546b9a59179d28abd39",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,
