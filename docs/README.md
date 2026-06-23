@@ -12,6 +12,7 @@
 - `api/agent-network-api.md`: SkillRegistry, Relay and M3 network protocol.
 - `api/extension-interfaces.md`: replaceable transport, signer, live, storage and read-model ports.
 - `api/lan-pilot-api.md`: M5 package, LAN control plane, observation, chain, voting and recovery interfaces.
+- `api/cli-reference.md`: complete CLI, operational, background soak and verification commands.
 
 ## Development
 
@@ -27,6 +28,7 @@
 ## Sources and archive
 
 - `reference/source-materials/current/`: current preserved source constraints.
+- `reference/licenses/scc0-provenance.md`: adopted SCC0 license source and exact provenance.
 - `archive/source-materials/2026-06-22/`: historical source materials.
 - `archive/specs/implemented/`: implemented M1/M2/M3/M4 specifications.
 - `archive/planning/2026-06-21/`: superseded plans.

@@ -13,7 +13,8 @@ These instructions apply to the LoveEngineSkill repository.
 7. `docs/api/agent-skill-api.md`
 8. `docs/api/agent-network-api.md`
 9. `docs/api/extension-interfaces.md`
-10. `skills/loveengine-witness/skill-manifest.json`
+10. `docs/api/cli-reference.md`
+11. `skills/loveengine-witness/skill-manifest.json`
 
 ## Source material boundary
 
@@ -53,6 +54,8 @@ uv run pytest tests/integration/test_network_demo.py
 - M5 observation Agents may reconnect from durable cursors, but still never
   sign votes. Vote approval is an explicit witness CLI action using an external
   RPC signer.
+- M5 measures task acceptance ACK latency separately from long-running task
+  completion latency.
 - Pilot write tokens are read from restricted files and never enter CLI
   arguments, logs, fixtures, snapshots, or transcripts.
 - Agent nodes verify chainId, SkillRegistry, Publisher, release status, package hash, recipient, nonce, and deadline.

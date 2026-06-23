@@ -29,6 +29,7 @@ class RelayStore:
                 nonce TEXT,
                 payload TEXT NOT NULL,
                 attempts INTEGER NOT NULL DEFAULT 0,
+                accepted INTEGER NOT NULL DEFAULT 0,
                 acked INTEGER NOT NULL DEFAULT 0,
                 receipt TEXT,
                 PRIMARY KEY (recipient, task_id),
@@ -36,6 +37,14 @@ class RelayStore:
             )
             """
         )
+        columns = {
+            str(row[1])
+            for row in self.connection.execute("PRAGMA table_info(messages)")
+        }
+        if "accepted" not in columns:
+            self.connection.execute(
+                "ALTER TABLE messages ADD COLUMN accepted INTEGER NOT NULL DEFAULT 0"
+            )
         self.connection.commit()
 
     def enqueue(
@@ -99,6 +108,17 @@ class RelayStore:
         )
         self.connection.commit()
 
+    def accept(self, recipient: str, task_id: str) -> bool:
+        cursor = self.connection.execute(
+            """
+            UPDATE messages SET accepted = 1
+            WHERE recipient = ? AND task_id = ? AND accepted = 0
+            """,
+            (recipient, task_id),
+        )
+        self.connection.commit()
+        return cursor.rowcount == 1
+
     def receipt(self, recipient: str, task_id: str) -> str | None:
         row = self.connection.execute(
             """
@@ -110,13 +130,15 @@ class RelayStore:
         return None if row is None else row[0]
 
     def metrics(self) -> dict[str, int]:
-        queued, delivered, acked = self.connection.execute(
+        queued, delivered, accepted, acked = self.connection.execute(
             """
-            SELECT COUNT(*), COALESCE(SUM(attempts), 0), COALESCE(SUM(acked), 0)
+            SELECT COUNT(*), COALESCE(SUM(attempts), 0),
+                   COALESCE(SUM(accepted), 0), COALESCE(SUM(acked), 0)
             FROM messages
             """
         ).fetchone()
         return {
+            "accepted": int(accepted),
             "acked": int(acked),
             "delivered": int(delivered),
             "queued": int(queued),

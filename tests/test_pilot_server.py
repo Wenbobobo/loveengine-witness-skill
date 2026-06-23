@@ -92,8 +92,16 @@ def test_pilot_server_protects_writes_and_exposes_read_models(tmp_path: Path) ->
             assert operator.status == 200
             assert "LoveEngine LAN Pilot" in operator_text
             assert "localStorage" not in operator_text
+            assert 'type="password"' in operator_text
+            assert 'id="metric-agents"' in operator_text
+            assert 'id="event-feed"' in operator_text
+            assert "method:'POST'" in operator_text
             dashboard = await client.get("/demo/")
             assert dashboard.status == 200
+            dashboard_text = await dashboard.text()
+            assert "Read-only evidence console" in dashboard_text
+            assert "innerHTML" not in dashboard_text
+            assert "method:'POST'" not in dashboard_text
         finally:
             await client.close()
 

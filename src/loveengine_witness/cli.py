@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .errors import LoveEngineError
 from .evidence import build_evidence_bundle
 from .dispute import aggregate_reviews, build_dispute, build_proposal_plan
@@ -50,6 +51,7 @@ from .pilot_snapshot import (
     verify_system_snapshot,
 )
 from .pilot_soak import run_pilot_soak
+from .pilot_soak_process import background_soak_status, start_background_soak
 from .pilot_chain import (
     initialize_chain,
     restore_chain,
@@ -74,6 +76,8 @@ class MachineArgumentParser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     parser = MachineArgumentParser(prog="loveengine")
     commands = parser.add_subparsers(dest="command")
+
+    commands.add_parser("version")
 
     manifest = commands.add_parser("manifest")
     manifest_commands = manifest.add_subparsers(dest="manifest_command")
@@ -311,6 +315,9 @@ def build_parser() -> argparse.ArgumentParser:
     pilot_soak.add_argument("--events", type=int, default=240)
     pilot_soak.add_argument("--observers", type=int, default=10)
     pilot_soak.add_argument("--output", type=Path, required=True)
+    pilot_soak.add_argument("--background", action="store_true")
+    pilot_soak_status = pilot_commands.add_parser("soak-status")
+    pilot_soak_status.add_argument("state", type=Path)
 
     witness = commands.add_parser("witness")
     witness_commands = witness.add_subparsers(dest="witness_command")
@@ -329,6 +336,14 @@ def emit(value: Any) -> None:
 
 
 def dispatch(args: argparse.Namespace) -> dict[str, Any]:
+    if args.command == "version":
+        manifest = read_json(DEFAULT_MANIFEST)
+        return {
+            "package_version": __version__,
+            "skill_version": manifest["version"],
+            "protocol": manifest["protocol"],
+            "package_root": str(Path(__file__).resolve().parents[2]),
+        }
     if args.command == "manifest" and args.manifest_command == "verify":
         return verify_manifest(args.manifest)
     if args.command == "node" and args.node_command == "declare":
@@ -694,12 +709,21 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
             args.output, older_than_days=args.older_than_days
         )
     if args.command == "pilot" and args.pilot_command == "soak":
+        if args.background:
+            return start_background_soak(
+                args.output,
+                duration_seconds=args.duration_seconds,
+                event_count=args.events,
+                observers=args.observers,
+            )
         return run_pilot_soak(
             args.output,
             duration_seconds=args.duration_seconds,
             event_count=args.events,
             observers=args.observers,
         )
+    if args.command == "pilot" and args.pilot_command == "soak-status":
+        return background_soak_status(args.state)
     if (
         args.command == "witness"
         and args.witness_command == "vote"

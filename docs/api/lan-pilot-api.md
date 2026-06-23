@@ -49,6 +49,9 @@ POST /v1/live/sessions/{sessionId}/close
 
 每个响应带 `X-Correlation-ID`。调用方可传入同名 header 关联请求。
 
+`/operator/` 是主持人写入控制台，token 只保存在页面内存；
+`/demo/` 是只读证据面板，不包含 POST、签名或交易操作。
+
 ## Observation protocol
 
 `ObserveLiveTextPayloadV1` 绑定 session、SSE URL、session URL、artifact
@@ -66,6 +69,16 @@ Agent 必须依次验证：
 
 三个不同签名节点的结果聚合为 `ObservationSetV1`。节点结果不一致时
 聚合失败。
+
+Relay 将任务接收与任务完成分开观测：
+
+- Agent 校验 task 的 chainId、Registry、recipient、nonce、deadline 和
+  payload 后，立即发送 `ack`/`accepted`。
+- `latency_ms` 只计算下发到接受 ACK 的延迟。
+- session 关闭、证据校验和签名回执完成后再发送 `TaskReceiptV2`；
+  该总耗时记录在 `completion_latency_ms`。
+- `observe_live_text` 运行期间客户端持续服务 WebSocket heartbeat，不能因
+  长直播阻塞 Relay 连接。
 
 ## Chain and voting
 
@@ -89,12 +102,16 @@ ObservationSet、EvidenceBundle、dispute、ProposalGate、proposal、五个
 ## Stable CLI
 
 ```text
+loveengine version
 loveengine package build|verify|install|self-check
 loveengine pilot serve|status
 loveengine pilot chain init|start|status|snapshot|restore
 loveengine pilot snapshot create|verify|restore|prune
 loveengine pilot transcript verify
-loveengine pilot soak
+loveengine pilot soak [--background]
+loveengine pilot soak-status <state>
 loveengine witness vote approve
 loveengine demo lan-pilot
 ```
+
+完整参数、后台 soak 和故障排查见 `docs/api/cli-reference.md`。

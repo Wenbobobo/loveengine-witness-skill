@@ -20,3 +20,5 @@ def test_accelerated_pilot_soak_with_faults_and_ten_observers(
     assert report["mode"] == "accelerated"
     assert report["passed"] is True
     assert all(report["checks"].values())
+    assert report["ack_latency_ms"]["p95"] < 2000
+    assert report["completion_latency_ms"]["count"] == 6

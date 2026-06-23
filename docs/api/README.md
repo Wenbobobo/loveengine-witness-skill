@@ -11,6 +11,7 @@
 | `docs/api/agent-network-api.md` | SkillRegistry、签名节点身份、bootstrap、网络任务、回执和 Relay Hub |
 | `docs/api/live-evidence-api.md` | LiveGateway、事件哈希链、EvidenceBundleV2、争议复核、ProposalGate 和只读面板 |
 | `docs/api/lan-pilot-api.md` | M5 PilotConfig、鉴权、观察协议、持久链、显式投票、snapshot 和统一 transcript |
+| `docs/api/cli-reference.md` | 完整 CLI、运行、后台 soak、验证矩阵和故障排查 |
 
 ## 状态标记
 

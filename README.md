@@ -99,103 +99,35 @@ tests/                     Unit, contract and end-to-end tests
 tools/                     Repository and compatibility validators
 ```
 
-## Requirements
+## Operator and read-only views
 
-- Python 3.11 or newer
-- [uv](https://docs.astral.sh/uv/)
-- Foundry `1.7.1` for contract and Anvil demos
+The Pilot Server exposes an authenticated host console and a separate
+read-only evidence view. The token remains only in page memory; the public view
+cannot write or sign. These screenshots are rendered from the repository's
+secret-free local UI fixture.
+
+![LoveEngine host operator console](docs/assets/operator-console.png)
+
+![LoveEngine read-only evidence console](docs/assets/read-only-dashboard.png)
+
+## Quick start
+
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Foundry `1.7.1`.
+The four commands below synchronize the locked environment, verify the
+manifest, run the package-to-PublicSink pilot, and verify its transcript.
 
 ```powershell
 uv sync --frozen
-cd contracts
-forge install foundry-rs/forge-std@v1.9.7 --no-git
-forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
-cd ..
-```
-
-## Verification
-
-```powershell
-uv run python .\tools\check.py
-uv run pytest -m "not integration" -q
-
-cd contracts
-forge test
-cd ..
-
-uv run pytest .\tests\test_demo.py
-uv run pytest .\tests\integration\test_network_demo.py
-uv run pytest .\tests\integration\test_live_evidence_demo.py
-uv run pytest .\tests\integration\test_pilot_chain.py
-uv run pytest .\tests\integration\test_pilot_demo.py
-uv run pytest .\tests\integration\test_pilot_soak.py
-```
-
-## Run the demos
-
-```powershell
 uv run loveengine manifest verify
-
-uv run loveengine demo local-loop --output .\examples\transcripts
-uv run loveengine transcript verify .\examples\transcripts\local-loop.fixture.json
-
-uv run loveengine network demo --nodes 3 --output .\examples\transcripts
-uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
-
-uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
-uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
-
-uv run loveengine package build --output .\dist
-uv run loveengine package verify .\dist\loveengine-witness-0.5.0-lan-pilot.zip
-uv run loveengine package install .\dist\loveengine-witness-0.5.0-lan-pilot.zip --target .\installed
-uv run loveengine package self-check --root .\installed
-
 uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
 uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 ```
 
-The LAN control-plane and recovery commands are specified in the [M5 API](docs/api/lan-pilot-api.md). The M3 presentation sequence remains available in the [demo runbook](docs/development/m3-demo-runbook.md).
-
-## LAN pilot operations
-
-Create a token file outside source control, then point `PilotConfigV1.token_file`
-to it. The token is never accepted as a CLI argument.
-
-```powershell
-uv run loveengine pilot chain init --root .\pilot-chain
-uv run loveengine pilot chain start --root .\pilot-chain
-uv run loveengine pilot chain status --root .\pilot-chain --rpc-url http://127.0.0.1:8545
-
-uv run loveengine pilot serve --config .\pilot-config.json
-uv run loveengine pilot status --url http://127.0.0.1:8780
-
-uv run loveengine pilot snapshot create --config .\pilot-config.json --chain-root .\pilot-chain --output .\snapshots
-uv run loveengine pilot snapshot verify .\snapshots\<snapshot>
-uv run loveengine pilot snapshot restore .\snapshots\<snapshot> --config .\pilot-config.json --chain-root .\pilot-chain
-uv run loveengine pilot snapshot prune --output .\snapshots --older-than-days 30
-```
-
-Formal four-hour soak:
-
-```powershell
-uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
-```
-
-The command injects one Pilot Server restart, one Anvil restart, and one
-disconnect for each of the three observation Agents. It fails if event
-continuity, ACK latency, recovery, disk, memory, or secret-scan thresholds are
-not met.
-
-## CLI groups
-
-```text
-manifest  node  fixture  evidence  transcript
-eip712    relayer  registry  bootstrap
-relay     network  live  dispute  review
-proposal  package  pilot  witness  demo
-```
-
-All successful commands emit JSON to stdout. Structured errors use stderr and stable error codes.
+Full installation, server, chain, snapshot, voting, legacy demo, background
+soak, and troubleshooting commands are in the
+[CLI and operations reference](docs/api/cli-reference.md). Run the complete
+automated quality matrix with `tools/run_release_checks.ps1`; the real
+four-hour wall-clock soak remains a separate release gate.
 
 ## Security invariants
 
@@ -207,14 +139,19 @@ All successful commands emit JSON to stdout. Structured errors use stderr and st
   `loveengine witness vote approve` command using an external RPC signer.
 - `PublicSink` remains read-only.
 
-## Documentation order
+## Documentation entrypoints
 
-1. [Master plan](docs/specs/love-engine-master-plan.md)
-2. [Active M5 specification](docs/specs/love-engine-lan-pilot-spec.md)
-3. [API index](docs/api/README.md)
-4. [Integration guide](docs/development/integration-guide.md)
-5. [Source inventory](docs/kb/source-inventory.md)
+- Architecture and scope: [master plan](docs/specs/love-engine-master-plan.md)
+  and [active M5 specification](docs/specs/love-engine-lan-pilot-spec.md).
+- Interfaces and commands: [API index](docs/api/README.md) and
+  [CLI reference](docs/api/cli-reference.md).
+- Development and operations:
+  [integration guide](docs/development/integration-guide.md) and
+  [M5 acceptance report](docs/development/m5-acceptance-report.md).
+- Provenance: [source inventory](docs/kb/source-inventory.md) and
+  [SCC0 provenance](docs/reference/licenses/scc0-provenance.md).
 
 ## License
 
-No repository-wide open-source license has been selected. Do not infer a license from archived SCC0 or DAism materials.
+LoveEngineSkill is released under Smart Creative Commons Zero (SCC0). See
+[LICENSE](LICENSE) and the exact [license provenance](docs/reference/licenses/scc0-provenance.md).

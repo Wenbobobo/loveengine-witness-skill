@@ -98,102 +98,33 @@ tests/                     单元、合约和端到端测试
 tools/                     仓库及兼容性检查
 ```
 
-## 环境准备
+## 操作台与只读面板
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/)
-- Foundry `1.7.1`
+Pilot Server 提供需要鉴权的主持人操作台，以及完全分离的只读证据面板。
+token 只保存在当前页面内存；公开面板不能写入或签名。以下截图由仓库内
+无秘密的本地 UI fixture 实际渲染。
+
+![LoveEngine 主持人操作台](docs/assets/operator-console.png)
+
+![LoveEngine 只读证据面板](docs/assets/read-only-dashboard.png)
+
+## 快速运行
+
+需要 Python 3.11+、[uv](https://docs.astral.sh/uv/) 和 Foundry `1.7.1`。
+下面四条命令依次同步锁定环境、校验 manifest、运行从发布包到
+PublicSink 的完整试点，并离线复核 transcript。
 
 ```powershell
 uv sync --frozen
-cd contracts
-forge install foundry-rs/forge-std@v1.9.7 --no-git
-forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
-cd ..
-```
-
-## 完整验证
-
-```powershell
-uv run python .\tools\check.py
-uv run pytest -m "not integration" -q
-
-cd contracts
-forge test
-cd ..
-
-uv run pytest .\tests\test_demo.py
-uv run pytest .\tests\integration\test_network_demo.py
-uv run pytest .\tests\integration\test_live_evidence_demo.py
-uv run pytest .\tests\integration\test_pilot_chain.py
-uv run pytest .\tests\integration\test_pilot_demo.py
-uv run pytest .\tests\integration\test_pilot_soak.py
-```
-
-## 运行演示
-
-```powershell
 uv run loveengine manifest verify
-
-uv run loveengine demo local-loop --output .\examples\transcripts
-uv run loveengine transcript verify .\examples\transcripts\local-loop.fixture.json
-
-uv run loveengine network demo --nodes 3 --output .\examples\transcripts
-uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
-
-uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
-uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
-
-uv run loveengine package build --output .\dist
-uv run loveengine package verify .\dist\loveengine-witness-0.5.0-lan-pilot.zip
-uv run loveengine package install .\dist\loveengine-witness-0.5.0-lan-pilot.zip --target .\installed
-uv run loveengine package self-check --root .\installed
-
 uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
 uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 ```
 
-局域网控制面、持久链和恢复命令见 [M5 API](docs/api/lan-pilot-api.md)。M3 对外演示顺序仍保留在[演示手册](docs/development/m3-demo-runbook.md)。
-
-## 局域网试点操作
-
-先在源码管理之外创建 token 文件，并通过 `PilotConfigV1.token_file`
-引用。CLI 不接受 token 明文参数。
-
-```powershell
-uv run loveengine pilot chain init --root .\pilot-chain
-uv run loveengine pilot chain start --root .\pilot-chain
-uv run loveengine pilot chain status --root .\pilot-chain --rpc-url http://127.0.0.1:8545
-
-uv run loveengine pilot serve --config .\pilot-config.json
-uv run loveengine pilot status --url http://127.0.0.1:8780
-
-uv run loveengine pilot snapshot create --config .\pilot-config.json --chain-root .\pilot-chain --output .\snapshots
-uv run loveengine pilot snapshot verify .\snapshots\<snapshot>
-uv run loveengine pilot snapshot restore .\snapshots\<snapshot> --config .\pilot-config.json --chain-root .\pilot-chain
-uv run loveengine pilot snapshot prune --output .\snapshots --older-than-days 30
-```
-
-正式四小时 soak：
-
-```powershell
-uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
-```
-
-该命令会注入一次 Pilot Server 重启、一次 Anvil 重启，以及三个观察
-Agent 各一次断线。事件连续性、ACK 延迟、恢复时间、磁盘、内存或
-secret scan 任一阈值不达标都会失败。
-
-## CLI 分组
-
-```text
-manifest  node  fixture  evidence  transcript
-eip712    relayer  registry  bootstrap
-relay     network  live  dispute  review
-proposal  package  pilot  witness  demo
-```
-
-成功结果写入 stdout JSON；错误写入 stderr，并使用稳定错误码。
+安装包、服务、链、snapshot、显式投票、旧里程碑演示、后台 soak 和故障
+排查命令统一放在[CLI 与运行手册](docs/api/cli-reference.md)。完整自动化
+质量矩阵由 `tools/run_release_checks.ps1` 执行；真实四小时墙钟 soak 仍是
+单独的发布门槛。
 
 ## 安全边界
 
@@ -205,14 +136,18 @@ proposal  package  pilot  witness  demo
   `loveengine witness vote approve`，并使用外部 RPC signer。
 - `PublicSink` 始终只读。
 
-## 阅读顺序
+## 文档入口
 
-1. [工程总规划](docs/specs/love-engine-master-plan.md)
-2. [M5 活动 SPEC](docs/specs/love-engine-lan-pilot-spec.md)
-3. [API 入口](docs/api/README.md)
-4. [开发接入指南](docs/development/integration-guide.md)
-5. [资料索引](docs/kb/source-inventory.md)
+- 架构与范围：[工程总规划](docs/specs/love-engine-master-plan.md)和
+  [M5 活动 SPEC](docs/specs/love-engine-lan-pilot-spec.md)。
+- 接口与命令：[API 入口](docs/api/README.md)和
+  [CLI 与运行手册](docs/api/cli-reference.md)。
+- 开发与运维：[接入指南](docs/development/integration-guide.md)和
+  [M5 验收报告](docs/development/m5-acceptance-report.md)。
+- 资料溯源：[资料索引](docs/kb/source-inventory.md)和
+  [SCC0 来源说明](docs/reference/licenses/scc0-provenance.md)。
 
 ## License
 
-仓库尚未选择统一开源许可证，不得从历史 SCC0 或 DAism 资料推断许可证。
+LoveEngineSkill 采用 Smart Creative Commons Zero（SCC0）。详见
+[LICENSE](LICENSE)和[SCC0 来源说明](docs/reference/licenses/scc0-provenance.md)。

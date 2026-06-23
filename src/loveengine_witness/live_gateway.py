@@ -21,21 +21,92 @@ SSE_COUNTER_KEY = web.AppKey("sse_counter", object)
 
 
 DASHBOARD_HTML = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>LoveEngine Live Evidence</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LoveEngine Live Evidence · Evidence Console</title>
 <style>
-body{font-family:system-ui;background:#0d1117;color:#e6edf3;max-width:960px;margin:3rem auto;padding:0 1rem}
-article{border:1px solid #30363d;border-radius:12px;padding:1rem;margin:.75rem 0}
-.ok{color:#3fb950}.bad{color:#f85149}code{color:#79c0ff}
-</style></head><body><h1>LoveEngine Live Evidence</h1>
-<p>Read-only M4 session, evidence, dispute and ProposalGate model.</p>
-<main id="sessions"></main>
+:root{color-scheme:dark;--bg:#0b0d0c;--panel:#151815;--line:#30352f;--text:#ebe8de;--muted:#989b94;
+--green:#9ee493;--blue:#8ecae6;--amber:#f0c36a;--red:#ff7b72}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#111711,var(--bg) 45%);color:var(--text);
+font:14px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}.shell{width:min(1180px,calc(100% - 32px));margin:30px auto 60px}
+header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;border-bottom:1px solid var(--line);padding-bottom:20px}
+.eyebrow{color:var(--green);font-size:11px;letter-spacing:.16em;text-transform:uppercase}h1,h2{font-family:Georgia,serif}
+h1{font-size:clamp(32px,5vw,52px);line-height:1;margin:6px 0}.subtitle{color:var(--muted);margin:0}
+.readonly{border:1px solid #3e5e3d;color:var(--green);padding:8px 11px;border-radius:99px}.metrics{display:grid;
+grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}.metric,.panel,.session{background:linear-gradient(145deg,#1b1f1b,var(--panel));
+border:1px solid var(--line)}.metric{padding:14px}.metric span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase}
+.metric strong{font:600 24px/1.3 Georgia,serif}.layout{display:grid;grid-template-columns:.8fr 1.4fr;gap:12px}.panel{padding:18px}
+.panel h2{margin:0 0 12px}.sessions{display:grid;gap:8px}.session{padding:14px;cursor:pointer;text-align:left;color:var(--text);font:inherit}
+.session:hover,.session.selected{border-color:var(--green)}.session-top{display:flex;justify-content:space-between;gap:10px}
+.badge{font-size:11px;border-radius:99px;padding:2px 7px;border:1px solid var(--line);color:var(--muted)}.badge.ok{color:var(--green);border-color:#3c5f3c}
+.hash{color:var(--blue);font-size:11px;word-break:break-all;margin-top:8px}.empty{color:var(--muted);padding:32px 0;text-align:center}
+.detail-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.integrity{padding:8px 10px;border-left:3px solid var(--amber);background:#282212}
+.integrity.ok{border-color:var(--green);background:#142014}.integrity.bad{border-color:var(--red);background:#291614}.timeline{margin-top:18px}
+.event{display:grid;grid-template-columns:50px 1fr;gap:10px;padding:11px 0;border-top:1px solid var(--line)}.seq{color:var(--green)}
+.event p{margin:0;white-space:pre-wrap}.meta{color:var(--muted);font-size:11px;margin-top:4px}.error{color:var(--red)}
+footer{color:var(--muted);font-size:11px;margin-top:14px;display:flex;justify-content:space-between}
+@media(max-width:800px){header{align-items:flex-start;flex-direction:column}.metrics{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}}
+@media(max-width:480px){.metrics{grid-template-columns:1fr}.shell{width:calc(100% - 18px)}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header><div><div class="eyebrow">LoveEngine / public read model</div><h1>Evidence console</h1>
+<p class="subtitle">Read-only evidence console for session continuity, artifact integrity and observable network state.</p></div>
+<div class="readonly">READ ONLY · no signing</div></header>
+<section class="metrics"><div class="metric"><span>Sessions</span><strong id="metric-sessions">—</strong></div>
+<div class="metric"><span>Events</span><strong id="metric-events">—</strong></div><div class="metric"><span>Agents</span><strong id="metric-agents">—</strong></div>
+<div class="metric"><span>Relay ACK</span><strong id="metric-acked">—</strong></div></section>
+<main class="layout"><section class="panel"><h2>Live sessions</h2><div id="sessions" class="sessions"><div class="empty">Loading sessions…</div></div></section>
+<section class="panel"><div id="detail"><div class="empty">Select a session to inspect its evidence chain.</div></div></section></main>
+<footer><span id="run-id">run · —</span><span id="updated">not updated</span></footer>
+</div>
 <script>
-fetch('/v1/dashboard/sessions').then(r=>r.json()).then(x=>{
- document.querySelector('#sessions').innerHTML=x.sessions.map(s=>
- `<article><strong>${s.session_id}</strong> <span class="${s.status==='closed'?'ok':'bad'}">${s.status}</span>
- <div>head <code>${s.head_event_hash}</code></div></article>`).join('')
-})
-</script></body></html>"""
+const byId=id=>document.getElementById(id);
+const node=(tag,className,text)=>{const value=document.createElement(tag);if(className)value.className=className;if(text!==undefined)value.textContent=text;return value};
+let selected='';
+async function jsonOrNull(path){try{const response=await fetch(path);return response.ok?await response.json():null}catch{return null}}
+function renderSessions(sessions){
+  const root=byId('sessions');root.replaceChildren();
+  if(!sessions.length){root.append(node('div','empty','No sessions recorded.'));return}
+  sessions.forEach(session=>{
+    const button=node('button','session'+(selected===session.session_id?' selected':''));
+    const top=node('div','session-top');top.append(node('strong','',session.session_id));
+    top.append(node('span','badge '+(session.status==='closed'?'ok':''),session.status));
+    button.append(top,node('div','hash',session.head_event_hash));button.addEventListener('click',()=>loadDetail(session.session_id));
+    root.append(button);
+  });
+}
+function renderDetail(value){
+  const root=byId('detail');root.replaceChildren();
+  if(!value){root.append(node('div','empty error','Session detail is unavailable.'));return}
+  const head=node('div','detail-head'),titles=node('div');titles.append(node('div','eyebrow','Selected session'),node('h2','',value.session.session_id));
+  const integrity=value.artifact_integrity===true?'verified':value.artifact_integrity===false?'failed':'pending';
+  head.append(titles,node('div','integrity '+(integrity==='verified'?'ok':integrity==='failed'?'bad':''),'Artifact integrity · '+integrity));
+  root.append(head,node('div','hash',value.session.head_event_hash));
+  const timeline=node('div','timeline');timeline.append(node('div','eyebrow','Committed event timeline'));
+  if(!value.events.length)timeline.append(node('div','empty','No committed events.'));
+  value.events.forEach(event=>{const row=node('div','event'),seq=node('div','seq','#'+event.sequence),body=node('div');
+    body.append(node('p','',event.content),node('div','meta',event.category+' · '+event.source_type+' · '+event.event_hash));row.append(seq,body);timeline.append(row)});
+  root.append(timeline);
+}
+async function loadDetail(id){selected=id;const [sessions,value]=await Promise.all([
+  jsonOrNull('/v1/dashboard/sessions'),jsonOrNull('/v1/dashboard/sessions/'+encodeURIComponent(id))]);
+  renderSessions(sessions?.sessions||[]);renderDetail(value)}
+async function refresh(){
+  const [sessionData,metrics]=await Promise.all([jsonOrNull('/v1/dashboard/sessions'),jsonOrNull('/v1/metrics')]);
+  const sessions=sessionData?.sessions||[];renderSessions(sessions);byId('metric-sessions').textContent=sessions.length;
+  byId('metric-events').textContent=metrics?.events?.count??'—';byId('metric-agents').textContent=metrics?.connections?.agents??'—';
+  byId('metric-acked').textContent=metrics?.relay?.acked??'—';byId('run-id').textContent='run · '+(metrics?.run_id||'standalone live gateway');
+  byId('updated').textContent='updated · '+new Date().toLocaleTimeString();
+  if(selected)renderDetail(await jsonOrNull('/v1/dashboard/sessions/'+encodeURIComponent(selected)));
+  else if(sessions.length)await loadDetail(sessions[0].session_id);
+}
+refresh();if(!new URLSearchParams(location.search).has('static'))setInterval(refresh,3000);
+</script>
+</body></html>"""
 
 
 @web.middleware

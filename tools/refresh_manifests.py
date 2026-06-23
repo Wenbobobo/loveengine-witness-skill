@@ -17,10 +17,15 @@ CURRENT = SKILL / "skill-manifest.json"
 M0 = SKILL / "skill-manifest.m0.json"
 
 M5_REFS = [
+    "LICENSE",
     "docs/specs/love-engine-lan-pilot-spec.md",
     "docs/api/lan-pilot-api.md",
+    "docs/api/cli-reference.md",
     "docs/development/m5-acceptance-report.md",
     "docs/development/m5-release-closeout-plan.md",
+    "docs/reference/licenses/scc0-provenance.md",
+    "docs/assets/operator-console.png",
+    "docs/assets/read-only-dashboard.png",
     "skills/loveengine-witness/SKILL.md",
     "skills/loveengine-witness/agents/openai.yaml",
     "schemas/pilot-config-v1.schema.json",
@@ -39,6 +44,8 @@ M5_REFS = [
     "src/loveengine_witness/pilot_transcript.py",
     "src/loveengine_witness/pilot_demo.py",
     "src/loveengine_witness/pilot_soak.py",
+    "src/loveengine_witness/pilot_soak_process.py",
+    "src/loveengine_witness/ui_fixture.py",
     "tools/refresh_manifests.py",
 ]
 

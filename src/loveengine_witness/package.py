@@ -27,6 +27,7 @@ CONTRACTS = (
     "SkillRegistry",
 )
 REQUIRED_ARCHIVE_PATHS = {
+    "LICENSE",
     "pyproject.toml",
     "uv.lock",
     "release.json",
@@ -85,6 +86,7 @@ def _safe_archive_path(name: str) -> PurePosixPath:
 
 def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
     fixed = (
+        "LICENSE",
         "pyproject.toml",
         "uv.lock",
         "README.md",
@@ -100,6 +102,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "docs/api/agent-network-api.md",
         "docs/api/live-evidence-api.md",
         "docs/api/extension-interfaces.md",
+        "docs/api/cli-reference.md",
         "docs/specs/love-engine-master-plan.md",
         "docs/specs/love-engine-lan-pilot-spec.md",
     )
@@ -140,6 +143,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
 
 
 def _spdx(files: dict[str, bytes]) -> dict[str, Any]:
+    license_id = "LicenseRef-SCC0"
     packages = [
         {
             "SPDXID": "SPDXRef-Package-LoveEngine",
@@ -147,8 +151,8 @@ def _spdx(files: dict[str, bytes]) -> dict[str, Any]:
             "versionInfo": PACKAGE_VERSION,
             "downloadLocation": "NOASSERTION",
             "filesAnalyzed": True,
-            "licenseConcluded": "NOASSERTION",
-            "licenseDeclared": "NOASSERTION",
+            "licenseConcluded": license_id,
+            "licenseDeclared": license_id,
             "copyrightText": "NOASSERTION",
         }
     ]
@@ -166,7 +170,7 @@ def _spdx(files: dict[str, bytes]) -> dict[str, Any]:
                         "checksumValue": hashlib.sha256(data).hexdigest(),
                     }
                 ],
-                "licenseConcluded": "NOASSERTION",
+                "licenseConcluded": license_id,
                 "copyrightText": "NOASSERTION",
             }
         )
@@ -193,6 +197,13 @@ def _spdx(files: dict[str, bytes]) -> dict[str, Any]:
         "packages": packages,
         "files": file_entries,
         "relationships": relationships,
+        "hasExtractedLicensingInfos": [
+            {
+                "licenseId": license_id,
+                "name": "Smart Creative Commons Zero (SCC0)",
+                "extractedText": files["LICENSE"].decode("utf-8"),
+            }
+        ],
     }
 
 

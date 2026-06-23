@@ -885,6 +885,61 @@
     "summary": "Defines the testable milestones for CLI diagnosis, background soak, observable UI, SCC0 documentation, long-run evidence, PR delivery and Git cleanup."
   },
   {
+    "id": "scc0-license",
+    "title": "SCC0 license text",
+    "path": "LICENSE",
+    "source_group": "license",
+    "layer": "legal",
+    "domain_tags": ["SCC0", "CC0", "license"],
+    "status": "current",
+    "canonical_role": "Repository license",
+    "summary": "Verbatim legal text adopted from the archived DAism2019 SCC0-License repository."
+  },
+  {
+    "id": "scc0-license-provenance",
+    "title": "SCC0 license provenance",
+    "path": "docs/reference/licenses/scc0-provenance.md",
+    "source_group": "reference",
+    "layer": "provenance",
+    "domain_tags": ["SCC0", "license", "provenance"],
+    "status": "current",
+    "canonical_role": "License source traceability",
+    "summary": "Records the SCC0 source repository, commit, archive date and original file hash."
+  },
+  {
+    "id": "cli-operations-reference",
+    "title": "LoveEngine CLI and operations reference",
+    "path": "docs/api/cli-reference.md",
+    "source_group": "docs/api",
+    "layer": "interface",
+    "domain_tags": ["CLI", "operations", "soak", "M5"],
+    "status": "current",
+    "canonical_role": "Complete command reference",
+    "summary": "Documents source diagnosis, package, server, chain, voting, transcript, background soak and release verification commands."
+  },
+  {
+    "id": "m5-operator-console-screenshot",
+    "title": "M5 operator console screenshot",
+    "path": "docs/assets/operator-console.png",
+    "source_group": "developer-docs",
+    "layer": "visual-evidence",
+    "domain_tags": ["M5", "UI", "operator"],
+    "status": "current",
+    "canonical_role": "Observable operator UI evidence",
+    "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
+  },
+  {
+    "id": "m5-read-only-dashboard-screenshot",
+    "title": "M5 read-only dashboard screenshot",
+    "path": "docs/assets/read-only-dashboard.png",
+    "source_group": "developer-docs",
+    "layer": "visual-evidence",
+    "domain_tags": ["M5", "UI", "dashboard"],
+    "status": "current",
+    "canonical_role": "Observable public read-model evidence",
+    "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
+  },
+  {
     "id": "standard-skill-entry",
     "title": "LoveEngine standard Skill entry",
     "path": "skills/loveengine-witness/SKILL.md",

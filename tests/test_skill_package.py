@@ -55,8 +55,11 @@ def test_deterministic_package_build_verify_install_and_self_check(
     assert installed["installed"] is True
     assert package_self_check(target)["valid"] is True
     assert (target / "skills" / "loveengine-witness" / "SKILL.md").is_file()
+    assert (target / "LICENSE").is_file()
     assert (target / "checksums.json").is_file()
     assert (target / "sbom.spdx.json").is_file()
+    sbom = json.loads((target / "sbom.spdx.json").read_text(encoding="utf-8"))
+    assert sbom["packages"][0]["licenseDeclared"] == "LicenseRef-SCC0"
 
     with pytest.raises(LoveEngineError) as error:
         install_package(first.archive, target)

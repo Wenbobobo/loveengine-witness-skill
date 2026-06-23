@@ -25,15 +25,18 @@ All files below are preserved verbatim under `docs/archive/source-materials/2026
 | --- | --- |
 | `README.md` | English repository entrypoint |
 | `README.zh-CN.md` | Chinese repository entrypoint |
+| `LICENSE` | SCC0 legal text adopted by this repository |
 | `docs/specs/love-engine-master-plan.md` | Authoritative roadmap |
 | `docs/specs/love-engine-lan-pilot-spec.md` | Active M5 LAN pilot specification |
 | `docs/api/extension-interfaces.md` | Replaceable infrastructure ports |
 | `docs/api/live-evidence-api.md` | LiveGateway, evidence and dispute API |
 | `docs/api/lan-pilot-api.md` | M5 LAN service, observation, chain, vote and recovery API |
+| `docs/api/cli-reference.md` | Complete CLI and operations reference |
 | `docs/development/m3-demo-runbook.md` | Presentation procedure |
 | `docs/development/m3-acceptance-report.md` | Verified baseline evidence |
 | `docs/development/m4-skill-supervision-and-next-stage-gaps.md` | M4 supervision baseline and next-stage gaps |
 | `docs/development/m5-release-closeout-plan.md` | Active M5 release closeout execution plan |
+| `docs/reference/licenses/scc0-provenance.md` | SCC0 source repository, commit and hash provenance |
 
 ## Implemented specifications
 

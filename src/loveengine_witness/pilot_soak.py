@@ -16,6 +16,21 @@ from .pilot_demo import run_pilot_demo
 from .pilot_transcript import verify_pilot_transcript
 
 
+def validate_pilot_soak_args(
+    duration_seconds: float, event_count: int, observers: int
+) -> None:
+    if duration_seconds <= 0 or duration_seconds > 4 * 3600:
+        raise LoveEngineError("invalid_soak_duration", str(duration_seconds))
+    if event_count <= 0:
+        raise LoveEngineError("invalid_event_count", str(event_count))
+    if observers != 10:
+        raise LoveEngineError("invalid_observer_count", "M5 requires 10 observers")
+    if duration_seconds >= 4 * 3600 and event_count < 240:
+        raise LoveEngineError(
+            "formal_soak_event_count", "at least 240 events required"
+        )
+
+
 def _disk_bytes(root: Path) -> int:
     return sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
 
@@ -82,15 +97,8 @@ def run_pilot_soak(
     event_count: int,
     observers: int = 10,
 ) -> dict[str, Any]:
-    if duration_seconds <= 0 or duration_seconds > 4 * 3600:
-        raise LoveEngineError("invalid_soak_duration", str(duration_seconds))
-    if event_count <= 0:
-        raise LoveEngineError("invalid_event_count", str(event_count))
-    if observers != 10:
-        raise LoveEngineError("invalid_observer_count", "M5 requires 10 observers")
+    validate_pilot_soak_args(duration_seconds, event_count, observers)
     formal = duration_seconds >= 4 * 3600
-    if formal and event_count < 240:
-        raise LoveEngineError("formal_soak_event_count", "at least 240 events required")
     output = Path(output).resolve()
     started = time.monotonic()
     result = run_pilot_demo(
@@ -124,7 +132,13 @@ def run_pilot_soak(
     }
     report = {
         "schema_version": "loveengine.pilot-soak-report/1",
-        "mode": "formal-4h" if formal else "accelerated",
+        "mode": (
+            "formal-4h"
+            if formal
+            else "wall-clock-preflight"
+            if duration_seconds >= 3600
+            else "accelerated"
+        ),
         "requested_duration_seconds": duration_seconds,
         "elapsed_seconds": round(elapsed, 3),
         "event_count": event_count,
@@ -132,6 +146,8 @@ def run_pilot_soak(
         "disk_bytes": disk,
         "peak_rss_bytes": memory,
         "faults": result["faults"],
+        "ack_latency_ms": latency,
+        "completion_latency_ms": relay["completion_latency_ms"],
         "secret_leaks": leaks,
         "checks": checks,
         "passed": all(checks.values()),
