@@ -60,5 +60,13 @@ was produced, so the run is not accepted.
 The protocol now binds `max_duration_seconds` into the signed
 `ObserveLiveTextPayloadV1`, capped at 14,700 seconds. Task acceptance ACK
 latency is measured separately from final observation completion latency. A
-repeat one-hour run is required before merge; the four-hour tag gate is
+second one-hour run completed the protocol flow, but correctly failed the
+resource gate: successful read polling was duplicated into both the
+hash-chained audit log and detached-process stdout, and final verification
+loaded the resulting audit file into memory. The measured output was
+1,663,152,147 bytes and peak RSS was 1,280,077,824 bytes.
+
+Successful read requests are now metrics-only, SSE empty reads use bounded
+long-polling instead of busy polling, and audit verification is streaming.
+Another one-hour run is required before merge; the four-hour tag gate is
 unchanged.

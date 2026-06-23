@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from time import time
@@ -228,13 +229,26 @@ async def stream_events(request: web.Request) -> web.Response:
         after = int(
             request.query.get("after", request.headers.get("Last-Event-ID", "0"))
         )
-        events = metadata.list_events(request.match_info["session_id"], after)
+        session_id = request.match_info["session_id"]
+        deadline = asyncio.get_running_loop().time() + 1.0
+        events = metadata.list_events(session_id, after)
+        while not events:
+            session = metadata.get_session(session_id)
+            if (
+                session["status"] == "closed"
+                or asyncio.get_running_loop().time() >= deadline
+            ):
+                break
+            await asyncio.sleep(0.05)
+            events = metadata.list_events(session_id, after)
         body = "".join(
             f"id: {event['sequence']}\nevent: live_event\ndata: "
             + json.dumps(event, ensure_ascii=False, sort_keys=True)
             + "\n\n"
             for event in events
         )
+        if not body:
+            body = ": keepalive\n\n"
         return web.Response(
             text=body,
             content_type="text/event-stream",

@@ -8,7 +8,12 @@ from pathlib import Path
 from aiohttp.test_utils import TestClient, TestServer
 
 from loveengine_witness.live_store import LocalArtifactStore
-from loveengine_witness.pilot_server import create_pilot_app, load_pilot_config
+from loveengine_witness.pilot_server import (
+    AuditLog,
+    create_pilot_app,
+    load_pilot_config,
+    verify_audit_log,
+)
 
 
 TOKEN = "lan-pilot-write-token"
@@ -109,9 +114,34 @@ def test_pilot_server_protects_writes_and_exposes_read_models(tmp_path: Path) ->
             await client.close()
 
     asyncio.run(scenario())
-    audit = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
+    audit_path = tmp_path / "audit.jsonl"
+    audit = audit_path.read_text(encoding="utf-8")
     assert TOKEN not in audit
     assert '"event":"request"' in audit
+    records = [
+        json.loads(line) for line in audit.splitlines() if line.strip()
+    ]
+    assert all(
+        record["method"] == "POST"
+        for record in records
+        if record["event"] == "request"
+    )
+
+
+def test_audit_verification_streams_records(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    path = tmp_path / "audit.jsonl"
+    audit = AuditLog(path, "streaming-test")
+    for index in range(20):
+        audit.write("state_change", sequence=index)
+
+    def reject_read_text(*args: object, **kwargs: object) -> str:
+        raise AssertionError("audit verification must not load the whole file")
+
+    monkeypatch.setattr(Path, "read_text", reject_read_text)
+    result = verify_audit_log(path)
+    assert result["record_count"] == 20
 
 
 def test_pilot_artifact_download_and_origin_rejection(tmp_path: Path) -> None:

@@ -105,25 +105,26 @@ def verify_audit_log(path: Path) -> dict[str, Any]:
     previous = "sha256:" + "0" * 64
     count = 0
     try:
-        lines = Path(path).read_text(encoding="utf-8").splitlines()
+        handle = Path(path).open("r", encoding="utf-8")
     except FileNotFoundError as exc:
         raise LoveEngineError("audit_log_missing", str(path), 3) from exc
-    for line_number, line in enumerate(lines, start=1):
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise LoveEngineError(
-                "audit_log_invalid", f"line {line_number}"
-            ) from exc
-        if record.get("previous_record_hash") != previous:
-            raise LoveEngineError("audit_chain_broken", f"line {line_number}")
-        expected = record.get("record_hash")
-        view = dict(record)
-        view.pop("record_hash", None)
-        if expected != sha256_prefixed(canonical_json_bytes(view)):
-            raise LoveEngineError("audit_hash_mismatch", f"line {line_number}")
-        previous = expected
-        count += 1
+    with handle:
+        for line_number, line in enumerate(handle, start=1):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise LoveEngineError(
+                    "audit_log_invalid", f"line {line_number}"
+                ) from exc
+            if record.get("previous_record_hash") != previous:
+                raise LoveEngineError("audit_chain_broken", f"line {line_number}")
+            expected = record.get("record_hash")
+            view = dict(record)
+            view.pop("record_hash", None)
+            if expected != sha256_prefixed(canonical_json_bytes(view)):
+                raise LoveEngineError("audit_hash_mismatch", f"line {line_number}")
+            previous = expected
+            count += 1
     return {"valid": True, "record_count": count, "head_hash": previous}
 
 
@@ -409,13 +410,14 @@ def create_pilot_app(
         response = await handler(request)
         metrics.accepted_requests += 1
         response.headers["X-Correlation-ID"] = correlation_id
-        audit.write(
-            "request",
-            correlation_id=correlation_id,
-            method=request.method,
-            path=request.path,
-            status=response.status,
-        )
+        if is_write or response.status >= 400:
+            audit.write(
+                "request",
+                correlation_id=correlation_id,
+                method=request.method,
+                path=request.path,
+                status=response.status,
+            )
         return response
 
     app = create_live_app(config.database, config.artifact_root)

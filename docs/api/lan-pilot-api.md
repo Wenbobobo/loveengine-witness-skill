@@ -33,6 +33,10 @@ GET /v1/bootstrap
 GET /v1/ws
 ```
 
+`stream` 使用最长一秒的 SSE long-poll：有新事件时立即返回，空闲时返回
+keepalive，客户端继续携带 `Last-Event-ID`/`after` 重连。这样保留 cursor
+恢复语义，同时避免空 session 上的高频 busy polling。
+
 写入：
 
 ```text
@@ -96,6 +100,9 @@ proposal、payload hash、witness 注册状态和 nonce，再通过
 
 系统 snapshot 包含 SQLite online backup、artifact、hash-chained audit
 JSONL、Anvil deployment/state 与 checksums。恢复前必须验证所有文件。
+
+Audit JSONL 记录写操作、拒绝和关键状态变化；成功的只读 GET 只计入 metrics，
+不逐请求写入审计链。审计校验逐行流式执行，长时间试点不会把完整日志载入内存。
 
 `PilotTranscriptV1` 交叉校验 package、session/event chain、
 ObservationSet、EvidenceBundle、dispute、ProposalGate、proposal、五个

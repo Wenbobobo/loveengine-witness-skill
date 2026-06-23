@@ -8,6 +8,47 @@ from aiohttp.test_utils import TestClient, TestServer
 from loveengine_witness.live_gateway import create_live_app
 
 
+def test_sse_waits_for_new_events_instead_of_busy_polling(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_live_app(tmp_path / "live.sqlite", tmp_path / "artifacts")
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            created = await client.post(
+                "/v1/live/sessions",
+                json={
+                    "session_id": "gateway-wait",
+                    "source_type": "http_push",
+                    "created_at": "1770000000",
+                },
+            )
+            assert created.status == 201
+
+            waiting = asyncio.create_task(
+                client.get("/v1/live/sessions/gateway-wait/stream?after=0")
+            )
+            await asyncio.sleep(0.08)
+            assert not waiting.done()
+
+            appended = await client.post(
+                "/v1/live/sessions/gateway-wait/events",
+                json={
+                    "event_id": "e1",
+                    "occurred_at": "1770000001",
+                    "category": "source",
+                    "source_type": "http_push",
+                    "content": "hello",
+                },
+            )
+            assert appended.status == 202
+            response = await asyncio.wait_for(waiting, timeout=1)
+            assert "id: 1" in await response.text()
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
 def test_gateway_accepts_json_ndjson_and_exposes_read_only_dashboard(
     tmp_path: Path,
 ) -> None:
