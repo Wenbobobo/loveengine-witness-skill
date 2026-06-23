@@ -17,6 +17,7 @@ from .live_store import LocalArtifactStore, LiveMetadataStore
 
 METADATA_KEY = web.AppKey("metadata", LiveMetadataStore)
 ARTIFACTS_KEY = web.AppKey("artifacts", LocalArtifactStore)
+SSE_COUNTER_KEY = web.AppKey("sse_counter", object)
 
 
 DASHBOARD_HTML = """<!doctype html>
@@ -149,19 +150,28 @@ async def get_events(request: web.Request) -> web.Response:
 
 async def stream_events(request: web.Request) -> web.Response:
     metadata, _ = _services(request)
-    after = int(request.query.get("after", request.headers.get("Last-Event-ID", "0")))
-    events = metadata.list_events(request.match_info["session_id"], after)
-    body = "".join(
-        f"id: {event['sequence']}\nevent: live_event\ndata: "
-        + json.dumps(event, ensure_ascii=False, sort_keys=True)
-        + "\n\n"
-        for event in events
-    )
-    return web.Response(
-        text=body,
-        content_type="text/event-stream",
-        headers={"Cache-Control": "no-cache"},
-    )
+    counter = request.app.get(SSE_COUNTER_KEY)
+    if counter is not None:
+        counter.sse_clients += 1
+    try:
+        after = int(
+            request.query.get("after", request.headers.get("Last-Event-ID", "0"))
+        )
+        events = metadata.list_events(request.match_info["session_id"], after)
+        body = "".join(
+            f"id: {event['sequence']}\nevent: live_event\ndata: "
+            + json.dumps(event, ensure_ascii=False, sort_keys=True)
+            + "\n\n"
+            for event in events
+        )
+        return web.Response(
+            text=body,
+            content_type="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
+    finally:
+        if counter is not None:
+            counter.sse_clients -= 1
 
 
 async def get_evidence(request: web.Request) -> web.Response:
@@ -181,6 +191,14 @@ async def get_evidence(request: web.Request) -> web.Response:
             finalized_at=session["closed_at"],
         )
     return web.json_response(bundle)
+
+
+async def get_artifact(request: web.Request) -> web.Response:
+    _, artifacts = _services(request)
+    return web.Response(
+        body=artifacts.get(request.match_info["digest"]),
+        content_type="application/octet-stream",
+    )
 
 
 async def dashboard_index(request: web.Request) -> web.Response:
@@ -235,6 +253,7 @@ def create_live_app(database: Path, artifact_root: Path) -> web.Application:
             web.get("/v1/live/sessions/{session_id}/events", get_events),
             web.get("/v1/live/sessions/{session_id}/stream", stream_events),
             web.get("/v1/live/sessions/{session_id}/evidence", get_evidence),
+            web.get("/v1/live/artifacts/{digest}", get_artifact),
             web.get("/demo/", dashboard_index),
             web.get("/v1/dashboard/sessions", dashboard_sessions),
             web.get("/v1/dashboard/sessions/{session_id}", dashboard_session),

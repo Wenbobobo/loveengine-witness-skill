@@ -19,14 +19,15 @@
     "eip712",
     "evidence",
     "security",
+    "distribution",
     "package_hash"
   ],
   "properties": {
     "schema_version": {"const": "loveengine.skill-manifest/0.3"},
     "skill_id": {"const": "loveengine-witness"},
-    "version": {"enum": ["0.3.0-network-pilot", "0.3.1-demo-ready", "0.4.0-live-evidence-pilot"]},
+    "version": {"enum": ["0.3.0-network-pilot", "0.3.1-demo-ready", "0.4.0-live-evidence-pilot", "0.5.0-lan-pilot"]},
     "status": {"const": "pilot"},
-    "protocol": {"enum": ["loveengine-witness-net/0.3", "loveengine-witness-net/0.4"]},
+    "protocol": {"enum": ["loveengine-witness-net/0.3", "loveengine-witness-net/0.4", "loveengine-witness-net/0.5"]},
     "source_refs": {
       "type": "array",
       "minItems": 1,
@@ -48,15 +49,15 @@
     "registry_binding": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chain_id", "address", "publisher", "skill_id_hash", "version_hash", "artifact_package_hash", "hash_algorithm", "environment"],
+      "required": ["chain_id", "address", "publisher", "skill_id_hash", "version_hash", "package_hash_source", "package_hash_algorithm", "environment"],
       "properties": {
         "chain_id": {"const": "31337"},
         "address": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
         "publisher": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
         "skill_id_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
         "version_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
-        "artifact_package_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
-        "hash_algorithm": {"const": "keccak256"},
+        "package_hash_source": {"const": "SkillRegistry.Release.packageHash"},
+        "package_hash_algorithm": {"const": "keccak256"},
         "environment": {"const": "anvil-only"}
       }
     },
@@ -86,6 +87,18 @@
         "private_keys_in_cli_arguments": {"const": false},
         "private_keys_in_transcripts": {"const": false},
         "vote_signing_tasks_allowed": {"const": false}
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archive_format", "deterministic", "checksums", "sbom", "registry_hash"],
+      "properties": {
+        "archive_format": {"const": "zip"},
+        "deterministic": {"const": true},
+        "checksums": {"const": "checksums.json"},
+        "sbom": {"const": "sbom.spdx.json"},
+        "registry_hash": {"const": "keccak256(actual_zip_bytes)"}
       }
     },
     "package_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}

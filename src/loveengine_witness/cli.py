@@ -34,12 +34,36 @@ from .network_protocol import (
 from .network_transcript import verify_network_transcript
 from .network_typed_data import build_node_profile_typed_data
 from .node_profile import build_node_profile
+from .package import (
+    build_package,
+    install_package,
+    package_self_check,
+    verify_package,
+)
+from .pilot_server import load_pilot_config, pilot_status, serve_pilot
+from .pilot_demo import run_pilot_demo
+from .pilot_transcript import verify_pilot_transcript
+from .pilot_snapshot import (
+    create_system_snapshot,
+    prune_snapshots,
+    restore_system_snapshot,
+    verify_system_snapshot,
+)
+from .pilot_soak import run_pilot_soak
+from .pilot_chain import (
+    initialize_chain,
+    restore_chain,
+    snapshot_chain,
+    start_chain,
+    status_chain,
+)
 from .registry import publish_plan, verify_release
 from .relayer import plan_batch
 from .relay import RelayStore
 from .relay_server import serve_forever
 from .transcript import verify_transcript
 from .typed_data import build_register_typed_data, build_vote_typed_data
+from .witness_vote import approve_vote
 
 
 class MachineArgumentParser(argparse.ArgumentParser):
@@ -114,6 +138,12 @@ def build_parser() -> argparse.ArgumentParser:
     live_evidence.add_argument("--nodes", type=int, default=3)
     live_evidence.add_argument("--input", type=Path, default=DEFAULT_LIVE_FIXTURE)
     live_evidence.add_argument("--output", type=Path, required=True)
+    lan_pilot = demo_commands.add_parser("lan-pilot")
+    lan_pilot.add_argument("--events", type=int, default=12)
+    lan_pilot.add_argument("--observers", type=int, default=10)
+    lan_pilot.add_argument("--event-interval", type=float, default=0.01)
+    lan_pilot.add_argument("--no-faults", action="store_true")
+    lan_pilot.add_argument("--output", type=Path, required=True)
 
     registry = commands.add_parser("registry")
     registry_commands = registry.add_subparsers(dest="registry_command")
@@ -216,6 +246,81 @@ def build_parser() -> argparse.ArgumentParser:
     proposal_gate = proposal_commands.add_parser("gate")
     proposal_gate.add_argument("--input", type=Path, required=True)
     proposal_gate.add_argument("--output", type=Path)
+
+    package = commands.add_parser("package")
+    package_commands = package.add_subparsers(dest="package_command")
+    package_build = package_commands.add_parser("build")
+    package_build.add_argument("--output", type=Path, required=True)
+    package_verify = package_commands.add_parser("verify")
+    package_verify.add_argument("archive", type=Path)
+    package_install = package_commands.add_parser("install")
+    package_install.add_argument("archive", type=Path)
+    package_install.add_argument("--target", type=Path, required=True)
+    package_check = package_commands.add_parser("self-check")
+    package_check.add_argument("--root", type=Path, required=True)
+
+    pilot = commands.add_parser("pilot")
+    pilot_commands = pilot.add_subparsers(dest="pilot_command")
+    pilot_serve = pilot_commands.add_parser("serve")
+    pilot_serve.add_argument("--config", type=Path, required=True)
+    pilot_status_command = pilot_commands.add_parser("status")
+    pilot_status_command.add_argument("--url", required=True)
+    pilot_chain = pilot_commands.add_parser("chain")
+    pilot_chain_commands = pilot_chain.add_subparsers(dest="pilot_chain_command")
+    chain_init = pilot_chain_commands.add_parser("init")
+    chain_init.add_argument("--root", type=Path, required=True)
+    chain_init.add_argument("--port", type=int, default=8545)
+    chain_start = pilot_chain_commands.add_parser("start")
+    chain_start.add_argument("--root", type=Path, required=True)
+    chain_start.add_argument("--port", type=int, default=8545)
+    chain_status = pilot_chain_commands.add_parser("status")
+    chain_status.add_argument("--root", type=Path, required=True)
+    chain_status.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+    chain_snapshot = pilot_chain_commands.add_parser("snapshot")
+    chain_snapshot.add_argument("--root", type=Path, required=True)
+    chain_snapshot.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+    chain_restore = pilot_chain_commands.add_parser("restore")
+    chain_restore.add_argument("--root", type=Path, required=True)
+    chain_restore.add_argument("--rpc-url", default="http://127.0.0.1:8545")
+    chain_restore.add_argument("--snapshot", type=Path, required=True)
+    pilot_transcript = pilot_commands.add_parser("transcript")
+    pilot_transcript_commands = pilot_transcript.add_subparsers(
+        dest="pilot_transcript_command"
+    )
+    pilot_transcript_verify = pilot_transcript_commands.add_parser("verify")
+    pilot_transcript_verify.add_argument("path", type=Path)
+    pilot_snapshot = pilot_commands.add_parser("snapshot")
+    pilot_snapshot_commands = pilot_snapshot.add_subparsers(
+        dest="pilot_snapshot_command"
+    )
+    snapshot_create = pilot_snapshot_commands.add_parser("create")
+    snapshot_create.add_argument("--config", type=Path, required=True)
+    snapshot_create.add_argument("--chain-root", type=Path, required=True)
+    snapshot_create.add_argument("--output", type=Path, required=True)
+    snapshot_verify = pilot_snapshot_commands.add_parser("verify")
+    snapshot_verify.add_argument("path", type=Path)
+    snapshot_restore = pilot_snapshot_commands.add_parser("restore")
+    snapshot_restore.add_argument("path", type=Path)
+    snapshot_restore.add_argument("--config", type=Path, required=True)
+    snapshot_restore.add_argument("--chain-root", type=Path, required=True)
+    snapshot_prune = pilot_snapshot_commands.add_parser("prune")
+    snapshot_prune.add_argument("--output", type=Path, required=True)
+    snapshot_prune.add_argument("--older-than-days", type=int, default=30)
+    pilot_soak = pilot_commands.add_parser("soak")
+    pilot_soak.add_argument("--duration-seconds", type=float, default=14400)
+    pilot_soak.add_argument("--events", type=int, default=240)
+    pilot_soak.add_argument("--observers", type=int, default=10)
+    pilot_soak.add_argument("--output", type=Path, required=True)
+
+    witness = commands.add_parser("witness")
+    witness_commands = witness.add_subparsers(dest="witness_command")
+    witness_vote = witness_commands.add_parser("vote")
+    witness_vote_commands = witness_vote.add_subparsers(dest="witness_vote_command")
+    witness_approve = witness_vote_commands.add_parser("approve")
+    witness_approve.add_argument("--proposal-plan", type=Path, required=True)
+    witness_approve.add_argument("--rpc-url", required=True)
+    witness_approve.add_argument("--address", required=True)
+    witness_approve.add_argument("--output", type=Path)
     return parser
 
 
@@ -312,6 +417,14 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "demo" and args.demo_command == "live-evidence":
         return run_live_evidence_demo(
             args.output, nodes=args.nodes, fixture=args.input
+        )
+    if args.command == "demo" and args.demo_command == "lan-pilot":
+        return run_pilot_demo(
+            args.output,
+            event_count=args.events,
+            observer_count=args.observers,
+            event_interval=args.event_interval,
+            simulate_faults=not args.no_faults,
         )
     if args.command == "registry" and args.registry_command == "publish":
         if not args.dry_run:
@@ -475,6 +588,129 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.output:
             write_json(args.output, result)
         return result
+    if args.command == "package" and args.package_command == "build":
+        result = build_package(Path(__file__).resolve().parents[2], args.output)
+        return {
+            "archive": str(result.archive.resolve()),
+            "archive_sha256": result.sha256,
+            "archive_keccak256": result.keccak256,
+            "file_count": result.file_count,
+            "checksums": str(result.checksums.resolve()),
+            "sbom": str(result.sbom.resolve()),
+        }
+    if args.command == "package" and args.package_command == "verify":
+        return verify_package(args.archive)
+    if args.command == "package" and args.package_command == "install":
+        return install_package(args.archive, args.target)
+    if args.command == "package" and args.package_command == "self-check":
+        return package_self_check(args.root)
+    if args.command == "pilot" and args.pilot_command == "serve":
+        serve_pilot(load_pilot_config(args.config))
+        return {"stopped": True}
+    if args.command == "pilot" and args.pilot_command == "status":
+        return asyncio.run(pilot_status(args.url))
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "chain"
+        and args.pilot_chain_command == "init"
+    ):
+        return initialize_chain(args.root, port=args.port)
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "chain"
+        and args.pilot_chain_command == "start"
+    ):
+        process = start_chain(args.root, port=args.port)
+        return {
+            "started": True,
+            "pid": process.pid,
+            "rpc_url": f"http://127.0.0.1:{args.port}",
+        }
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "chain"
+        and args.pilot_chain_command == "status"
+    ):
+        return status_chain(args.root, args.rpc_url)
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "chain"
+        and args.pilot_chain_command == "snapshot"
+    ):
+        return snapshot_chain(args.root, args.rpc_url)
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "chain"
+        and args.pilot_chain_command == "restore"
+    ):
+        return restore_chain(args.root, args.rpc_url, args.snapshot)
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "transcript"
+        and args.pilot_transcript_command == "verify"
+    ):
+        return verify_pilot_transcript(read_json(args.path))
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "snapshot"
+        and args.pilot_snapshot_command == "create"
+    ):
+        config = load_pilot_config(args.config)
+        return create_system_snapshot(
+            run_id=config.run_id,
+            database=config.database,
+            relay_database=config.relay_database,
+            artifact_root=config.artifact_root,
+            audit_log=config.audit_log,
+            chain_root=args.chain_root,
+            output=args.output,
+        )
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "snapshot"
+        and args.pilot_snapshot_command == "verify"
+    ):
+        return verify_system_snapshot(args.path)
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "snapshot"
+        and args.pilot_snapshot_command == "restore"
+    ):
+        config = load_pilot_config(args.config)
+        return restore_system_snapshot(
+            args.path,
+            database=config.database,
+            relay_database=config.relay_database,
+            artifact_root=config.artifact_root,
+            audit_log=config.audit_log,
+            chain_root=args.chain_root,
+        )
+    if (
+        args.command == "pilot"
+        and args.pilot_command == "snapshot"
+        and args.pilot_snapshot_command == "prune"
+    ):
+        return prune_snapshots(
+            args.output, older_than_days=args.older_than_days
+        )
+    if args.command == "pilot" and args.pilot_command == "soak":
+        return run_pilot_soak(
+            args.output,
+            duration_seconds=args.duration_seconds,
+            event_count=args.events,
+            observers=args.observers,
+        )
+    if (
+        args.command == "witness"
+        and args.witness_command == "vote"
+        and args.witness_vote_command == "approve"
+    ):
+        return approve_vote(
+            args.proposal_plan,
+            args.rpc_url,
+            args.address,
+            args.output,
+        )
     raise LoveEngineError("missing_command", "a command and subcommand are required")
 
 

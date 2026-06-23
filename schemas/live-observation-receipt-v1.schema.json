@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/live-observation-receipt-v1.schema.json",
+  "title": "LiveObservationReceiptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "observed_from", "last_sequence", "event_count", "head_event_hash", "bundle_hash", "artifact_count", "recovered_from_cursor"],
+  "properties": {
+    "schema_version": {"const": "loveengine.live-observation-receipt/1"},
+    "session_id": {"type": "string", "minLength": 1},
+    "observed_from": {"type": "string", "pattern": "^[0-9]+$"},
+    "last_sequence": {"type": "string", "pattern": "^[0-9]+$"},
+    "event_count": {"type": "string", "pattern": "^[0-9]+$"},
+    "head_event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "bundle_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "artifact_count": {"type": "string", "pattern": "^[0-9]+$"},
+    "recovered_from_cursor": {"type": "boolean"}
+  }
+}

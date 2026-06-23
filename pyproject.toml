@@ -1,7 +1,7 @@
 [project]
 name = "loveengine-witness-skill"
-version = "0.4.0"
-description = "LoveEngine Witness Skill repository and M0 validation tools"
+version = "0.5.0"
+description = "LoveEngine verifiable witness protocol and LAN pilot runtime"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LoveEngine Witness"
+  short_description: "Operate and audit LoveEngine witness workflows"
+  default_prompt: "Use the LoveEngine Witness protocol to verify, operate, or audit the requested workflow."

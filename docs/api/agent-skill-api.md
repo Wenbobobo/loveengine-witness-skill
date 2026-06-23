@@ -1,6 +1,12 @@
 # Agent and Skill API
 
-本文定义 LoveEngine Witness Skill 面向 Agent、Harness/Hermes adapter 和本地 CLI 的数据结构。状态：M0 兼容包与 M1/M2 local-loop implementation 均已存在。
+本文定义 LoveEngine Witness Skill 面向 Agent adapter、本地 CLI 和 Codex loader 的数据结构。状态：M0–M4 已实现，M5 正在增加标准 Skill 入口、确定性安装包和局域网试点。
+
+## 标准 Skill 入口
+
+`skills/loveengine-witness/SKILL.md` 是薄指令层，只包含触发条件、验证流程、命令导航和安全边界。`agents/openai.yaml` 提供 Codex UI metadata。协议行为继续由 manifest、Schema、Python 运行时、合约和 transcript 实现。
+
+M5 确定性 ZIP 是独立安装边界。它包含运行必需文件、`checksums.json` 与 `sbom.spdx.json`；SkillRegistry 的 package hash 绑定 ZIP 的 Keccak-256。
 
 ## 当前 M0 文件
 
@@ -187,6 +193,25 @@ loveengine relayer batch-register --dry-run
 loveengine relayer batch-vote --dry-run
 loveengine transcript verify <path>
 loveengine demo local-loop --output <dir>
+loveengine package build --output <dir>
+loveengine package verify <archive>
+loveengine package install <archive> --target <dir>
+loveengine package self-check --root <dir>
+loveengine pilot serve --config <path>
+loveengine pilot status --url <url>
+loveengine pilot chain init --root <dir>
+loveengine pilot chain start --root <dir>
+loveengine pilot chain status --root <dir> --rpc-url <url>
+loveengine pilot chain snapshot --root <dir> --rpc-url <url>
+loveengine pilot chain restore --root <dir> --rpc-url <url> --snapshot <path>
+loveengine pilot snapshot create --config <path> --chain-root <dir> --output <dir>
+loveengine pilot snapshot verify <path>
+loveengine pilot snapshot restore <path> --config <path> --chain-root <dir>
+loveengine pilot snapshot prune --output <dir> --older-than-days 30
+loveengine witness vote approve --proposal-plan <path> --rpc-url <url> --address <address>
+loveengine demo lan-pilot --events 12 --observers 10 --output <dir>
+loveengine pilot transcript verify <path>
+loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir>
 ```
 
 Each command should support machine-readable output. Prefer JSON output by default for Agent adapters; human text can be added with `--pretty`.

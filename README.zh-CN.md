@@ -6,6 +6,14 @@ LoveEngine Witness Skill 是面向 Agent 网络的公共利益见证协议。它
 
 当前稳定演示版本：`0.4.0-live-evidence-pilot`。
 上一版纯网络演示：`0.3.1-demo-ready`。
+当前发布候选：`0.5.0-lan-pilot`，协议为 `loveengine-witness-net/0.5`。
+
+## Skill 模型
+
+LoveEngine 采用“薄指令层、厚协议运行时”。面向 Codex 的 `SKILL.md`
+只定义触发条件、验证流程、命令导航和安全边界；实际协议由版本化
+manifest、Schema、Python 用例、适配器、合约和 transcript 承担。
+这样可以保持 Agent 上下文精简，同时保证行为确定、可测试、可复核。
 
 ## 系统架构
 
@@ -117,6 +125,9 @@ cd ..
 uv run pytest .\tests\test_demo.py
 uv run pytest .\tests\integration\test_network_demo.py
 uv run pytest .\tests\integration\test_live_evidence_demo.py
+uv run pytest .\tests\integration\test_pilot_chain.py
+uv run pytest .\tests\integration\test_pilot_demo.py
+uv run pytest .\tests\integration\test_pilot_soak.py
 ```
 
 ## 运行演示
@@ -132,9 +143,46 @@ uv run loveengine network transcript verify .\examples\transcripts\network-pilot
 
 uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
 uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
+
+uv run loveengine package build --output .\dist
+uv run loveengine package verify .\dist\loveengine-witness-0.5.0-lan-pilot.zip
+uv run loveengine package install .\dist\loveengine-witness-0.5.0-lan-pilot.zip --target .\installed
+uv run loveengine package self-check --root .\installed
+
+uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
+uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 ```
 
-M3 对外演示顺序见[演示手册](docs/development/m3-demo-runbook.md)，验证证据见[验收报告](docs/development/m3-acceptance-report.md)。
+局域网控制面、持久链和恢复命令见 [M5 API](docs/api/lan-pilot-api.md)。M3 对外演示顺序仍保留在[演示手册](docs/development/m3-demo-runbook.md)。
+
+## 局域网试点操作
+
+先在源码管理之外创建 token 文件，并通过 `PilotConfigV1.token_file`
+引用。CLI 不接受 token 明文参数。
+
+```powershell
+uv run loveengine pilot chain init --root .\pilot-chain
+uv run loveengine pilot chain start --root .\pilot-chain
+uv run loveengine pilot chain status --root .\pilot-chain --rpc-url http://127.0.0.1:8545
+
+uv run loveengine pilot serve --config .\pilot-config.json
+uv run loveengine pilot status --url http://127.0.0.1:8780
+
+uv run loveengine pilot snapshot create --config .\pilot-config.json --chain-root .\pilot-chain --output .\snapshots
+uv run loveengine pilot snapshot verify .\snapshots\<snapshot>
+uv run loveengine pilot snapshot restore .\snapshots\<snapshot> --config .\pilot-config.json --chain-root .\pilot-chain
+uv run loveengine pilot snapshot prune --output .\snapshots --older-than-days 30
+```
+
+正式四小时 soak：
+
+```powershell
+uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
+```
+
+该命令会注入一次 Pilot Server 重启、一次 Anvil 重启，以及三个观察
+Agent 各一次断线。事件连续性、ACK 延迟、恢复时间、磁盘、内存或
+secret scan 任一阈值不达标都会失败。
 
 ## CLI 分组
 
@@ -142,7 +190,7 @@ M3 对外演示顺序见[演示手册](docs/development/m3-demo-runbook.md)，�
 manifest  node  fixture  evidence  transcript
 eip712    relayer  registry  bootstrap
 relay     network  live  dispute  review
-proposal  demo
+proposal  package  pilot  witness  demo
 ```
 
 成功结果写入 stdout JSON；错误写入 stderr，并使用稳定错误码。
@@ -153,13 +201,14 @@ proposal  demo
 - Relayer 只能提交签名，不能代替见证者或节点签名。
 - 签名任务必须绑定 chainId、合约、issuer、recipient、payloadHash、nonce 和 deadline。
 - 原始证据不上链；提案和合约只使用内容 hash。
-- M4 复核任务不得请求或生成投票签名。
+- Agent 不得自动签投票。每个见证者必须单独执行
+  `loveengine witness vote approve`，并使用外部 RPC signer。
 - `PublicSink` 始终只读。
 
 ## 阅读顺序
 
 1. [工程总规划](docs/specs/love-engine-master-plan.md)
-2. [M4 活动 SPEC](docs/specs/love-engine-live-evidence-pilot-spec.md)
+2. [M5 活动 SPEC](docs/specs/love-engine-lan-pilot-spec.md)
 3. [API 入口](docs/api/README.md)
 4. [开发接入指南](docs/development/integration-guide.md)
 5. [资料索引](docs/kb/source-inventory.md)
