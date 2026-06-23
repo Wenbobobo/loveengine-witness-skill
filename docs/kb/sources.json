@@ -396,11 +396,12 @@
       "M2",
       "M3",
       "M4",
+      "M5",
       "manifest"
     ],
     "status": "current",
-    "canonical_role": "Current live-evidence Skill manifest",
-    "summary": "0.4.0-live-evidence-pilot manifest with M1-M3 compatibility and M4 V2 live evidence bindings."
+    "canonical_role": "Current LAN-pilot Skill manifest",
+    "summary": "0.5.0-lan-pilot manifest with M0-M4 compatibility and M5 package, observation, recovery and unified E2E bindings."
   },
   {
     "id": "protocol-schemas",
@@ -412,12 +413,13 @@
       "M1",
       "M3",
       "M4",
+      "M5",
       "JSON Schema",
       "protocol"
     ],
     "status": "current",
     "canonical_role": "Machine-readable protocol schemas",
-    "summary": "Draft 2020-12 schemas for manifest, local loop, releases, V1/V2 network messages, live evidence, disputes and transcripts."
+    "summary": "Draft 2020-12 schemas for manifests, local loop, network messages, live evidence, observations, pilot configuration, votes and transcripts."
   },
   {
     "id": "python-protocol-package",
@@ -687,13 +689,24 @@
   {
     "id": "live-evidence-pilot-spec",
     "title": "LoveEngine M4 Live Evidence Pilot SPEC",
-    "path": "docs/specs/love-engine-live-evidence-pilot-spec.md",
+    "path": "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md",
     "source_group": "developer-docs",
     "layer": "specification",
     "domain_tags": ["M4", "live evidence", "dispute review"],
+    "status": "implemented",
+    "canonical_role": "Implemented M4 specification",
+    "summary": "Provider-neutral live text, content-addressed evidence, three-node review, ProposalGate, dashboard, and E2E acceptance."
+  },
+  {
+    "id": "lan-pilot-spec",
+    "title": "LoveEngine M5 LAN Pilot SPEC",
+    "path": "docs/specs/love-engine-lan-pilot-spec.md",
+    "source_group": "developer-docs",
+    "layer": "specification",
+    "domain_tags": ["M5", "LAN", "packaging", "operations"],
     "status": "current",
     "canonical_role": "Active implementation specification",
-    "summary": "Provider-neutral live text, content-addressed evidence, three-node review, ProposalGate, dashboard, and E2E acceptance."
+    "summary": "Deterministic Skill packaging, LAN live service, signed observations, persistent Anvil, unified E2E, observability and recovery."
   },
   {
     "id": "extension-interfaces",
@@ -826,5 +839,181 @@
     "status": "current",
     "canonical_role": "Auditable live evidence result",
     "summary": "Links five contract addresses, twelve events, evidence hash, five signed receipts, resolved and unresolved disputes, and both gate outcomes."
+  },
+  {
+    "id": "m4-skill-supervision-next-stage-gaps",
+    "title": "M4 Skill supervision and next-stage gaps",
+    "path": "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
+    "source_group": "developer-docs",
+    "layer": "supervision",
+    "domain_tags": ["M4", "Skill packaging", "distribution", "E2E"],
+    "status": "current",
+    "canonical_role": "Next-stage SPEC supervision baseline",
+    "summary": "Explains the protocol-package Skill model, current workflow, six known gaps, and the required direction for packaging, distribution, live-source and local/public-testnet E2E."
+  },
+  {
+    "id": "lan-pilot-api",
+    "title": "LAN Pilot API",
+    "path": "docs/api/lan-pilot-api.md",
+    "source_group": "docs/api",
+    "layer": "interface",
+    "domain_tags": ["M5", "LAN", "observation", "recovery"],
+    "status": "current",
+    "canonical_role": "M5 public interface contract",
+    "summary": "Defines PilotConfig, authenticated writes, observation, persistent chain, explicit voting, snapshots and PilotTranscript."
+  },
+  {
+    "id": "m5-acceptance-report",
+    "title": "M5 LAN pilot acceptance report",
+    "path": "docs/development/m5-acceptance-report.md",
+    "source_group": "developer-docs",
+    "layer": "acceptance",
+    "domain_tags": ["M5", "E2E", "soak", "release"],
+    "status": "current",
+    "canonical_role": "Release-candidate evidence and formal soak gate",
+    "summary": "Separates automated accelerated acceptance from the required real four-hour release run."
+  },
+  {
+    "id": "m5-release-closeout-plan",
+    "title": "M5 release closeout execution plan",
+    "path": "docs/development/m5-release-closeout-plan.md",
+    "source_group": "developer-docs",
+    "layer": "execution-plan",
+    "domain_tags": ["M5", "CLI", "soak", "UI", "release"],
+    "status": "current",
+    "canonical_role": "Active release closeout plan",
+    "summary": "Defines the testable milestones for CLI diagnosis, background soak, observable UI, SCC0 documentation, long-run evidence, PR delivery and Git cleanup."
+  },
+  {
+    "id": "scc0-license",
+    "title": "SCC0 license text",
+    "path": "LICENSE",
+    "source_group": "license",
+    "layer": "legal",
+    "domain_tags": ["SCC0", "CC0", "license"],
+    "status": "current",
+    "canonical_role": "Repository license",
+    "summary": "Verbatim legal text adopted from the archived DAism2019 SCC0-License repository."
+  },
+  {
+    "id": "scc0-license-provenance",
+    "title": "SCC0 license provenance",
+    "path": "docs/reference/licenses/scc0-provenance.md",
+    "source_group": "reference",
+    "layer": "provenance",
+    "domain_tags": ["SCC0", "license", "provenance"],
+    "status": "current",
+    "canonical_role": "License source traceability",
+    "summary": "Records the SCC0 source repository, commit, archive date and original file hash."
+  },
+  {
+    "id": "cli-operations-reference",
+    "title": "LoveEngine CLI and operations reference",
+    "path": "docs/api/cli-reference.md",
+    "source_group": "docs/api",
+    "layer": "interface",
+    "domain_tags": ["CLI", "operations", "soak", "M5"],
+    "status": "current",
+    "canonical_role": "Complete command reference",
+    "summary": "Documents source diagnosis, package, server, chain, voting, transcript, background soak and release verification commands."
+  },
+  {
+    "id": "m5-operator-console-screenshot",
+    "title": "M5 operator console screenshot",
+    "path": "docs/assets/operator-console.png",
+    "source_group": "developer-docs",
+    "layer": "visual-evidence",
+    "domain_tags": ["M5", "UI", "operator"],
+    "status": "current",
+    "canonical_role": "Observable operator UI evidence",
+    "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
+  },
+  {
+    "id": "m5-read-only-dashboard-screenshot",
+    "title": "M5 read-only dashboard screenshot",
+    "path": "docs/assets/read-only-dashboard.png",
+    "source_group": "developer-docs",
+    "layer": "visual-evidence",
+    "domain_tags": ["M5", "UI", "dashboard"],
+    "status": "current",
+    "canonical_role": "Observable public read-model evidence",
+    "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
+  },
+  {
+    "id": "standard-skill-entry",
+    "title": "LoveEngine standard Skill entry",
+    "path": "skills/loveengine-witness/SKILL.md",
+    "source_group": "skill",
+    "layer": "instruction",
+    "domain_tags": ["M5", "Codex", "Skill"],
+    "status": "current",
+    "canonical_role": "Thin Agent instruction layer",
+    "summary": "Declares triggers, verification flow, command routing and safety boundaries without duplicating runtime logic."
+  },
+  {
+    "id": "m5-package-runtime",
+    "title": "Deterministic package runtime",
+    "path": "src/loveengine_witness/package.py",
+    "source_group": "implementation",
+    "layer": "distribution",
+    "domain_tags": ["M5", "ZIP", "SBOM", "checksum"],
+    "status": "current",
+    "canonical_role": "Safe deterministic build and install adapter",
+    "summary": "Builds reproducible archives and rejects unsafe paths, missing checksums, symlinks and tampering."
+  },
+  {
+    "id": "m5-pilot-server",
+    "title": "LAN Pilot Server",
+    "path": "src/loveengine_witness/pilot_server.py",
+    "source_group": "implementation",
+    "layer": "application",
+    "domain_tags": ["M5", "aiohttp", "auth", "metrics"],
+    "status": "current",
+    "canonical_role": "Single-process LAN control plane",
+    "summary": "Combines live, Relay, dashboard, operator, health, readiness, metrics and hash-chained audit logging."
+  },
+  {
+    "id": "m5-observation",
+    "title": "Live observation protocol",
+    "path": "src/loveengine_witness/observation.py",
+    "source_group": "implementation",
+    "layer": "domain",
+    "domain_tags": ["M5", "SSE", "cursor", "receipt"],
+    "status": "current",
+    "canonical_role": "Independent event and artifact verifier",
+    "summary": "Validates stream continuity, artifacts, durable cursors and three-node ObservationSet agreement."
+  },
+  {
+    "id": "m5-persistent-chain",
+    "title": "Persistent Anvil lifecycle",
+    "path": "src/loveengine_witness/pilot_chain.py",
+    "source_group": "implementation",
+    "layer": "adapter",
+    "domain_tags": ["M5", "Anvil", "snapshot", "code hash"],
+    "status": "current",
+    "canonical_role": "Local chain persistence adapter",
+    "summary": "Initializes, restores and verifies fixed-chain deployments and code hashes."
+  },
+  {
+    "id": "m5-unified-demo",
+    "title": "Package-to-PublicSink pilot demo",
+    "path": "src/loveengine_witness/pilot_demo.py",
+    "source_group": "implementation",
+    "layer": "integration",
+    "domain_tags": ["M5", "E2E", "fault injection"],
+    "status": "current",
+    "canonical_role": "Unified system acceptance path",
+    "summary": "Runs package install, ten observers, three Agents, evidence, review, explicit votes, restarts and PublicSink verification."
+  },
+  {
+    "id": "m5-pilot-transcript",
+    "title": "Pilot transcript verifier",
+    "path": "src/loveengine_witness/pilot_transcript.py",
+    "source_group": "implementation",
+    "layer": "verification",
+    "domain_tags": ["M5", "transcript", "offline verification"],
+    "status": "current",
+    "canonical_role": "Cross-phase audit verifier",
+    "summary": "Cross-checks package, events, observations, evidence, proposal, votes, transactions and final state."
   }
 ]

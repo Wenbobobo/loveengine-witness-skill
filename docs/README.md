@@ -3,7 +3,7 @@
 ## Active specifications
 
 - `specs/love-engine-master-plan.md`: authoritative roadmap and status.
-- `specs/love-engine-live-evidence-pilot-spec.md`: active M4 implementation specification.
+- `specs/love-engine-lan-pilot-spec.md`: active M5 LAN pilot specification.
 
 ## API
 
@@ -11,6 +11,8 @@
 - `api/agent-skill-api.md`: package, node, evidence and local-loop interfaces.
 - `api/agent-network-api.md`: SkillRegistry, Relay and M3 network protocol.
 - `api/extension-interfaces.md`: replaceable transport, signer, live, storage and read-model ports.
+- `api/lan-pilot-api.md`: M5 package, LAN control plane, observation, chain, voting and recovery interfaces.
+- `api/cli-reference.md`: complete CLI, operational, background soak and verification commands.
 
 ## Development
 
@@ -19,11 +21,15 @@
 - `development/contract-team-handoff.md`: contract mapping and governance questions.
 - `development/m3-demo-runbook.md`: presentation sequence.
 - `development/m3-acceptance-report.md`: verified M3 evidence.
+- `development/m4-skill-supervision-and-next-stage-gaps.md`: M4 architecture review, missing pieces and next-stage supervision baseline.
+- `development/m5-acceptance-report.md`: executed M5 verification and remaining formal soak/release gate.
+- `development/m5-release-closeout-plan.md`: active CLI, long-run, UI, documentation and Git delivery plan.
 
 ## Sources and archive
 
 - `reference/source-materials/current/`: current preserved source constraints.
+- `reference/licenses/scc0-provenance.md`: adopted SCC0 license source and exact provenance.
 - `archive/source-materials/2026-06-22/`: historical source materials.
-- `archive/specs/implemented/`: implemented M1/M2/M3 specifications.
+- `archive/specs/implemented/`: implemented M1/M2/M3/M4 specifications.
 - `archive/planning/2026-06-21/`: superseded plans.
 - `kb/source-inventory.md` and `kb/sources.json`: inventories.

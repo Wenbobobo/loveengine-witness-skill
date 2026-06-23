@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/pilot-transcript-v1.schema.json",
+  "title": "PilotTranscriptV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "version", "package", "chain", "session", "events", "observation_set", "evidence_bundle", "dispute", "proposal_gate", "proposal", "vote_approvals", "transactions", "final_state", "metrics", "faults", "snapshots", "transcript_hash"],
+  "properties": {
+    "schema_version": {"const": "loveengine.pilot-transcript/1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "version": {"const": "0.5.0-lan-pilot"},
+    "package": {"type": "object"},
+    "chain": {"type": "object"},
+    "session": {"type": "object"},
+    "events": {"type": "array"},
+    "observation_set": {"type": "object"},
+    "evidence_bundle": {"type": "object"},
+    "dispute": {"type": "object"},
+    "proposal_gate": {"type": "object"},
+    "proposal": {"type": "object"},
+    "vote_approvals": {"type": "array", "minItems": 5},
+    "transactions": {"type": "array"},
+    "final_state": {"type": "object"},
+    "metrics": {"type": "object"},
+    "faults": {"type": "object"},
+    "snapshots": {"type": "array"},
+    "transcript_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

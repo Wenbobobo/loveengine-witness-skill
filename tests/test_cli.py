@@ -24,3 +24,27 @@ def test_cli_exposes_m1_command_tree() -> None:
     assert result.returncode == 0, result.stderr
     for command in ("manifest", "node", "fixture", "evidence", "transcript"):
         assert command in result.stdout
+
+
+def test_cli_exposes_m5_command_tree() -> None:
+    result = run_cli("--help")
+
+    assert result.returncode == 0, result.stderr
+    for command in ("package", "pilot", "witness"):
+        assert command in result.stdout
+
+    pilot = run_cli("pilot", "--help")
+    assert pilot.returncode == 0, pilot.stderr
+    for command in ("serve", "status", "chain", "transcript", "snapshot", "soak"):
+        assert command in pilot.stdout
+
+
+def test_version_reports_runtime_source() -> None:
+    result = run_cli("version")
+
+    assert result.returncode == 0, result.stderr
+    value = __import__("json").loads(result.stdout)
+    assert value["package_version"] == "0.5.0"
+    assert value["skill_version"] == "0.5.0-lan-pilot"
+    assert value["protocol"] == "loveengine-witness-net/0.5"
+    assert Path(value["package_root"]).resolve() == ROOT

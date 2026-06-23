@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/pilot-config-v1.schema.json",
+  "title": "PilotConfigV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "host", "port", "database", "relay_database", "artifact_root", "audit_log", "token_file", "bootstrap_file", "release_file", "package_archive", "allowed_origin", "rpc_url", "chain_id", "allow_all_interfaces"],
+  "properties": {
+    "schema_version": {"const": "loveengine.pilot-config/1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "host": {"type": "string", "minLength": 1},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    "database": {"type": "string", "minLength": 1},
+    "relay_database": {"type": "string", "minLength": 1},
+    "artifact_root": {"type": "string", "minLength": 1},
+    "audit_log": {"type": "string", "minLength": 1},
+    "token_file": {"type": "string", "minLength": 1},
+    "bootstrap_file": {"type": "string", "minLength": 1},
+    "release_file": {"type": "string", "minLength": 1},
+    "package_archive": {"type": "string", "minLength": 1},
+    "allowed_origin": {"type": "string", "pattern": "^https?://"},
+    "rpc_url": {"type": "string", "pattern": "^https?://"},
+    "chain_id": {"type": "string", "pattern": "^[0-9]+$"},
+    "allow_all_interfaces": {"type": "boolean"}
+  }
+}

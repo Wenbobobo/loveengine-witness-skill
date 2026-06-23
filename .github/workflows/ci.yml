@@ -83,3 +83,61 @@ jobs:
           forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
       - name: Live evidence integration
         run: uv run pytest tests/integration/test_live_evidence_demo.py
+
+  m5-package-install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync --frozen
+      - name: Install pinned contract dependencies
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std@v1.9.7 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge build
+      - name: Build twice and verify deterministic package
+        run: |
+          uv run loveengine package build --output dist-a
+          uv run loveengine package build --output dist-b
+          cmp dist-a/loveengine-witness-0.5.0-lan-pilot.zip dist-b/loveengine-witness-0.5.0-lan-pilot.zip
+          uv run loveengine package verify dist-a/loveengine-witness-0.5.0-lan-pilot.zip
+      - name: Package security and CLI integration tests
+        run: |
+          uv run pytest tests/test_skill_package.py
+          uv run pytest tests/test_cli_commands.py::test_package_cli_build_verify_install_and_self_check
+      - name: Clean install and frozen sync
+        run: |
+          uv run loveengine package install dist-a/loveengine-witness-0.5.0-lan-pilot.zip --target installed
+          uv sync --frozen --project installed
+          uv run --project installed loveengine package self-check --root installed
+
+  m5-lan-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync --frozen
+      - name: Install pinned contract dependencies
+        working-directory: contracts
+        run: |
+          forge install foundry-rs/forge-std@v1.9.7 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+      - name: Persistent chain integration
+        run: uv run pytest tests/integration/test_pilot_chain.py
+      - name: Unified package-to-PublicSink E2E
+        run: uv run pytest tests/integration/test_pilot_demo.py
+      - name: Accelerated faults and ten-observer soak
+        run: uv run pytest tests/integration/test_pilot_soak.py

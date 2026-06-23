@@ -6,6 +6,15 @@ LoveEngine Witness Skill is an Agent-network-first protocol for verifiable publi
 
 Current stable demo: `0.4.0-live-evidence-pilot`.
 Previous network-only demo: `0.3.1-demo-ready`.
+Current release candidate: `0.5.0-lan-pilot` (`loveengine-witness-net/0.5`).
+
+## Skill model
+
+LoveEngine uses a thin instruction layer and a thick protocol runtime. The
+Codex-facing `SKILL.md` only defines triggers, verification, command routing,
+and safety boundaries. Versioned manifests, schemas, Python use cases,
+adapters, contracts, and transcripts carry the executable protocol. This keeps
+Agent context small while preserving deterministic, testable behavior.
 
 ## Architecture
 
@@ -90,62 +99,35 @@ tests/                     Unit, contract and end-to-end tests
 tools/                     Repository and compatibility validators
 ```
 
-## Requirements
+## Operator and read-only views
 
-- Python 3.11 or newer
-- [uv](https://docs.astral.sh/uv/)
-- Foundry `1.7.1` for contract and Anvil demos
+The Pilot Server exposes an authenticated host console and a separate
+read-only evidence view. The token remains only in page memory; the public view
+cannot write or sign. These screenshots are rendered from the repository's
+secret-free local UI fixture.
+
+![LoveEngine host operator console](docs/assets/operator-console.png)
+
+![LoveEngine read-only evidence console](docs/assets/read-only-dashboard.png)
+
+## Quick start
+
+Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Foundry `1.7.1`.
+The four commands below synchronize the locked environment, verify the
+manifest, run the package-to-PublicSink pilot, and verify its transcript.
 
 ```powershell
 uv sync --frozen
-cd contracts
-forge install foundry-rs/forge-std@v1.9.7 --no-git
-forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
-cd ..
-```
-
-## Verification
-
-```powershell
-uv run python .\tools\check.py
-uv run pytest -m "not integration" -q
-
-cd contracts
-forge test
-cd ..
-
-uv run pytest .\tests\test_demo.py
-uv run pytest .\tests\integration\test_network_demo.py
-uv run pytest .\tests\integration\test_live_evidence_demo.py
-```
-
-## Run the demos
-
-```powershell
 uv run loveengine manifest verify
-
-uv run loveengine demo local-loop --output .\examples\transcripts
-uv run loveengine transcript verify .\examples\transcripts\local-loop.fixture.json
-
-uv run loveengine network demo --nodes 3 --output .\examples\transcripts
-uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
-
-uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
-uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
+uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
+uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 ```
 
-The M3 presentation sequence is in [demo runbook](docs/development/m3-demo-runbook.md). Verified release evidence is in [acceptance report](docs/development/m3-acceptance-report.md).
-
-## CLI groups
-
-```text
-manifest  node  fixture  evidence  transcript
-eip712    relayer  registry  bootstrap
-relay     network  live  dispute  review
-proposal  demo
-```
-
-All successful commands emit JSON to stdout. Structured errors use stderr and stable error codes.
+Full installation, server, chain, snapshot, voting, legacy demo, background
+soak, and troubleshooting commands are in the
+[CLI and operations reference](docs/api/cli-reference.md). Run the complete
+automated quality matrix with `tools/run_release_checks.ps1`; the real
+four-hour wall-clock soak remains a separate release gate.
 
 ## Security invariants
 
@@ -153,17 +135,23 @@ All successful commands emit JSON to stdout. Structured errors use stderr and st
 - A relayer submits signatures but cannot sign for a witness or node.
 - Every signed task binds chain ID, verifying contract, issuer, recipient, payload hash, nonce, and deadline.
 - Raw evidence stays off-chain; only content hashes enter proposals or contracts.
-- M4 review tasks never request or produce vote signatures.
+- Agents never auto-sign votes. Each witness approval is a separate explicit
+  `loveengine witness vote approve` command using an external RPC signer.
 - `PublicSink` remains read-only.
 
-## Documentation order
+## Documentation entrypoints
 
-1. [Master plan](docs/specs/love-engine-master-plan.md)
-2. [Active M4 specification](docs/specs/love-engine-live-evidence-pilot-spec.md)
-3. [API index](docs/api/README.md)
-4. [Integration guide](docs/development/integration-guide.md)
-5. [Source inventory](docs/kb/source-inventory.md)
+- Architecture and scope: [master plan](docs/specs/love-engine-master-plan.md)
+  and [active M5 specification](docs/specs/love-engine-lan-pilot-spec.md).
+- Interfaces and commands: [API index](docs/api/README.md) and
+  [CLI reference](docs/api/cli-reference.md).
+- Development and operations:
+  [integration guide](docs/development/integration-guide.md) and
+  [M5 acceptance report](docs/development/m5-acceptance-report.md).
+- Provenance: [source inventory](docs/kb/source-inventory.md) and
+  [SCC0 provenance](docs/reference/licenses/scc0-provenance.md).
 
 ## License
 
-No repository-wide open-source license has been selected. Do not infer a license from archived SCC0 or DAism materials.
+LoveEngineSkill is released under Smart Creative Commons Zero (SCC0). See
+[LICENSE](LICENSE) and the exact [license provenance](docs/reference/licenses/scc0-provenance.md).

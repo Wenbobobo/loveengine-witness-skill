@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/onchain-proposal-plan-v1.schema.json",
+  "title": "OnchainProposalPlanV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "chain_id", "witness_dao", "proposal_id", "payload_hash", "support", "reason_hash", "deadline"],
+  "properties": {
+    "schema_version": {"const": "loveengine.onchain-proposal-plan/1"},
+    "chain_id": {"type": "string", "pattern": "^[0-9]+$"},
+    "witness_dao": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
+    "proposal_id": {"type": "string", "pattern": "^[0-9]+$"},
+    "payload_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "support": {"type": "boolean"},
+    "reason_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "deadline": {"type": "string", "pattern": "^[0-9]+$"}
+  }
+}

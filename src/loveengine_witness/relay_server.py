@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import asyncio
 import secrets
+import time
+import math
+from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable, TypeVar
 
 from aiohttp import ClientSession, WSMsgType, web
 from eth_account import Account
@@ -29,7 +32,45 @@ from .m4_network import (
     verify_task_v2,
 )
 from .m4_typed_data import build_receipt_v2_typed_data
+from .observation import ObservationCursorStore, observe_live_session
 from .relay import RelayStore
+
+
+T = TypeVar("T")
+
+
+async def _run_with_relay_keepalive(
+    ws: Any,
+    operation: Awaitable[T],
+    pending_messages: list[dict[str, Any]],
+    *,
+    interval: float = 3.0,
+) -> T:
+    """Run a long task while continuing to service the Relay WebSocket."""
+
+    task = asyncio.create_task(operation)
+    try:
+        while not task.done():
+            try:
+                message = await ws.receive_json(timeout=interval)
+            except TimeoutError:
+                if not task.done():
+                    await ws.send_json({"type": "heartbeat"})
+                continue
+            message_type = message.get("type")
+            if message_type == "task":
+                pending_messages.append(message)
+            elif message_type == "error":
+                raise LoveEngineError(
+                    str(message.get("code", "relay_error")),
+                    str(message.get("message", "Relay rejected long-running task")),
+                    4,
+                )
+        return await task
+    finally:
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 def parse_client_message(value: str) -> dict[str, Any]:
@@ -106,7 +147,8 @@ class RelayHub:
         self.connected: set[str] = set()
         self.receipts: list[dict[str, Any]] = []
         self.rejected = 0
-        self.latencies_ms: list[float] = []
+        self.acceptance_latencies_ms: list[float] = []
+        self.completion_latencies_ms: list[float] = []
         self.runner: web.AppRunner | None = None
 
     def app(self) -> web.Application:
@@ -221,6 +263,23 @@ class RelayHub:
                 if value.get("type") == "heartbeat":
                     await ws.send_json({"type": "heartbeat"})
                     continue
+                if value.get("type") == "ack":
+                    task_id = value.get("task_id")
+                    if (
+                        value.get("status") != "accepted"
+                        or not isinstance(task_id, str)
+                        or task_id not in starts
+                    ):
+                        self.rejected += 1
+                        await ws.send_json(
+                            {"type": "error", "code": "invalid_task_ack"}
+                        )
+                        continue
+                    if self.store.accept(node, task_id):
+                        self.acceptance_latencies_ms.append(
+                            (perf_counter() - starts[task_id]) * 1000
+                        )
+                    continue
                 if value.get("type") != "receipt":
                     self.rejected += 1
                     await ws.send_json(
@@ -242,7 +301,9 @@ class RelayHub:
                     self.receipts.append(receipt)
                     start = starts.get(receipt["task_id"])
                     if start is not None:
-                        self.latencies_ms.append((perf_counter() - start) * 1000)
+                        self.completion_latencies_ms.append(
+                            (perf_counter() - start) * 1000
+                        )
                     await ws.send_json(
                         {
                             "type": "ack",
@@ -264,14 +325,26 @@ class RelayHub:
 
     def metrics(self) -> dict[str, Any]:
         base = self.store.metrics()
+        def latency(values: list[float]) -> dict[str, float | int]:
+            ordered = sorted(values)
+            p95_index = max(
+                0, min(len(ordered) - 1, math.ceil(len(ordered) * 0.95) - 1)
+            )
+            return {
+                "count": len(values),
+                "max": round(max(values, default=0.0), 3),
+                "p95": round(ordered[p95_index], 3) if ordered else 0.0,
+            }
+
         base.update(
             {
                 "connected": len(self.connected),
                 "rejected": self.rejected,
-                "latency_ms": {
-                    "count": len(self.latencies_ms),
-                    "max": round(max(self.latencies_ms, default=0.0), 3),
-                },
+                "latency_ms": latency(self.acceptance_latencies_ms),
+                "completion_latency_ms": latency(
+                    self.completion_latencies_ms
+                ),
+                "queue_depth": max(0, base["queued"] - base["acked"]),
             }
         )
         return base
@@ -317,6 +390,13 @@ async def run_node_client(
                     rejected += 1
                     continue
                 verify_task_for_node(task, signed_profile)
+                await ws.send_json(
+                    {
+                        "type": "ack",
+                        "task_id": task["task_id"],
+                        "status": "accepted",
+                    }
+                )
                 completed.add(task["task_id"])
                 receipt = build_receipt(
                     chain_id=task["chain_id"],
@@ -400,6 +480,13 @@ async def run_v2_review_client(
                     expected_registry=signed_profile["registry"],
                     expected_recipient=node,
                 )
+                await ws.send_json(
+                    {
+                        "type": "ack",
+                        "task_id": task["task_id"],
+                        "status": "accepted",
+                    }
+                )
                 completed.add(task["task_id"])
                 dispute_id = task["payload"]["dispute_id"]
                 verdict = verdicts[dispute_id]
@@ -437,6 +524,97 @@ async def run_v2_review_client(
                         continue
                     raise RuntimeError(
                         "relay did not acknowledge receipt: "
+                        + json.dumps(ack, sort_keys=True)
+                    )
+                receipts.append(receipt)
+    return {"node": node, "receipts": receipts}
+
+
+async def run_v2_observation_client(
+    url: str,
+    node_address: str,
+    signed_profile: dict[str, Any],
+    expected_tasks: int,
+    cursor_database: str,
+    sign_challenge: Callable[[str], str],
+    sign_typed_data: Callable[[dict[str, Any]], str],
+) -> dict[str, Any]:
+    node = to_checksum_address(node_address)
+    receipts: list[dict[str, Any]] = []
+    pending_messages: list[dict[str, Any]] = []
+    cursor_store = ObservationCursorStore(Path(cursor_database))
+    async with ClientSession() as session:
+        async with session.ws_connect(url) as ws:
+            challenge = await ws.receive_json()
+            await ws.send_json(
+                {
+                    "type": "authenticate",
+                    "profile": signed_profile,
+                    "challenge_signature": sign_challenge(challenge["challenge"]),
+                }
+            )
+            authenticated = await ws.receive_json()
+            if authenticated.get("status") != "authenticated":
+                raise RuntimeError("relay authentication failed")
+            while len(receipts) < expected_tasks:
+                message = (
+                    pending_messages.pop(0)
+                    if pending_messages
+                    else await ws.receive_json(timeout=30)
+                )
+                if message.get("type") != "task":
+                    continue
+                task = message["task"]
+                verify_task_v2(
+                    task,
+                    expected_chain_id=signed_profile["chain_id"],
+                    expected_registry=signed_profile["registry"],
+                    expected_recipient=node,
+                )
+                if task["task_type"] != "observe_live_text":
+                    raise LoveEngineError(
+                        "unsupported_task_type", task["task_type"]
+                    )
+                await ws.send_json(
+                    {
+                        "type": "ack",
+                        "task_id": task["task_id"],
+                        "status": "accepted",
+                    }
+                )
+                result = await _run_with_relay_keepalive(
+                    ws,
+                    observe_live_session(task["payload"], cursor_store, node),
+                    pending_messages,
+                )
+                receipt = build_receipt_v2(
+                    chain_id=task["chain_id"],
+                    registry=task["registry"],
+                    task_id=task["task_id"],
+                    node=node,
+                    status="completed",
+                    result=result,
+                    nonce=task["nonce"],
+                    completed_at=str(int(time.time())),
+                )
+                receipt["signature"] = sign_typed_data(
+                    build_receipt_v2_typed_data(receipt)
+                )
+                await ws.send_json({"type": "receipt", "receipt": receipt})
+                while True:
+                    ack = await ws.receive_json(timeout=10)
+                    if (
+                        ack.get("type") == "ack"
+                        and ack.get("task_id") == receipt["task_id"]
+                    ):
+                        break
+                    if ack.get("type") == "task":
+                        pending_messages.append(ack)
+                        continue
+                    if ack.get("type") == "heartbeat":
+                        continue
+                    raise RuntimeError(
+                        "relay did not acknowledge observation receipt: "
                         + json.dumps(ack, sort_keys=True)
                     )
                 receipts.append(receipt)

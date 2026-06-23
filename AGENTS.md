@@ -7,12 +7,14 @@ These instructions apply to the LoveEngineSkill repository.
 1. `README.md`
 2. `docs/development/integration-guide.md`
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
-5. `docs/api/loveengine-contract-api.md`
-6. `docs/api/agent-skill-api.md`
-7. `docs/api/agent-network-api.md`
-8. `docs/api/extension-interfaces.md`
-9. `skills/loveengine-witness/skill-manifest.json`
+4. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
+5. `docs/specs/love-engine-lan-pilot-spec.md`
+6. `docs/api/loveengine-contract-api.md`
+7. `docs/api/agent-skill-api.md`
+8. `docs/api/agent-network-api.md`
+9. `docs/api/extension-interfaces.md`
+10. `docs/api/cli-reference.md`
+11. `skills/loveengine-witness/skill-manifest.json`
 
 ## Source material boundary
 
@@ -49,6 +51,13 @@ uv run pytest tests/integration/test_network_demo.py
 - Raw private keys never enter Agent context, prompts, logs, fixtures, or transcripts.
 - Network tasks are limited to `propagate_skill` and `observe_broadcast`; M3 never requests vote signatures.
 - M4 tasks may use `observe_live_text` and `review_dispute`, but never request vote signatures.
+- M5 observation Agents may reconnect from durable cursors, but still never
+  sign votes. Vote approval is an explicit witness CLI action using an external
+  RPC signer.
+- M5 measures task acceptance ACK latency separately from long-running task
+  completion latency.
+- Pilot write tokens are read from restricted files and never enter CLI
+  arguments, logs, fixtures, snapshots, or transcripts.
 - Agent nodes verify chainId, SkillRegistry, Publisher, release status, package hash, recipient, nonce, and deadline.
 - `VoteSignature` must bind `proposalId`, nonce, deadline, and payload hash.
 - `PublicSink` stays read-only.

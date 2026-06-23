@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import asyncio
 import json
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import pytest
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.relay import RelayStore
 from loveengine_witness.relay_server import (
+    _run_with_relay_keepalive,
     parse_client_message,
     verify_relay_profile_binding,
     verify_task_for_node,
@@ -28,9 +30,12 @@ def test_relay_store_redelivers_until_ack_and_restores_cursor(tmp_path) -> None:
     assert [item.task_id for item in redelivery] == ["task-1"]
     assert redelivery[0].attempts == 2
 
+    assert store.accept("node-a", "task-1") is True
+    assert store.accept("node-a", "task-1") is False
     store.ack("node-a", "task-1", '{"status":"completed"}')
     assert store.pending("node-a") == []
     assert store.metrics() == {
+        "accepted": 1,
         "acked": 1,
         "delivered": 2,
         "queued": 1,
@@ -106,3 +111,38 @@ def test_relay_transport_implements_transport_boundary() -> None:
         sign_typed_data=lambda _: "0x",
     )
     assert isinstance(transport, Transport)
+
+
+def test_long_running_relay_task_keeps_websocket_active() -> None:
+    class QuietWebSocket:
+        def __init__(self) -> None:
+            self.sent: list[dict] = []
+
+        async def receive_json(self, timeout: float) -> dict:
+            await asyncio.sleep(timeout)
+            raise TimeoutError
+
+        async def send_json(self, value: dict) -> None:
+            self.sent.append(value)
+
+    async def scenario() -> None:
+        socket = QuietWebSocket()
+        pending: list[dict] = []
+
+        async def operation() -> str:
+            await asyncio.sleep(0.04)
+            return "complete"
+
+        result = await _run_with_relay_keepalive(
+            socket,
+            operation(),
+            pending,
+            interval=0.01,
+        )
+
+        assert result == "complete"
+        assert socket.sent
+        assert all(item == {"type": "heartbeat"} for item in socket.sent)
+        assert pending == []
+
+    asyncio.run(scenario())

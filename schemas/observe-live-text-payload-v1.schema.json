@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/observe-live-text-payload-v1.schema.json",
+  "title": "ObserveLiveTextPayloadV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "stream_url", "session_url", "artifact_base_url", "start_cursor", "initial_head_hash"],
+  "properties": {
+    "schema_version": {"const": "loveengine.observe-live-text-payload/1"},
+    "session_id": {"type": "string", "minLength": 1},
+    "stream_url": {"type": "string", "pattern": "^https?://"},
+    "session_url": {"type": "string", "pattern": "^https?://"},
+    "artifact_base_url": {"type": "string", "pattern": "^https?://"},
+    "start_cursor": {"type": "string", "pattern": "^[0-9]+$"},
+    "initial_head_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "max_duration_seconds": {"type": "integer", "minimum": 1, "maximum": 14700}
+  }
+}

@@ -14,7 +14,7 @@ Then read:
 - `docs/development/integration-guide.md`
 - `docs/development/contract-team-handoff.md`
 - `docs/specs/love-engine-master-plan.md`
-- `docs/specs/love-engine-live-evidence-pilot-spec.md`
+- `docs/specs/love-engine-lan-pilot-spec.md`
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
 - `docs/api/agent-network-api.md`
@@ -85,8 +85,13 @@ forge test
 cd ..
 uv run pytest .\tests\test_demo.py
 uv run pytest .\tests\integration\test_network_demo.py
+uv run pytest .\tests\integration\test_live_evidence_demo.py
+uv run pytest .\tests\integration\test_pilot_demo.py
+uv run pytest .\tests\integration\test_pilot_soak.py
 ```
 
 ## Current priority
 
-M1/M2 Local Witness Loop and the M3 signed three-process Relay Hub pilot are implemented. New protocol work starts from the master plan and must preserve the M3 network transcript and no-secret acceptance gates.
+M0–M4 are implemented. M5 is a release candidate with a real four-hour soak
+as its final tag gate. An accelerated CI soak does not authorize the
+`v0.5.0-lan-pilot` tag.

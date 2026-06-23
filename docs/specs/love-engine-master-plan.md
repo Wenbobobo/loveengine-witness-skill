@@ -1,9 +1,9 @@
 # LoveEngine Witness Skill master plan
 
 状态：`current`  
-更新日期：2026-06-22
+更新日期：2026-06-23
 
-本文是唯一活动工程总规划。当前实施规格是 `love-engine-live-evidence-pilot-spec.md`；已完成规格保存在 `docs/archive/specs/implemented/`。
+本文是唯一活动工程总规划。当前实施规格是 `love-engine-lan-pilot-spec.md`；已完成规格保存在 `docs/archive/specs/implemented/`。
 
 ## Direction
 
@@ -25,30 +25,30 @@ LoveEngine 首先是可被 Agent 网络验证、安装、传播和运行的 UAS 
 - **M2**：完成，标签 `v0.2.0-local-loop`。四合约、五见证者 E2E 和 69 签名测试已实现。
 - **M3**：完成，标签 `v0.3.0-network-pilot`。SkillRegistry、Relay、三节点任务与 transcript 已实现。
 - **M3.1**：完成，标签 `v0.3.1-demo-ready`。Git、双语 README、演示入口和扩展接口已收口。
-- **M4**：完成，目标标签 `v0.4.0-live-evidence-pilot`。通用文字流、证据、三节点争议复核、ProposalGate、只读面板和 E2E 已实现。
-- **M5**：未来。企业补偿申请、表决、记录和公开查询。
+- **M4**：完成，标签 `v0.4.0-live-evidence-pilot`。通用文字流、证据、三节点争议复核、ProposalGate、只读面板和 E2E 已实现。
+- **M5**：release candidate。标准 Skill、确定性发布包、局域网真实文字直播、观察回执、统一链上 E2E、故障恢复与加速 soak 已实现；`v0.5.0-lan-pilot` 仅等待真实四小时 soak 和 Release 资产。
+- **M6**：未来。企业补偿申请、表决、记录和公开查询。
 
-## M4 acceptance
+## M5 acceptance
 
-- provider-neutral LiveSource 和 HTTP/NDJSON gateway。
-- append-only hash-chained LiveEvent。
-- 内容寻址 ArtifactStore 和 SQLite metadata。
-- EvidenceBundleV2。
-- 三个签名节点按简单多数复核争议。
-- upheld/unresolved 阻断；只有 dismissed 放行。
-- aiohttp 只读面板。
-- LiveReviewTranscript 与完整 E2E。
+- Codex 可发现、跨平台可移植的薄 `SKILL.md`。
+- 可重复构建并由 SkillRegistry package hash 绑定的确定性 ZIP。
+- 带写入 token、操作页面、readiness、指标和审计日志的局域网 Pilot Server。
+- 三个 Agent 通过 Relay 执行真实 `observe_live_text` 并签名观察回执。
+- 持久化 Anvil、显式 CLI 投票批准和重启恢复。
+- 从 Skill 安装、文字直播到 PublicSink 查询的 `PilotTranscriptV1`。
+- 3 节点、10 观察者、4 小时正式试点运行器与验收报告。
 
 ## Active scope
 
-包括 Skill 包、schemas、Python CLI、合约、Relay、直播文字证据、争议复核、只读面板和本地 Anvil demo。
+包括 Skill 包、schemas、Python CLI、合约、Relay、局域网文字直播、观察回执、争议复核、Pilot Server、持久化 Anvil、只读面板和本地链统一 E2E。
 
-当前不包括公共测试网、具体直播平台认证、视频处理、多模态推理、生产身份、密钥托管、P2P、HA、端到端加密、自动投票和链上争议门禁。
+当前不包括公共测试网、具体直播平台认证、视频处理、多模态推理、生产身份、生产密钥托管、P2P、HA、端到端加密、自动投票和链上争议门禁。
 
 ## Authority order
 
 1. 本文。
-2. `docs/specs/love-engine-live-evidence-pilot-spec.md`。
+2. `docs/specs/love-engine-lan-pilot-spec.md`。
 3. `docs/api/`。
 4. `docs/reference/source-materials/current/`。
 5. `docs/archive/specs/implemented/`。

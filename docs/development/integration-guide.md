@@ -1,6 +1,6 @@
 # Integration guide
 
-本文给参与 LoveEngine Witness Skill M4 直播证据试点及后续升级的开发者和 Agent 使用。
+本文给参与 LoveEngine Witness Skill M5 局域网试点及后续升级的开发者和 Agent 使用。
 
 ## 1. 初始化
 
@@ -16,10 +16,11 @@ uv run python .\tools\check.py
 
 1. `README.md`
 2. `docs/specs/love-engine-master-plan.md`
-3. `docs/specs/love-engine-live-evidence-pilot-spec.md`
-4. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
-5. `docs/api/README.md`
-6. `skills/loveengine-witness/skill-manifest.json`
+3. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
+4. `docs/specs/love-engine-lan-pilot-spec.md`
+5. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
+6. `docs/api/README.md`
+7. `skills/loveengine-witness/skill-manifest.json`
 
 查原始约束时再读：
 
@@ -72,6 +73,31 @@ M4 验收：
 uv run pytest .\tests\integration\test_live_evidence_demo.py
 uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
 uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
+```
+
+M5：
+
+1. 先验证 `SKILL.md` frontmatter 与确定性 ZIP。
+2. Pilot Server 写接口必须先有缺失/错误 token 的失败测试。
+3. `observe_live_text` 必须在独立 Agent 进程中验证 SSE、event hash chain 和 artifact。
+4. 持久链先测试 state dump/load 和 code hash，再接 proposal。
+5. 投票只能由五个显式 `witness vote approve` 命令产生。
+6. 最后执行带服务重启、Anvil 重启和三个 Agent 断线的统一 E2E。
+
+M5 快速验收：
+
+```powershell
+uv run pytest .\tests\integration\test_pilot_chain.py
+uv run pytest .\tests\integration\test_pilot_demo.py
+uv run pytest .\tests\integration\test_pilot_soak.py
+uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
+uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
+```
+
+正式发布前必须单独执行四小时 soak：
+
+```powershell
+uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
 ```
 
 ## 4. 接口规则

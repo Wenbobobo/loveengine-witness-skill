@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
 
 from loveengine_witness.canonical import canonical_json_bytes
@@ -35,7 +36,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.4.0-live-evidence-pilot"
+    assert output["version"] == "0.5.0-lan-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -309,3 +310,141 @@ def test_live_cli_session_ingest_close_and_finalize(tmp_path: Path) -> None:
     value = json.loads(bundle.read_text(encoding="utf-8"))
     load_schema("evidence-bundle-v2.schema.json").validate(value)
     assert value["event_count"] == "12"
+
+
+@pytest.mark.integration
+def test_package_cli_build_verify_install_and_self_check(tmp_path: Path) -> None:
+    release = tmp_path / "release"
+    build = run_cli("package", "build", "--output", str(release))
+    assert build.returncode == 0, build.stderr
+    built = json.loads(build.stdout)
+    archive = Path(built["archive"])
+    assert archive.is_file()
+    assert built["archive_keccak256"].startswith("0x")
+
+    verify = run_cli("package", "verify", str(archive))
+    assert verify.returncode == 0, verify.stderr
+    assert json.loads(verify.stdout)["valid"] is True
+
+    target = tmp_path / "installed"
+    install = run_cli(
+        "package", "install", str(archive), "--target", str(target)
+    )
+    assert install.returncode == 0, install.stderr
+    check = run_cli("package", "self-check", "--root", str(target))
+    assert check.returncode == 0, check.stderr
+    assert json.loads(check.stdout)["version"] == "0.5.0-lan-pilot"
+
+
+def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
+    missing = run_cli("pilot", "serve", "--config", str(tmp_path / "missing.json"))
+    assert missing.returncode == 3
+    assert json.loads(missing.stderr)["error"]["code"] == "file_not_found"
+
+    status = run_cli("pilot", "status", "--url", "http://127.0.0.1:1")
+    assert status.returncode == 4
+    assert json.loads(status.stderr)["error"]["code"] == "pilot_unavailable"
+
+
+def test_pilot_chain_and_explicit_vote_commands_are_machine_readable(
+    tmp_path: Path,
+) -> None:
+    status = run_cli(
+        "pilot",
+        "chain",
+        "status",
+        "--root",
+        str(tmp_path),
+        "--rpc-url",
+        "http://127.0.0.1:1",
+    )
+    assert status.returncode == 3
+    assert json.loads(status.stderr)["error"]["code"] == "file_not_found"
+
+    plan = tmp_path / "proposal-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "schema_version": "loveengine.onchain-proposal-plan/1",
+                "chain_id": "31337",
+                "witness_dao": "0x" + "11" * 20,
+                "proposal_id": "1",
+                "payload_hash": "0x" + "22" * 32,
+                "support": True,
+                "reason_hash": "0x" + "00" * 32,
+                "deadline": "4102444800",
+            }
+        ),
+        encoding="utf-8",
+    )
+    vote = run_cli(
+        "witness",
+        "vote",
+        "approve",
+        "--proposal-plan",
+        str(plan),
+        "--rpc-url",
+        "http://127.0.0.1:1",
+        "--address",
+        "0x" + "33" * 20,
+    )
+    assert vote.returncode == 4
+    assert json.loads(vote.stderr)["error"]["code"] == "rpc_unavailable"
+
+
+def test_pilot_transcript_cli_verifies_fixture_shape(tmp_path: Path) -> None:
+    from loveengine_witness.pilot_transcript import pilot_transcript_hash
+
+    transcript = {
+        "schema_version": "loveengine.pilot-transcript/1",
+        "run_id": "cli-pilot",
+        "version": "0.5.0-lan-pilot",
+        "package": {"archive_keccak256": "0x" + "11" * 32},
+        "chain": {},
+        "session": {
+            "session_id": "s1",
+            "status": "closed",
+            "head_event_hash": "0x" + "21" * 32,
+        },
+        "events": [],
+        "observation_set": {
+            "session_id": "s1",
+            "head_event_hash": "0x" + "21" * 32,
+            "bundle_hash": "0x" + "22" * 32,
+        },
+        "evidence_bundle": {
+            "session_id": "s1",
+            "head_event_hash": "0x" + "21" * 32,
+            "bundle_hash": "0x" + "22" * 32,
+        },
+        "dispute": {"status": "dismissed"},
+        "proposal_gate": {"ready": True},
+        "proposal": {
+            "proposal_id": "1",
+            "payload_hash": "0x" + "31" * 32,
+        },
+        "vote_approvals": [
+            {"proposal_id": "1", "payload_hash": "0x" + "31" * 32}
+            for _ in range(5)
+        ],
+        "transactions": [],
+        "final_state": {"proposal_executed": True, "total_uto": "1"},
+        "metrics": {},
+        "faults": {},
+        "snapshots": [],
+    }
+    transcript["transcript_hash"] = pilot_transcript_hash(transcript)
+    path = tmp_path / "pilot.json"
+    path.write_text(json.dumps(transcript), encoding="utf-8")
+
+    result = run_cli("pilot", "transcript", "verify", str(path))
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["valid"] is True
+
+
+def test_pilot_snapshot_cli_has_stable_missing_file_error(tmp_path: Path) -> None:
+    result = run_cli(
+        "pilot", "snapshot", "verify", str(tmp_path / "missing-snapshot")
+    )
+    assert result.returncode == 3
+    assert json.loads(result.stderr)["error"]["code"] == "file_not_found"
