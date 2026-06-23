@@ -705,12 +705,19 @@ async def _pilot_flow(
             system_snapshot["chain_snapshot"] = chain_snapshot
             metrics = hub.metrics()
             metrics["server_requests"] = app[METRICS_KEY].accepted_requests
+            metrics["recoveries"] = app[METRICS_KEY].recoveries
             metrics["read_only_observers"] = {
                 "count": observer_count,
                 "connections": sum(
                     item["connections"] for item in observer_results
                 ),
                 "events_each": str(event_count),
+            }
+            faults = {
+                "server_restarts": int(simulate_faults),
+                "anvil_restarts": int(simulate_faults),
+                "agent_disconnects": 3 if simulate_faults else 0,
+                "recovery_seconds": round(fault_recovery_seconds, 3),
             }
             transcript = {
                 "schema_version": "loveengine.pilot-transcript/1",
@@ -748,6 +755,7 @@ async def _pilot_flow(
                     "total_uto": str(public_sink.functions.getTotalUTO().call()),
                 },
                 "metrics": metrics,
+                "faults": faults,
                 "snapshots": [system_snapshot],
             }
             transcript["transcript_hash"] = pilot_transcript_hash(transcript)
@@ -762,12 +770,7 @@ async def _pilot_flow(
                 "proposal_executed": transcript["final_state"]["proposal_executed"],
                 "total_uto": transcript["final_state"]["total_uto"],
                 "read_only_observers": observer_count,
-                "faults": {
-                    "server_restarts": int(simulate_faults),
-                    "anvil_restarts": int(simulate_faults),
-                    "agent_disconnects": 3 if simulate_faults else 0,
-                    "recovery_seconds": round(fault_recovery_seconds, 3),
-                },
+                "faults": faults,
             }
     finally:
         for process in all_processes:

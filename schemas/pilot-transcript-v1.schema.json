@@ -4,7 +4,7 @@
   "title": "PilotTranscriptV1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "version", "package", "chain", "session", "events", "observation_set", "evidence_bundle", "dispute", "proposal_gate", "proposal", "vote_approvals", "transactions", "final_state", "metrics", "snapshots", "transcript_hash"],
+  "required": ["schema_version", "run_id", "version", "package", "chain", "session", "events", "observation_set", "evidence_bundle", "dispute", "proposal_gate", "proposal", "vote_approvals", "transactions", "final_state", "metrics", "faults", "snapshots", "transcript_hash"],
   "properties": {
     "schema_version": {"const": "loveengine.pilot-transcript/1"},
     "run_id": {"type": "string", "minLength": 1},
@@ -22,6 +22,7 @@
     "transactions": {"type": "array"},
     "final_state": {"type": "object"},
     "metrics": {"type": "object"},
+    "faults": {"type": "object"},
     "snapshots": {"type": "array"},
     "transcript_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   }

@@ -52,6 +52,7 @@ def _fixture() -> dict:
         "transactions": [],
         "final_state": {"proposal_executed": True, "total_uto": "20"},
         "metrics": {},
+        "faults": {},
         "snapshots": [],
     }
     value["transcript_hash"] = pilot_transcript_hash(value)

@@ -428,6 +428,7 @@ def test_pilot_transcript_cli_verifies_fixture_shape(tmp_path: Path) -> None:
         "transactions": [],
         "final_state": {"proposal_executed": True, "total_uto": "1"},
         "metrics": {},
+        "faults": {},
         "snapshots": [],
     }
     transcript["transcript_hash"] = pilot_transcript_hash(transcript)

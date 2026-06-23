@@ -131,6 +131,7 @@ def run_pilot_soak(
         "observer_count": observers,
         "disk_bytes": disk,
         "peak_rss_bytes": memory,
+        "faults": result["faults"],
         "secret_leaks": leaks,
         "checks": checks,
         "passed": all(checks.values()),

@@ -175,7 +175,7 @@
     "schemas/live-observation-receipt-v1.schema.json": "sha256:069e372ddcf46ef1e5303b2d63da24cef1e3888d8631349c9c293c426cb643c0",
     "schemas/observation-set-v1.schema.json": "sha256:2ffacdfae5fc89834ae91104e307493ca20bc96538e897860d7189c718094d96",
     "schemas/onchain-proposal-plan-v1.schema.json": "sha256:104931dde3db2cc1b36652347e4f95770c480f293c1217618ad77507313f9690",
-    "schemas/pilot-transcript-v1.schema.json": "sha256:d3d550e597945f6fcad13028e1ca819554fafab0cc532a56ae7f4e774115923b",
+    "schemas/pilot-transcript-v1.schema.json": "sha256:cc846057c67ac5e5dbdb7934de610501b35acf6b3843fb50bb08001798dc669c",
     "src/loveengine_witness/package.py": "sha256:900cf60ba13602fd53a8056652e1749e3d23f0731aa9dc093c3d7e0d5c5a7b9f",
     "src/loveengine_witness/pilot_server.py": "sha256:0b8b9e5a574505f3545d49f958a62007654138029f8bae9dab09ca12a721f250",
     "src/loveengine_witness/observation.py": "sha256:5b1d5a91d371c7df3fc4b61a1fb67a292288e6dc599ab6b473de10fd6522cac7",
@@ -184,8 +184,8 @@
     "src/loveengine_witness/witness_vote.py": "sha256:cc02d791a247f76f28ba3e5e4b8a1482d9cbbce73a4c5ea669d6e6dca33673e7",
     "src/loveengine_witness/pilot_snapshot.py": "sha256:8c3103bd3c95d67fef12160ae16dda39e2f6c6c1e816589893733822851c3ffd",
     "src/loveengine_witness/pilot_transcript.py": "sha256:fea1df8755493326d457780c169af97eff81f18ebe1621d0a2a4c70f44285b0a",
-    "src/loveengine_witness/pilot_demo.py": "sha256:a34cd11435765b8cade83642ae3a36ff267f40c9363f0d84607375df0c52ac71",
-    "src/loveengine_witness/pilot_soak.py": "sha256:497a09f66fe83ac38b44eb248451b5398fb22a0d306ea86c3b1032a1fe290b68",
+    "src/loveengine_witness/pilot_demo.py": "sha256:7c7ac030da01e11b479c0d8faac805a20729f545d7c75499905f13516c3d1616",
+    "src/loveengine_witness/pilot_soak.py": "sha256:ce159e1882f52241e86843e41284748577dcc53404bd26a22fc33cb451a1a642",
     "tools/refresh_manifests.py": "sha256:1fe6cc703acd7936c11f6d11c9f4c64cee8fea6669cf5ed67ac9ddb3f5358e28"
   },
   "commands": {
@@ -279,7 +279,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:5a1c42ec96cf941575d0559b8a80f1f6c25e9188645e72c81eabd9ce5d8836d1",
+  "package_hash": "sha256:b46b5e7b0063334710ac804e9811847e9d7746de80ddca7a2d143cf2e108e6e6",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,
