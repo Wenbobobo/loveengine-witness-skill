@@ -24,8 +24,6 @@ M5_REFS = [
     "docs/development/m5-acceptance-report.md",
     "docs/development/m5-release-closeout-plan.md",
     "docs/reference/licenses/scc0-provenance.md",
-    "docs/assets/operator-console.png",
-    "docs/assets/read-only-dashboard.png",
     "skills/loveengine-witness/SKILL.md",
     "skills/loveengine-witness/agents/openai.yaml",
     "schemas/pilot-config-v1.schema.json",
@@ -48,6 +46,15 @@ M5_REFS = [
     "src/loveengine_witness/ui_fixture.py",
     "tools/refresh_manifests.py",
 ]
+
+# Documentation screenshots are tracked through the source inventory, but they
+# are intentionally outside the protocol trust root. Git LFS checkouts expose
+# pointer bytes before the asset fetch step, so protecting them in the manifest
+# would make repository validation depend on checkout implementation details.
+UNPROTECTED_DOC_ASSETS = {
+    "docs/assets/operator-console.png",
+    "docs/assets/read-only-dashboard.png",
+}
 
 
 def load(path: Path) -> dict:
@@ -81,6 +88,7 @@ def refresh_current() -> None:
         if ref == "docs/specs/love-engine-live-evidence-pilot-spec.md"
         else ref
         for ref in value["source_refs"]
+        if ref not in UNPROTECTED_DOC_ASSETS
     ]
     for ref in M5_REFS:
         if ref not in refs:

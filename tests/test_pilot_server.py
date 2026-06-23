@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 from aiohttp.test_utils import TestClient, TestServer
@@ -16,6 +17,8 @@ TOKEN = "lan-pilot-write-token"
 def _config(tmp_path: Path) -> Path:
     token = tmp_path / "operator.token"
     token.write_text(TOKEN, encoding="utf-8")
+    if os.name != "nt":
+        token.chmod(0o600)
     (tmp_path / "bootstrap.json").write_text("{}", encoding="utf-8")
     (tmp_path / "release.json").write_text("{}", encoding="utf-8")
     (tmp_path / "package.zip").write_bytes(b"fixture")

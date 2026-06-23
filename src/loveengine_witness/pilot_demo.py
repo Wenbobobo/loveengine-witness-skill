@@ -357,6 +357,13 @@ async def _pilot_flow(
                         "artifact_base_url": base + "/v1/live/artifacts",
                         "start_cursor": "0",
                         "initial_head_hash": ZERO_HASH,
+                        "max_duration_seconds": min(
+                            14700,
+                            max(
+                                30,
+                                int(event_count * event_interval) + 180,
+                            ),
+                        ),
                     },
                     nonce=str(index),
                     deadline=deadline,

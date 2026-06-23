@@ -5,6 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from jsonschema import Draft202012Validator
 
 from loveengine_witness.canonical import canonical_json_bytes
@@ -311,6 +312,7 @@ def test_live_cli_session_ingest_close_and_finalize(tmp_path: Path) -> None:
     assert value["event_count"] == "12"
 
 
+@pytest.mark.integration
 def test_package_cli_build_verify_install_and_self_check(tmp_path: Path) -> None:
     release = tmp_path / "release"
     build = run_cli("package", "build", "--output", str(release))

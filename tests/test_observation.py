@@ -15,6 +15,7 @@ from loveengine_witness.m4_typed_data import build_receipt_v2_typed_data
 from loveengine_witness.observation import (
     ObservationCursorStore,
     aggregate_observations,
+    observation_timeout_seconds,
     observe_live_session,
 )
 
@@ -143,3 +144,22 @@ def test_cursor_store_rejects_rollback(tmp_path: Path) -> None:
     with pytest.raises(LoveEngineError) as exc:
         store.save("node-1", "session-1", 1, "0x" + "22" * 32, 1)
     assert exc.value.code == "cursor_rollback"
+
+
+def test_observation_duration_is_signed_and_bounded() -> None:
+    payload = {
+        "schema_version": "loveengine.observe-live-text-payload/1",
+        "session_id": "session-1",
+        "stream_url": "http://127.0.0.1:8780/stream",
+        "session_url": "http://127.0.0.1:8780/session",
+        "artifact_base_url": "http://127.0.0.1:8780/artifacts",
+        "start_cursor": "0",
+        "initial_head_hash": "0x" + "00" * 32,
+        "max_duration_seconds": 3780,
+    }
+
+    assert observation_timeout_seconds(payload) == 3780
+    payload["max_duration_seconds"] = 14701
+    with pytest.raises(LoveEngineError) as error:
+        observation_timeout_seconds(payload)
+    assert error.value.code == "schema_validation_failed"

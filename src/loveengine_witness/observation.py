@@ -21,6 +21,11 @@ from .schema import validate_schema
 from .secrets import reject_secret_fields
 
 
+def observation_timeout_seconds(payload: dict[str, Any]) -> float:
+    validate_schema(payload, "observe-live-text-payload-v1.schema.json")
+    return float(payload.get("max_duration_seconds", 30))
+
+
 class ObservationCursorStore:
     """Durable per-node cursor with monotonic update enforcement."""
 
@@ -102,12 +107,12 @@ async def observe_live_session(
     consumer: str,
     *,
     poll_interval: float = 0.05,
-    timeout_seconds: float = 30,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Observe a live SSE feed, verify every artifact, and resume from disk."""
 
     reject_secret_fields(payload)
-    validate_schema(payload, "observe-live-text-payload-v1.schema.json")
+    configured_timeout = observation_timeout_seconds(payload)
     session_id = payload["session_id"]
     start = int(payload["start_cursor"])
     stored = cursors.get(consumer, session_id)
@@ -119,7 +124,9 @@ async def observe_live_session(
     event_count = stored["event_count"] if stored else start
     observed_from = cursor
     artifact_count = 0
-    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    deadline = asyncio.get_running_loop().time() + (
+        configured_timeout if timeout_seconds is None else timeout_seconds
+    )
 
     try:
         async with ClientSession(timeout=ClientTimeout(total=5)) as session:

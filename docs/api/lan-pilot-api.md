@@ -55,7 +55,9 @@ POST /v1/live/sessions/{sessionId}/close
 ## Observation protocol
 
 `ObserveLiveTextPayloadV1` 绑定 session、SSE URL、session URL、artifact
-URL、起始 cursor 和初始 head hash。`NetworkTaskV2` 继续绑定 chainId、
+URL、起始 cursor、初始 head hash 和可选 `max_duration_seconds`。该时长
+进入签名 payload，最大为 14,700 秒，允许四小时 session 加五分钟收口；
+缺省值 30 秒仅用于兼容早期短任务。`NetworkTaskV2` 继续绑定 chainId、
 Registry、issuer、recipient、nonce、deadline 和 payload hash。
 
 Agent 必须依次验证：

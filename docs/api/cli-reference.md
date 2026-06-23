@@ -149,6 +149,9 @@ stdout、stderr 和报告路径。`passed` 只由完整 `pilot-soak-report.json`
 - `completion_latency_ms`：直播观察直到 session 关闭并签署回执的总时间，
   自然接近直播时长，不适用 ACK 阈值。
 
+`observe_live_text` 的签名 payload 同时携带 `max_duration_seconds`；协议上限
+为 14,700 秒。这样长任务不会沿用旧的 30 秒短任务超时，也不会变成无界等待。
+
 ## 10. 完整验证
 
 长测试矩阵由脚本统一执行，避免手工漏项：
@@ -170,4 +173,3 @@ eip712    relayer  registry  bootstrap
 relay     network  live  dispute  review
 proposal  package  pilot  witness  demo
 ```
-

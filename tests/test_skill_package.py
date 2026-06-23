@@ -35,6 +35,7 @@ def test_skill_entry_is_codex_discoverable_and_thin() -> None:
     assert (skill_path.parent / "agents" / "openai.yaml").is_file()
 
 
+@pytest.mark.integration
 def test_deterministic_package_build_verify_install_and_self_check(
     tmp_path: Path,
 ) -> None:
@@ -66,6 +67,7 @@ def test_deterministic_package_build_verify_install_and_self_check(
     assert error.value.code == "package_target_not_empty"
 
 
+@pytest.mark.integration
 def test_package_verify_rejects_tampering_and_unsafe_paths(tmp_path: Path) -> None:
     result = build_package(ROOT, tmp_path / "release")
     tampered = tmp_path / "tampered.zip"
@@ -113,6 +115,7 @@ def test_package_verify_rejects_tampering_and_unsafe_paths(tmp_path: Path) -> No
     assert error.value.code == "package_secret_file_forbidden"
 
 
+@pytest.mark.integration
 def test_package_excludes_secrets_and_repository_history(tmp_path: Path) -> None:
     result = build_package(ROOT, tmp_path / "release")
     with zipfile.ZipFile(result.archive) as archive:

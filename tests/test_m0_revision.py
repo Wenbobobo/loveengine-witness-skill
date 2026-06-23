@@ -73,6 +73,8 @@ def test_current_manifest_is_lan_pilot() -> None:
     ]
     assert manifest["eip712"]["domain_version"] == "2"
     assert manifest["security"]["private_keys_in_agent_context"] is False
+    assert "docs/assets/operator-console.png" not in manifest["source_refs"]
+    assert "docs/assets/read-only-dashboard.png" not in manifest["source_refs"]
 
 
 def test_m0_validator_accepts_revision_and_rejects_tampering() -> None:

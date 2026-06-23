@@ -49,3 +49,16 @@ uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 1
 The resulting `pilot-soak-report.json`, PilotTranscript, ZIP, checksums and SBOM
 are release assets. Until this real four-hour command completes, the version is
 a release candidate and must not be described as a completed four-hour trial.
+
+## Wall-clock preflight findings
+
+The first one-hour attempt on 2026-06-23 was a valid failed preflight. It
+exposed that the observation client still used the original 30-second default
+timeout even while Relay heartbeats kept the connection alive. No final report
+was produced, so the run is not accepted.
+
+The protocol now binds `max_duration_seconds` into the signed
+`ObserveLiveTextPayloadV1`, capped at 14,700 seconds. Task acceptance ACK
+latency is measured separately from final observation completion latency. A
+repeat one-hour run is required before merge; the four-hour tag gate is
+unchanged.
