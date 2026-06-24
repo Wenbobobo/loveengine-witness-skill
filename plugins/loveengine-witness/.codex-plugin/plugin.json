@@ -1,0 +1,18 @@
+{
+  "name": "loveengine-witness",
+  "version": "0.6.0",
+  "description": "SCC0-licensed pilot distribution wrapper for the LoveEngine Witness Skill. It never stores private keys, never auto-approves votes, and treats SkillRegistry package hashes as the protocol trust root.",
+  "author": {
+    "name": "LoveEngine"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "LoveEngine Witness",
+    "shortDescription": "Install, join, observe, and audit LoveEngine witness pilots.",
+    "longDescription": "LoveEngine Witness is a Codex-facing pilot plugin for verifying manifests, joining invite-based LAN/Tailscale pilots, operating live-text evidence sessions, and auditing transcripts. It is a distribution entrypoint only; the protocol trust root remains the on-chain SkillRegistry package hash.",
+    "developerName": "LoveEngine",
+    "category": "Developer Tools",
+    "capabilities": [],
+    "defaultPrompt": "Use the LoveEngine Witness workflow. First verify the manifest/package, then identify my role and provide the safe next command."
+  }
+}

@@ -35,7 +35,15 @@ def test_cli_exposes_m5_command_tree() -> None:
 
     pilot = run_cli("pilot", "--help")
     assert pilot.returncode == 0, pilot.stderr
-    for command in ("serve", "status", "chain", "transcript", "snapshot", "soak"):
+    for command in (
+        "quickstart",
+        "serve",
+        "status",
+        "chain",
+        "transcript",
+        "snapshot",
+        "soak",
+    ):
         assert command in pilot.stdout
 
 
@@ -44,7 +52,7 @@ def test_version_reports_runtime_source() -> None:
 
     assert result.returncode == 0, result.stderr
     value = __import__("json").loads(result.stdout)
-    assert value["package_version"] == "0.5.0"
-    assert value["skill_version"] == "0.5.0-lan-pilot"
-    assert value["protocol"] == "loveengine-witness-net/0.5"
+    assert value["package_version"] == "0.6.0"
+    assert value["skill_version"] == "0.6.0-contract-public-pilot"
+    assert value["protocol"] == "loveengine-witness-net/0.6"
     assert Path(value["package_root"]).resolve() == ROOT

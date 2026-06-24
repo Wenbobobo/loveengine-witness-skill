@@ -1,8 +1,8 @@
 # Contract team v2 source snapshot
 
-Status: preserved source input  
-Received: 2026-06-24  
-Original local path: `contracts2/`  
+Status: preserved source input
+Received: 2026-06-24
+Original local path: `contracts2/`
 Current path: `docs/reference/contracts/contract-team-v2/`
 
 This directory preserves the contract team's second contract handoff as source
@@ -32,4 +32,3 @@ forge build --contracts ..\docs\reference\contracts\contract-team-v2\contracts
 
 Compilation success is only a syntax and dependency check. It is not equivalent
 to accepting the contract set as the protocol ABI.
-

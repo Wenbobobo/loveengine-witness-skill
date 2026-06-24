@@ -1,8 +1,8 @@
 # 合约团队 v2 版本对比与建议
 
-状态：活跃交接说明  
-基线版本：`v0.5.0-lan-pilot` / 分支 `feat/loveengine-m6-contract-public-pilot`  
-合约团队快照：`docs/reference/contracts/contract-team-v2/contracts/`  
+状态：活跃交接说明
+基线版本：`v0.5.0-lan-pilot` / 分支 `feat/loveengine-m6-contract-public-pilot`
+合约团队快照：`docs/reference/contracts/contract-team-v2/contracts/`
 当前目标实现：`contracts/src/`
 
 本说明旨在连同额外的 `SkillRegistry` 合约一并发回给合约团队。它不会修改已保留的 `contract-team-v2` 源文件。

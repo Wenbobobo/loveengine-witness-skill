@@ -99,17 +99,29 @@ def test_pilot_server_protects_writes_and_exposes_read_models(tmp_path: Path) ->
             operator_text = await operator.text()
             assert operator.status == 200
             assert "LoveEngine LAN Pilot" in operator_text
+            assert "Language" in operator_text
             assert "localStorage" not in operator_text
             assert 'type="password"' in operator_text
             assert 'id="metric-agents"' in operator_text
             assert 'id="event-feed"' in operator_text
             assert "method:'POST'" in operator_text
+            operator_zh = await client.get("/operator/?lang=zh-CN")
+            operator_zh_text = await operator_zh.text()
+            assert "见证操作台" in operator_zh_text
+            assert "语言" in operator_zh_text
+            assert "localStorage" not in operator_zh_text
             dashboard = await client.get("/demo/")
             assert dashboard.status == 200
             dashboard_text = await dashboard.text()
             assert "Read-only evidence console" in dashboard_text
+            assert "Language" in dashboard_text
             assert "innerHTML" not in dashboard_text
             assert "method:'POST'" not in dashboard_text
+            dashboard_zh = await client.get("/demo/?lang=zh-CN")
+            dashboard_zh_text = await dashboard_zh.text()
+            assert "只读证据面板" in dashboard_zh_text
+            assert "语言" in dashboard_zh_text
+            assert "method:'POST'" not in dashboard_zh_text
         finally:
             await client.close()
 

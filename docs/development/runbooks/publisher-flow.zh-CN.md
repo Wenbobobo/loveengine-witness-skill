@@ -1,6 +1,6 @@
 # 发布者流程
 
-适用角色：发布者 / Publisher  
+适用角色：发布者 / Publisher
 适用版本：`0.6.0-contract-public-pilot`
 
 发布者负责构建确定性 ZIP，发布 SkillRegistry release，并维护版本状态。Plugin

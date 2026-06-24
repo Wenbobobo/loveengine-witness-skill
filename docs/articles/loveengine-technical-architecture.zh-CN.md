@@ -1,6 +1,6 @@
 # LoveEngine 的技术选型：把“可验证见证”做成可安装协议
 
-状态：`current`  
+状态：`current`
 适用版本：`0.6.0-contract-public-pilot`
 
 ## 1. 问题定义

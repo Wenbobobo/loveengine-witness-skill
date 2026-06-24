@@ -17,7 +17,7 @@ from .errors import LoveEngineError
 from .hashes import keccak256_hex, sha256_prefixed
 
 
-PACKAGE_VERSION = "0.5.0-lan-pilot"
+PACKAGE_VERSION = "0.6.0-contract-public-pilot"
 ARCHIVE_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 CONTRACTS = (
     "WitnessDAO",
@@ -36,6 +36,8 @@ REQUIRED_ARCHIVE_PATHS = {
     "skills/loveengine-witness/SKILL.md",
     "skills/loveengine-witness/agents/openai.yaml",
     "skills/loveengine-witness/skill-manifest.json",
+    "plugins/loveengine-witness/.codex-plugin/plugin.json",
+    "plugins/loveengine-witness/skills/loveengine-witness/SKILL.md",
 }
 FORBIDDEN_ARCHIVE_NAMES = {
     ".env",
@@ -90,6 +92,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "pyproject.toml",
         "uv.lock",
         "README.md",
+        "README.zh-CN.md",
         "contracts/foundry.toml",
         "contracts/remappings.txt",
         "skills/loveengine-witness/SKILL.md",
@@ -97,14 +100,21 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "skills/loveengine-witness/skill-manifest.json",
         "skills/loveengine-witness/skill-manifest.m0.json",
         "skills/loveengine-witness/agent-onboarding.md",
+        "plugins/loveengine-witness/.codex-plugin/plugin.json",
+        "plugins/loveengine-witness/skills/loveengine-witness/SKILL.md",
+        "plugins/marketplace.example.json",
         "docs/api/README.md",
         "docs/api/agent-skill-api.md",
         "docs/api/agent-network-api.md",
         "docs/api/live-evidence-api.md",
         "docs/api/extension-interfaces.md",
+        "docs/api/loveengine-contract-api.md",
+        "docs/api/lan-pilot-api.md",
         "docs/api/cli-reference.md",
+        "docs/development/contract2-comparison-and-recommendations.md",
+        "docs/development/participant-runbook.zh-CN.md",
         "docs/specs/love-engine-master-plan.md",
-        "docs/specs/love-engine-lan-pilot-spec.md",
+        "docs/specs/love-engine-contract-public-pilot-spec.md",
     )
     for relative in fixed:
         path = root / relative
@@ -224,7 +234,7 @@ def build_package(root: Path, output: Path) -> PackageBuildResult:
         "schema_version": "loveengine.package-release/1",
         "skill_id": "loveengine-witness",
         "version": PACKAGE_VERSION,
-        "protocol": "loveengine-witness-net/0.5",
+        "protocol": "loveengine-witness-net/0.6",
         "archive_format": "zip",
         "registry_package_hash": "keccak256",
         "contract_artifacts": [

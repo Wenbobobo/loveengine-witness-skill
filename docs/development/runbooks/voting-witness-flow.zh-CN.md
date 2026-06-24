@@ -1,6 +1,6 @@
 # 投票见证者批准流程
 
-适用角色：投票见证者 / Voting Witness  
+适用角色：投票见证者 / Voting Witness
 适用版本：`0.6.0-contract-public-pilot`
 
 投票见证者拥有链上 witness 地址。只有 ProposalGate 放行后，见证者才手动批准

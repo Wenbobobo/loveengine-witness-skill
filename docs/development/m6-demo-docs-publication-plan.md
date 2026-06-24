@@ -1,7 +1,7 @@
 # LoveEngine M6.8 Demo Documentation and Publication Plan
 
-Status: active execution checklist  
-Target version: `0.6.0-contract-public-pilot`  
+Status: active execution checklist
+Target version: `0.6.0-contract-public-pilot`
 Last updated: 2026-06-24
 
 ## 1. Objective

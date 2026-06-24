@@ -1,6 +1,6 @@
 # 只读观察者流程
 
-适用角色：只读观察者 / Public Viewer  
+适用角色：只读观察者 / Public Viewer
 适用版本：`0.6.0-contract-public-pilot`
 
 只读观察者只需要浏览器。你不需要安装 Skill，不需要 token，不需要钱包。

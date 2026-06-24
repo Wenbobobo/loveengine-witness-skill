@@ -56,7 +56,7 @@ from .witness_vote import approve_vote
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.5.0-lan-pilot"
+VERSION = "0.6.0-contract-public-pilot"
 ZERO_HASH = "0x" + "00" * 32
 
 

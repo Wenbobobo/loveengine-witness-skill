@@ -1,6 +1,6 @@
 # 观察节点运行流程
 
-适用角色：观察 Agent 节点 / Observation Node  
+适用角色：观察 Agent 节点 / Observation Node
 适用版本：`0.6.0-contract-public-pilot`
 
 观察节点通过 invite 加入 Relay，只验证文字流、证据和争议任务，并签

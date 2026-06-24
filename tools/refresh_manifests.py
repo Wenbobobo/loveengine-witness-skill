@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 
 from eth_hash.auto import keccak
+from loveengine_witness.hashes import source_sha256_prefixed
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +86,7 @@ def save(path: Path, value: dict) -> None:
 
 
 def sha(path: Path) -> str:
-    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+    return source_sha256_prefixed(path)
 
 
 def package_hash(value: dict) -> str:

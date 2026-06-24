@@ -117,9 +117,9 @@ Pilot Server 提供需要鉴权的主持人操作台，以及完全分离的只�
 token 只保存在当前页面内存；公开面板不能写入或签名。以下截图由仓库内
 无秘密的本地 UI fixture 实际渲染。
 
-![LoveEngine 主持人操作台](docs/assets/operator-console.png)
+![LoveEngine 主持人操作台](docs/assets/runbooks/common/operator-en-overview.png)
 
-![LoveEngine 只读证据面板](docs/assets/read-only-dashboard.png)
+![LoveEngine 只读证据面板](docs/assets/runbooks/common/viewer-en-overview.png)
 
 ## 快速运行：主持人本地启动
 

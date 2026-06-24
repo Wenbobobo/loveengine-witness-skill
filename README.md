@@ -107,9 +107,9 @@ read-only evidence view. The token remains only in page memory; the public view
 cannot write or sign. These screenshots are rendered from the repository's
 secret-free local UI fixture.
 
-![LoveEngine host operator console](docs/assets/operator-console.png)
+![LoveEngine host operator console](docs/assets/runbooks/common/operator-en-overview.png)
 
-![LoveEngine read-only evidence console](docs/assets/read-only-dashboard.png)
+![LoveEngine read-only evidence console](docs/assets/runbooks/common/viewer-en-overview.png)
 
 ## Quick start
 

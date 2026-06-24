@@ -1,6 +1,6 @@
 # 主持人操作流程
 
-适用角色：主持人 / Operator  
+适用角色：主持人 / Operator
 适用版本：`0.6.0-contract-public-pilot`
 
 主持人负责启动 Pilot Server、创建文字直播 session、发布文字、关闭

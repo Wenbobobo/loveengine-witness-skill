@@ -7,7 +7,7 @@ from typing import Any
 
 from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
-from .hashes import sha256_prefixed
+from .hashes import sha256_prefixed, source_sha256_prefixed
 from .jsonio import read_json
 from .schema import validate_schema
 
@@ -39,7 +39,7 @@ def verify_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
     for ref in refs:
         source_path = source_root / ref
         try:
-            actual = sha256_prefixed(source_path.read_bytes())
+            actual = source_sha256_prefixed(source_path)
         except FileNotFoundError as exc:
             raise LoveEngineError("missing_source_ref", ref, 3) from exc
         if hashes.get(ref) != actual:

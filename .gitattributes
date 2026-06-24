@@ -7,3 +7,11 @@
 *.jpg filter=lfs diff=lfs merge=lfs -text
 *.jpeg filter=lfs diff=lfs merge=lfs -text
 *.webp filter=lfs diff=lfs merge=lfs -text
+
+# Runbook screenshots are small release documentation assets and must remain
+# directly available in normal Git clones and GitHub PR previews.
+docs/assets/runbooks/**/*.png -filter -diff -merge -text
+
+# Preserved contract-team source input. Keep bytes stable and do not fail
+# release whitespace checks on formatting inherited from the upstream handoff.
+docs/reference/contracts/contract-team-v2/contracts/*.sol whitespace=-blank-at-eol,-blank-at-eof

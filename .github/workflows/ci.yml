@@ -106,15 +106,15 @@ jobs:
         run: |
           uv run loveengine package build --output dist-a
           uv run loveengine package build --output dist-b
-          cmp dist-a/loveengine-witness-0.5.0-lan-pilot.zip dist-b/loveengine-witness-0.5.0-lan-pilot.zip
-          uv run loveengine package verify dist-a/loveengine-witness-0.5.0-lan-pilot.zip
+          cmp dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip dist-b/loveengine-witness-0.6.0-contract-public-pilot.zip
+          uv run loveengine package verify dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip
       - name: Package security and CLI integration tests
         run: |
           uv run pytest tests/test_skill_package.py
           uv run pytest tests/test_cli_commands.py::test_package_cli_build_verify_install_and_self_check
       - name: Clean install and frozen sync
         run: |
-          uv run loveengine package install dist-a/loveengine-witness-0.5.0-lan-pilot.zip --target installed
+          uv run loveengine package install dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip --target installed
           uv sync --frozen --project installed
           uv run --project installed loveengine package self-check --root installed
 

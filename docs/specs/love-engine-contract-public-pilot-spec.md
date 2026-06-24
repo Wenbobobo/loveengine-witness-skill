@@ -1,8 +1,8 @@
 # LoveEngine M6 Contract Fusion and Public Pilot Readiness SPEC
 
-Status: active  
-Target version: `0.6.0-contract-public-pilot`  
-Protocol: `loveengine-witness-net/0.6`  
+Status: active
+Target version: `0.6.0-contract-public-pilot`
+Protocol: `loveengine-witness-net/0.6`
 Updated: 2026-06-24
 
 ## 1. Core goal

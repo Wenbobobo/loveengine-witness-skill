@@ -1,6 +1,6 @@
 # LoveEngine 参与者运行手册
 
-状态：`current`  
+状态：`current`
 适用版本：`0.6.0-contract-public-pilot`
 
 本文给非开发者和试点协作者使用。协议细节见 `docs/api/README.md`；这里
