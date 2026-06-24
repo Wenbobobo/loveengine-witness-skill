@@ -8,6 +8,7 @@ contract StreamingEngine {
 
     address public immutable bootstrapper;
     uint256 public immutable ratePerUser;
+    uint256 public immutable ratePerUserPerSecond;
     address public witnessDAO;
 
     uint256 public checkpointTime;
@@ -25,6 +26,7 @@ contract StreamingEngine {
     constructor(uint256 ratePerUser_, uint256 initialUserCount) {
         bootstrapper = msg.sender;
         ratePerUser = ratePerUser_;
+        ratePerUserPerSecond = ratePerUser_;
         checkpointTime = block.timestamp;
         rate = initialUserCount * ratePerUser_;
     }

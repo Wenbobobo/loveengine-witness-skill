@@ -14,7 +14,7 @@ Then read:
 - `docs/development/integration-guide.md`
 - `docs/development/contract-team-handoff.md`
 - `docs/specs/love-engine-master-plan.md`
-- `docs/specs/love-engine-lan-pilot-spec.md`
+- `docs/specs/love-engine-contract-public-pilot-spec.md`
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
 - `docs/api/agent-network-api.md`
@@ -92,6 +92,8 @@ uv run pytest .\tests\integration\test_pilot_soak.py
 
 ## Current priority
 
-M0–M4 are implemented. M5 is a release candidate with a real four-hour soak
-as its final tag gate. An accelerated CI soak does not authorize the
-`v0.5.0-lan-pilot` tag.
+M0–M5 are implemented through the LAN pilot line. M6 is the active
+contract-fusion and public-pilot preparation track. Do not replace current
+contracts wholesale with `docs/reference/contracts/contract-team-v2/`; merge
+business improvements only after preserving nonce/deadline/payloadHash,
+reasonHash and transcript boundaries.

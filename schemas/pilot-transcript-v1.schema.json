@@ -8,7 +8,7 @@
   "properties": {
     "schema_version": {"const": "loveengine.pilot-transcript/1"},
     "run_id": {"type": "string", "minLength": 1},
-    "version": {"const": "0.5.0-lan-pilot"},
+    "version": {"enum": ["0.5.0-lan-pilot", "0.6.0-contract-public-pilot"]},
     "package": {"type": "object"},
     "chain": {"type": "object"},
     "session": {"type": "object"},

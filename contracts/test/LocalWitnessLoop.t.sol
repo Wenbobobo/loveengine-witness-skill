@@ -314,6 +314,128 @@ contract LocalWitnessLoopTest is Test {
         assertEq(engine.rate(), 20 * RATE_PER_USER);
     }
 
+    function testExpiredProposalCanBeFinalizedAsFailedAndNewProposalCanStart()
+        public
+    {
+        for (uint256 key = 1; key <= 5; key++) {
+            registerWitness(key);
+        }
+        uint256 proposalId = scheduleAndPropose(20);
+
+        assertEq(dao.proposalCreatedAt(proposalId), block.timestamp);
+        assertEq(dao.proposalVotingDeadline(proposalId), block.timestamp + 1 days);
+
+        vm.warp(block.timestamp + 1 days + 1);
+        dao.finalizeProposal(proposalId);
+
+        assertFalse(dao.proposalActive(proposalId));
+        assertFalse(dao.proposalExecuted(proposalId));
+        assertEq(dao.activeProposalId(), 0);
+        assertEq(engine.rate(), 10 * RATE_PER_USER);
+
+        uint256 next = block.timestamp + 14 days;
+        vm.prank(corporateAdmin);
+        corporateSink.scheduleBroadcast(next, keccak256("next-live"));
+        vm.warp(next);
+        vm.prank(corporateAdmin);
+        uint256 nextProposal =
+            dao.proposeUserCount(21, keccak256("next-evidence"));
+        assertTrue(dao.proposalActive(nextProposal));
+    }
+
+    function testExpiredProposalRejectsLateVoteBeforeFinalize() public {
+        for (uint256 key = 1; key <= 5; key++) {
+            registerWitness(key);
+        }
+        uint256 proposalId = scheduleAndPropose(20);
+        WitnessDAO.VoteSignature[] memory signatures =
+            new WitnessDAO.VoteSignature[](1);
+        signatures[0] = vote(
+            1,
+            proposalId,
+            true,
+            dao.proposalPayloadHash(proposalId)
+        );
+
+        vm.warp(block.timestamp + 1 days + 1);
+        vm.expectRevert(WitnessDAO.ProposalExpired.selector);
+        dao.batchVote(signatures);
+    }
+
+    function testWhitelistedRelayerAccruesWithdrawableRefundCredit() public {
+        vm.deal(address(dao), 1 ether);
+        vm.txGasPrice(1 gwei);
+        vm.prank(corporateAdmin);
+        dao.setRelayerRefundPolicy(relayer, true, 0.01 ether);
+
+        uint256 beforeCredit = dao.relayerRefundCredits(relayer);
+        registerWitness(42);
+        uint256 credit = dao.relayerRefundCredits(relayer);
+
+        assertGt(credit, beforeCredit);
+        assertLe(credit, 0.01 ether);
+
+        uint256 balanceBefore = relayer.balance;
+        vm.prank(relayer);
+        dao.withdrawRelayerRefund();
+        assertEq(dao.relayerRefundCredits(relayer), 0);
+        assertGt(relayer.balance, balanceBefore);
+    }
+
+    function testUnlistedRelayerCanStillSubmitWithoutRefundCredit() public {
+        address openRelayer = makeAddr("open-relayer");
+        address witness = vm.addr(43);
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 digest = dao.hashRegister(witness, 0, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(43, digest);
+        WitnessDAO.RegisterSignature[] memory signatures =
+            new WitnessDAO.RegisterSignature[](1);
+        signatures[0] = WitnessDAO.RegisterSignature(
+            witness, 0, deadline, v, r, s
+        );
+
+        vm.prank(openRelayer);
+        dao.batchRegister(signatures);
+
+        assertTrue(dao.registeredWitnesses(witness));
+        assertEq(dao.relayerRefundCredits(openRelayer), 0);
+    }
+
+    function testBroadcastsExposeIndexedMetadataAndCertificateBinding() public {
+        uint256 scheduledAt = block.timestamp + 14 days;
+        bytes32 liveMetadataHash = keccak256("metadata");
+        bytes32 certificateHash = keccak256("certificate");
+        bytes32 sessionIdHash = keccak256("session");
+        bytes32 evidenceBundleHash = keccak256("evidence");
+
+        vm.prank(corporateAdmin);
+        corporateSink.scheduleBroadcast(scheduledAt, liveMetadataHash);
+
+        assertEq(corporateSink.broadcastCount(), 1);
+        assertEq(corporateSink.broadcastAt(0), scheduledAt);
+        assertEq(corporateSink.broadcastMetadataHash(0), liveMetadataHash);
+
+        vm.warp(scheduledAt);
+        vm.prank(corporateAdmin);
+        corporateSink.uploadCertificate(
+            0,
+            certificateHash,
+            sessionIdHash,
+            evidenceBundleHash
+        );
+
+        assertEq(corporateSink.getCorporateCSR(0), certificateHash);
+        assertEq(corporateSink.certificateSessionHash(0), sessionIdHash);
+        assertEq(
+            corporateSink.certificateEvidenceBundleHash(0),
+            evidenceBundleHash
+        );
+    }
+
+    function testStreamingEngineExposesRatePerUserPerSecondAlias() public view {
+        assertEq(engine.ratePerUserPerSecond(), RATE_PER_USER);
+    }
+
     function testBatchScaleWithSixtyNineWitnesses() public {
         StreamingEngine scaleEngine = new StreamingEngine(RATE_PER_USER, 10);
         CorporateSink scaleCorporate =

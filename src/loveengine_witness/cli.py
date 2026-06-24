@@ -41,7 +41,12 @@ from .package import (
     package_self_check,
     verify_package,
 )
-from .pilot_server import load_pilot_config, pilot_status, serve_pilot
+from .pilot_server import (
+    load_pilot_config,
+    pilot_status,
+    quickstart_pilot,
+    serve_pilot,
+)
 from .pilot_demo import run_pilot_demo
 from .pilot_transcript import verify_pilot_transcript
 from .pilot_snapshot import (
@@ -63,6 +68,7 @@ from .registry import publish_plan, verify_release
 from .relayer import plan_batch
 from .relay import RelayStore
 from .relay_server import serve_forever
+from .schema import validate_schema
 from .transcript import verify_transcript
 from .typed_data import build_register_typed_data, build_vote_typed_data
 from .witness_vote import approve_vote
@@ -180,7 +186,8 @@ def build_parser() -> argparse.ArgumentParser:
     relay_serve.add_argument("--port", type=int, default=8765)
 
     node_connect = node_commands.add_parser("connect")
-    node_connect.add_argument("--url", required=True)
+    node_connect.add_argument("--url")
+    node_connect.add_argument("--invite", type=Path)
     node_connect.add_argument("--profile", type=Path, required=True)
     node_connect.add_argument("--rpc-url")
     node_connect.add_argument("--address")
@@ -265,6 +272,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     pilot = commands.add_parser("pilot")
     pilot_commands = pilot.add_subparsers(dest="pilot_command")
+    pilot_quickstart = pilot_commands.add_parser("quickstart")
+    pilot_quickstart.add_argument("--root", type=Path, required=True)
+    pilot_quickstart.add_argument("--host", default="127.0.0.1")
+    pilot_quickstart.add_argument("--port", type=int, default=8780)
+    pilot_quickstart.add_argument("--base-url", default="http://127.0.0.1:8780")
+    pilot_quickstart.add_argument("--open-ui", action="store_true")
+    pilot_quickstart.add_argument("--headless", action="store_true")
+    pilot_quickstart.add_argument("--dry-run", action="store_true")
     pilot_serve = pilot_commands.add_parser("serve")
     pilot_serve.add_argument("--config", type=Path, required=True)
     pilot_status_command = pilot_commands.add_parser("status")
@@ -367,6 +382,27 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         }
     if args.command == "node" and args.node_command == "connect":
         signed_profile = read_json(args.profile)
+        invite = read_json(args.invite) if args.invite else None
+        if invite is not None:
+            validate_schema(invite, "pilot-invite-v1.schema.json")
+        url = args.url or (invite["relay_url"] if invite else None)
+        if not url:
+            raise LoveEngineError(
+                "invalid_arguments",
+                "node connect requires --url or --invite",
+                2,
+            )
+        if invite is not None:
+            if signed_profile["chain_id"] != invite["chain_id"]:
+                raise LoveEngineError(
+                    "wrong_chain_id",
+                    "profile chainId does not match invite",
+                )
+            if signed_profile["registry"].lower() != invite["registry"].lower():
+                raise LoveEngineError(
+                    "wrong_registry",
+                    "profile Registry does not match invite",
+                )
         node_address = verify_node_profile(signed_profile)
         if not args.dry_run:
             if not args.rpc_url or not args.address:
@@ -374,9 +410,9 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
                     "local_signer_required",
                     "live connect requires --rpc-url and --address",
                     4,
-                )
+            )
             return connect_node(
-                url=args.url,
+                url=url,
                 rpc_url=args.rpc_url,
                 address=args.address,
                 profile_path=args.profile,
@@ -387,7 +423,14 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
             "connected": False,
             "dry_run": True,
             "node": node_address,
-            "url": args.url,
+            "url": url,
+            "invite": {
+                "dashboard_url": invite["dashboard_url"],
+                "server_url": invite["server_url"],
+                "package_hash": invite["package_hash"],
+            }
+            if invite
+            else None,
         }
     if args.command == "fixture" and args.fixture_command == "generate":
         paths = generate_witness_fixtures(args.witnesses, args.output)
@@ -619,6 +662,16 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return install_package(args.archive, args.target)
     if args.command == "package" and args.package_command == "self-check":
         return package_self_check(args.root)
+    if args.command == "pilot" and args.pilot_command == "quickstart":
+        return quickstart_pilot(
+            root=args.root,
+            base_url=args.base_url,
+            host=args.host,
+            port=args.port,
+            open_ui=args.open_ui,
+            headless=args.headless,
+            dry_run=args.dry_run,
+        )
     if args.command == "pilot" and args.pilot_command == "serve":
         serve_pilot(load_pilot_config(args.config))
         return {"stopped": True}

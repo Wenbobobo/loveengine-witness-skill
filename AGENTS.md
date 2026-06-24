@@ -8,7 +8,7 @@ These instructions apply to the LoveEngineSkill repository.
 2. `docs/development/integration-guide.md`
 3. `docs/specs/love-engine-master-plan.md`
 4. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
-5. `docs/specs/love-engine-lan-pilot-spec.md`
+5. `docs/specs/love-engine-contract-public-pilot-spec.md`
 6. `docs/api/loveengine-contract-api.md`
 7. `docs/api/agent-skill-api.md`
 8. `docs/api/agent-network-api.md`
@@ -56,6 +56,9 @@ uv run pytest tests/integration/test_network_demo.py
   RPC signer.
 - M5 measures task acceptance ACK latency separately from long-running task
   completion latency.
+- M6 treats `docs/reference/contracts/contract-team-v2/` as preserved
+  collaborator input. Do not rewrite that reference copy; record fusion
+  decisions in `docs/development/contract2-comparison-and-recommendations.md`.
 - Pilot write tokens are read from restricted files and never enter CLI
   arguments, logs, fixtures, snapshots, or transcripts.
 - Agent nodes verify chainId, SkillRegistry, Publisher, release status, package hash, recipient, nonce, and deadline.

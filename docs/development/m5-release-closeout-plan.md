@@ -2,12 +2,13 @@
 
 状态：active  
 日期：2026-06-23  
-适用版本：`0.5.0-lan-pilot` release candidate  
-权威规格：`docs/specs/love-engine-lan-pilot-spec.md`
+状态：implemented archive
+适用版本：`0.5.0-lan-pilot`
+权威规格归档：`docs/archive/specs/implemented/love-engine-lan-pilot-spec.md`
 
 ## 1. 结论与问题边界
 
-本轮不是继续扩大 M5 协议范围，而是完成发布候选的工程收口：修复主工作
+本计划记录 M5 发布候选的工程收口：修复主工作
 目录看不到 `pilot` 命令的问题，使长时间 soak 能独立于终端会话运行，改进
 局域网操作界面的可观察性，整理 README 和许可证，并将经过验证的变更通过
 PR 合并回 `main`。
@@ -248,10 +249,9 @@ uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 1
 
 ## 10. 发布判定
 
-本轮可以在一小时预运行和全部自动化检查通过后合并 M5 release candidate，
+本轮可以在一小时预运行和全部自动化检查通过后合并 M5 发布候选，
 但只有实际四小时 soak 完成、报告通过、资产复核且主线 CI 全绿时，才允许：
 
 1. 创建 `v0.5.0-lan-pilot` tag。
 2. 发布确定性 ZIP、`checksums.json`、SBOM、PilotTranscript 和 soak report。
 3. 将 master plan 中 M5 状态从 release candidate 改为 completed。
-

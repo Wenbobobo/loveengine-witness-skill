@@ -5,9 +5,11 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import secrets
 import sqlite3
 import sys
 import uuid
+import webbrowser
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import time
@@ -20,7 +22,7 @@ from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
 from .hashes import sha256_prefixed
 from .hashes import keccak256_hex
-from .jsonio import read_json
+from .jsonio import read_json, write_json
 from .live_gateway import (
     METADATA_KEY,
     SSE_COUNTER_KEY,
@@ -216,6 +218,155 @@ def _disk_bytes(*roots: Path) -> int:
     return total
 
 
+def build_pilot_invite(
+    *,
+    base_url: str,
+    chain_id: str,
+    registry: str,
+    publisher: str,
+    version: str,
+    package_hash: str,
+) -> dict[str, Any]:
+    base = base_url.rstrip("/")
+    return {
+        "schema_version": "loveengine.pilot-invite/1",
+        "server_url": base,
+        "operator_url": base + "/operator/",
+        "dashboard_url": base + "/demo/",
+        "relay_url": base + "/v1/ws",
+        "chain_id": chain_id,
+        "registry": registry,
+        "publisher": publisher,
+        "skill_id": "loveengine-witness",
+        "version": version,
+        "package_hash": package_hash,
+    }
+
+
+def prepare_quickstart_root(
+    *,
+    root: Path,
+    base_url: str,
+    host: str,
+    port: int,
+    chain_id: str = "31337",
+    registry: str = "0x0000000000000000000000000000000000000000",
+    publisher: str = "0x0000000000000000000000000000000000000000",
+) -> tuple[PilotConfig, dict[str, Any]]:
+    from .manifest import DEFAULT_MANIFEST
+
+    root = root.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    token_file = root / "operator.token"
+    if not token_file.exists():
+        token_file.write_text(secrets.token_urlsafe(32), encoding="utf-8")
+        if os.name != "nt":
+            token_file.chmod(0o600)
+    token = token_file.read_text(encoding="utf-8").strip()
+    manifest = read_json(DEFAULT_MANIFEST)
+    base = base_url.rstrip("/")
+    invite = build_pilot_invite(
+        base_url=base,
+        chain_id=chain_id,
+        registry=registry,
+        publisher=publisher,
+        version=manifest["version"],
+        package_hash=manifest["package_hash"],
+    )
+    invite_path = root / "pilot-invite.json"
+    write_json(invite_path, invite)
+
+    bootstrap_file = root / "bootstrap.json"
+    release_file = root / "release.json"
+    package_archive = root / "package-placeholder.zip"
+    if not bootstrap_file.exists():
+        write_json(bootstrap_file, {})
+    if not release_file.exists():
+        write_json(release_file, {})
+    if not package_archive.exists():
+        package_archive.write_bytes(b"loveengine quickstart placeholder")
+    config_path = root / "pilot-config.json"
+    config_json = {
+        "schema_version": "loveengine.pilot-config/1",
+        "run_id": "quickstart",
+        "host": host,
+        "port": port,
+        "database": str(root / "pilot.sqlite"),
+        "relay_database": str(root / "relay.sqlite"),
+        "artifact_root": str(root / "artifacts"),
+        "audit_log": str(root / "audit.jsonl"),
+        "token_file": str(token_file),
+        "bootstrap_file": str(bootstrap_file),
+        "release_file": str(release_file),
+        "package_archive": str(package_archive),
+        "allowed_origin": base,
+        "rpc_url": "http://127.0.0.1:8545",
+        "chain_id": chain_id,
+        "allow_all_interfaces": host in {"0.0.0.0", "::"},
+    }
+    write_json(config_path, config_json)
+    config = PilotConfig(
+        schema_version="loveengine.pilot-config/1",
+        run_id="quickstart",
+        host=host,
+        port=port,
+        database=root / "pilot.sqlite",
+        relay_database=root / "relay.sqlite",
+        artifact_root=root / "artifacts",
+        audit_log=root / "audit.jsonl",
+        token_file=token_file,
+        bootstrap_file=bootstrap_file,
+        release_file=release_file,
+        package_archive=package_archive,
+        allowed_origin=base,
+        rpc_url="http://127.0.0.1:8545",
+        chain_id=chain_id,
+        allow_all_interfaces=host in {"0.0.0.0", "::"},
+        write_token=token,
+    )
+    info = {
+        "root": str(root),
+        "config": str(config_path),
+        "invite_path": str(invite_path),
+        "token_file": str(token_file),
+        "operator_url": invite["operator_url"],
+        "dashboard_url": invite["dashboard_url"],
+        "relay_url": invite["relay_url"],
+    }
+    return config, info
+
+
+def quickstart_pilot(
+    *,
+    root: Path,
+    base_url: str,
+    host: str,
+    port: int,
+    open_ui: bool,
+    headless: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    config, info = prepare_quickstart_root(
+        root=root,
+        base_url=base_url,
+        host=host,
+        port=port,
+    )
+    info = {**info, "started": False, "headless": headless}
+    if dry_run:
+        return info
+    if open_ui and not headless:
+        webbrowser.open(info["operator_url"])
+        webbrowser.open(info["dashboard_url"])
+    print(json.dumps(info, ensure_ascii=False, sort_keys=True), flush=True)
+    web.run_app(
+        create_pilot_app(config, readiness=lambda: (True, {"quickstart": True})),
+        host=config.host,
+        port=config.port,
+    )
+    return {**info, "stopped": True}
+
+
 OPERATOR_HTML = """<!doctype html>
 <html lang="en">
 <head>
@@ -234,6 +385,8 @@ font:600 clamp(30px,5vw,52px)/1.02 Georgia,serif}.lede{margin:0;color:var(--mute
 .status-stack{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill{border:1px solid var(--line);border-radius:99px;
 padding:7px 10px;color:var(--muted);background:#121512}.pill.ok{border-color:#365c37;color:var(--green)}
 .pill.bad{border-color:#6a3835;color:var(--red)}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.language-switch{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-bottom:10px;color:var(--muted);font-size:12px}
+.language-switch a{color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:4px 8px}
 .metric,.panel{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid var(--line);box-shadow:0 14px 32px #0004}
 .metric{padding:15px}.metric label{display:block;color:var(--muted);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
 .metric strong{display:block;margin-top:4px;font:600 24px/1.2 Georgia,serif}.grid{display:grid;grid-template-columns:minmax(300px,.8fr) minmax(420px,1.4fr);gap:12px}
@@ -262,7 +415,8 @@ footer{display:flex;justify-content:space-between;gap:20px;margin-top:14px;color
 <header>
   <div><div class="eyebrow">LoveEngine / LAN Pilot</div><h1 class="title">Witness operations</h1>
   <p class="lede">Authenticated text broadcasting with visible evidence continuity, outbound Agent observation and an explicit proposal gate.</p></div>
-  <div class="status-stack"><span id="health-pill" class="pill">service · checking</span><span id="ready-pill" class="pill">chain · checking</span></div>
+  <div><nav class="language-switch" aria-label="Language"><span>Language</span><a href="?lang=en">English</a><a href="?lang=zh-CN">中文</a></nav>
+  <div class="status-stack"><span id="health-pill" class="pill">service · checking</span><span id="ready-pill" class="pill">chain · checking</span></div></div>
 </header>
 <section class="metrics" aria-label="Pilot metrics">
   <div class="metric"><label>Agent connections</label><strong id="metric-agents">—</strong></div>
@@ -351,6 +505,53 @@ async function refresh(){
 refresh();if(!new URLSearchParams(location.search).has('static'))setInterval(refresh,1500);
 </script>
 </body></html>"""
+
+
+OPERATOR_ZH_REPLACEMENTS = {
+    '<html lang="en">': '<html lang="zh-CN">',
+    "Witness operations": "见证操作台",
+    "Authenticated text broadcasting with visible evidence continuity, outbound Agent observation and an explicit proposal gate.": "带鉴权的文字直播操作台：可观察证据连续性、Agent 出站观察和显式提案门禁。",
+    "Language": "语言",
+    "service · checking": "服务 · 检查中",
+    "chain · checking": "链 · 检查中",
+    "Agent connections": "Agent 连接",
+    "Relay queue": "Relay 队列",
+    "Committed events": "已提交事件",
+    "Stream lag": "流延迟",
+    "Broadcast control": "直播控制",
+    "The write token stays in this page's memory and is never persisted.": "写入 token 只保存在当前页面内存，不会持久化。",
+    "Operator token": "主持人 token",
+    "Loaded from the restricted token file": "来自受限 token 文件",
+    "Session ID": "直播 Session ID",
+    "Live text": "直播文字",
+    "Publish the next observable statement…": "发布下一条可观察文字…",
+    "Create session": "创建 session",
+    "Publish text": "发布文字",
+    "Close session": "关闭 session",
+    "Refresh now": "立即刷新",
+    "Ready. Enter the token to enable authenticated writes.": "就绪。输入 token 后可进行鉴权写入。",
+    "Evidence continuity": "证据连续性",
+    "Read-only state from the canonical metadata store.": "来自 canonical 元数据存储的只读状态。",
+    "not loaded": "未加载",
+    "Sequence": "序号",
+    "Source": "来源",
+    "Chain block": "链区块",
+    "Head event hash": "头事件 hash",
+    "No session selected.": "尚未选择 session。",
+    "Event feed": "事件流",
+    "No committed events.": "暂无已提交事件。",
+    "ProposalGate: manual hold": "ProposalGate：手动等待",
+    "Evidence must be finalized and every critical dispute dismissed before a proposal plan can be produced.": "只有证据 finalize 且所有关键争议均 dismissed 后，才能生成提案计划。",
+}
+
+
+def localized_operator_html(lang: str | None) -> str:
+    if lang != "zh-CN":
+        return OPERATOR_HTML
+    html = OPERATOR_HTML
+    for source, target in OPERATOR_ZH_REPLACEMENTS.items():
+        html = html.replace(source, target)
+    return html
 
 
 def create_pilot_app(
@@ -509,7 +710,10 @@ def create_pilot_app(
         )
 
     async def operator(request: web.Request) -> web.Response:
-        return web.Response(text=OPERATOR_HTML, content_type="text/html")
+        return web.Response(
+            text=localized_operator_html(request.query.get("lang")),
+            content_type="text/html",
+        )
 
     app.add_routes(
         [

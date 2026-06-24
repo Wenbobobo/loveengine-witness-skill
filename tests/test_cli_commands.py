@@ -6,10 +6,14 @@ import sys
 from pathlib import Path
 
 import pytest
+from eth_account import Account
+from eth_account.messages import encode_typed_data
 from jsonschema import Draft202012Validator
 
 from loveengine_witness.canonical import canonical_json_bytes
 from loveengine_witness.hashes import sha256_prefixed
+from loveengine_witness.network_protocol import build_node_profile
+from loveengine_witness.network_typed_data import build_node_profile_typed_data
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +40,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.5.0-lan-pilot"
+    assert output["version"] == "0.6.0-contract-public-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -333,7 +337,7 @@ def test_package_cli_build_verify_install_and_self_check(tmp_path: Path) -> None
     assert install.returncode == 0, install.stderr
     check = run_cli("package", "self-check", "--root", str(target))
     assert check.returncode == 0, check.stderr
-    assert json.loads(check.stdout)["version"] == "0.5.0-lan-pilot"
+    assert json.loads(check.stdout)["version"] == "0.6.0-contract-public-pilot"
 
 
 def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
@@ -344,6 +348,98 @@ def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
     status = run_cli("pilot", "status", "--url", "http://127.0.0.1:1")
     assert status.returncode == 4
     assert json.loads(status.stderr)["error"]["code"] == "pilot_unavailable"
+
+
+def test_pilot_quickstart_dry_run_writes_invite_without_secrets(
+    tmp_path: Path,
+) -> None:
+    result = run_cli(
+        "pilot",
+        "quickstart",
+        "--root",
+        str(tmp_path / "pilot"),
+        "--headless",
+        "--dry-run",
+        "--base-url",
+        "http://100.64.0.10:8780",
+    )
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["started"] is False
+    assert output["operator_url"] == "http://100.64.0.10:8780/operator/"
+    assert output["dashboard_url"] == "http://100.64.0.10:8780/demo/"
+    assert output["headless"] is True
+    assert Path(output["token_file"]).is_file()
+    assert Path(output["invite_path"]).is_file()
+
+    invite = json.loads(Path(output["invite_path"]).read_text(encoding="utf-8"))
+    load_schema("pilot-invite-v1.schema.json").validate(invite)
+    assert invite["server_url"] == "http://100.64.0.10:8780"
+    assert invite["dashboard_url"] == "http://100.64.0.10:8780/demo/"
+    raw = json.dumps(invite)
+    assert "token" not in raw.lower()
+    assert "private_key" not in raw.lower()
+
+
+def test_node_connect_accepts_invite_file_for_relay_url(tmp_path: Path) -> None:
+    account = Account.create()
+    profile = build_node_profile(
+        account.address,
+        ["propagate_skill"],
+        "1",
+        "4102444800",
+    )
+    signed_profile = {
+        "schema_version": "loveengine.signed-agent-node-profile/1",
+        "chain_id": "31337",
+        "registry": "0x" + "12" * 20,
+        "profile": profile,
+        "signature": "0x"
+        + Account.sign_message(
+            encode_typed_data(
+                full_message=build_node_profile_typed_data(
+                    "31337",
+                    "0x" + "12" * 20,
+                    profile,
+                )
+            ),
+            account.key,
+        ).signature.hex(),
+    }
+    profile_path = tmp_path / "signed-profile.json"
+    profile_path.write_text(json.dumps(signed_profile), encoding="utf-8")
+    invite = {
+        "schema_version": "loveengine.pilot-invite/1",
+        "server_url": "http://100.64.0.10:8780",
+        "operator_url": "http://100.64.0.10:8780/operator/",
+        "dashboard_url": "http://100.64.0.10:8780/demo/",
+        "relay_url": "http://100.64.0.10:8780/v1/ws",
+        "chain_id": "31337",
+        "registry": "0x" + "12" * 20,
+        "publisher": "0x" + "34" * 20,
+        "skill_id": "loveengine-witness",
+        "version": "0.6.0-contract-public-pilot",
+        "package_hash": "sha256:" + "56" * 32,
+    }
+    invite_path = tmp_path / "pilot-invite.json"
+    invite_path.write_text(json.dumps(invite), encoding="utf-8")
+
+    result = run_cli(
+        "node",
+        "connect",
+        "--invite",
+        str(invite_path),
+        "--profile",
+        str(profile_path),
+        "--dry-run",
+    )
+
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["url"] == invite["relay_url"]
+    assert output["invite"]["dashboard_url"] == invite["dashboard_url"]
+    assert output["node"] == account.address
 
 
 def test_pilot_chain_and_explicit_vote_commands_are_machine_readable(
@@ -398,7 +494,7 @@ def test_pilot_transcript_cli_verifies_fixture_shape(tmp_path: Path) -> None:
     transcript = {
         "schema_version": "loveengine.pilot-transcript/1",
         "run_id": "cli-pilot",
-        "version": "0.5.0-lan-pilot",
+        "version": "0.6.0-contract-public-pilot",
         "package": {"archive_keccak256": "0x" + "11" * 32},
         "chain": {},
         "session": {

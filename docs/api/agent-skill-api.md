@@ -1,12 +1,17 @@
 # Agent and Skill API
 
-本文定义 LoveEngine Witness Skill 面向 Agent adapter、本地 CLI 和 Codex loader 的数据结构。状态：M0–M4 已实现，M5 正在增加标准 Skill 入口、确定性安装包和局域网试点。
+本文定义 LoveEngine Witness Skill 面向 Agent adapter、本地 CLI、Codex Skill
+和 Codex Plugin loader 的数据结构。状态：M0–M5 已实现，M6 正在增加
+合约融合、参与者上手、Plugin 包装和公网预备。
 
 ## 标准 Skill 入口
 
 `skills/loveengine-witness/SKILL.md` 是薄指令层，只包含触发条件、验证流程、命令导航和安全边界。`agents/openai.yaml` 提供 Codex UI metadata。协议行为继续由 manifest、Schema、Python 运行时、合约和 transcript 实现。
 
-M5 确定性 ZIP 是独立安装边界。它包含运行必需文件、`checksums.json` 与 `sbom.spdx.json`；SkillRegistry 的 package hash 绑定 ZIP 的 Keccak-256。
+M5/M6 确定性 ZIP 是独立安装边界。它包含运行必需文件、`checksums.json`
+与 `sbom.spdx.json`；SkillRegistry 的 package hash 绑定 ZIP 的 Keccak-256。
+M6 还提供 `plugins/loveengine-witness/` 作为 Codex 分发包装。Plugin 不是
+协议信任根，只负责让 Codex 发现工作流。
 
 ## 当前 M0 文件
 
@@ -197,6 +202,7 @@ loveengine package build --output <dir>
 loveengine package verify <archive>
 loveengine package install <archive> --target <dir>
 loveengine package self-check --root <dir>
+loveengine pilot quickstart --root <dir> --open-ui|--headless
 loveengine pilot serve --config <path>
 loveengine pilot status --url <url>
 loveengine pilot chain init --root <dir>

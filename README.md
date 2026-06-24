@@ -6,7 +6,8 @@ LoveEngine Witness Skill is an Agent-network-first protocol for verifiable publi
 
 Current stable demo: `0.4.0-live-evidence-pilot`.
 Previous network-only demo: `0.3.1-demo-ready`.
-Current release candidate: `0.5.0-lan-pilot` (`loveengine-witness-net/0.5`).
+Current active version: `0.6.0-contract-public-pilot`
+(`loveengine-witness-net/0.6`). Previous LAN pilot: `0.5.0-lan-pilot`.
 
 ## Skill model
 
@@ -106,28 +107,28 @@ read-only evidence view. The token remains only in page memory; the public view
 cannot write or sign. These screenshots are rendered from the repository's
 secret-free local UI fixture.
 
-![LoveEngine host operator console](docs/assets/operator-console.png)
+![LoveEngine host operator console](docs/assets/runbooks/common/operator-en-overview.png)
 
-![LoveEngine read-only evidence console](docs/assets/read-only-dashboard.png)
+![LoveEngine read-only evidence console](docs/assets/runbooks/common/viewer-en-overview.png)
 
 ## Quick start
 
 Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Foundry `1.7.1`.
-The four commands below synchronize the locked environment, verify the
-manifest, run the package-to-PublicSink pilot, and verify its transcript.
 
 ```powershell
 uv sync --frozen
-uv run loveengine manifest verify
-uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
-uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
+uv run loveengine pilot quickstart --root .\pilot --open-ui
+uv run loveengine pilot status --url http://127.0.0.1:8780
 ```
 
-Full installation, server, chain, snapshot, voting, legacy demo, background
-soak, and troubleshooting commands are in the
-[CLI and operations reference](docs/api/cli-reference.md). Run the complete
-automated quality matrix with `tools/run_release_checks.ps1`; the real
-four-hour wall-clock soak remains a separate release gate.
+`--open-ui` opens the operator console when a desktop browser is available.
+Use `--headless` on remote Debian/Tailscale hosts; stdout JSON includes
+`operator_url`, `dashboard_url`, `invite_path`, and `token_file`. Full
+installation, server, chain, snapshot, voting, package, background soak, and
+troubleshooting commands are in the [CLI and operations reference](docs/api/cli-reference.md).
+Run `pilot status` from a second terminal while quickstart is running. Use
+`uv run loveengine demo lan-pilot --output .\pilot-output` for the full
+package-to-PublicSink E2E transcript.
 
 ## Security invariants
 
@@ -142,12 +143,15 @@ four-hour wall-clock soak remains a separate release gate.
 ## Documentation entrypoints
 
 - Architecture and scope: [master plan](docs/specs/love-engine-master-plan.md)
-  and [active M5 specification](docs/specs/love-engine-lan-pilot-spec.md).
+  and [active M6 specification](docs/specs/love-engine-contract-public-pilot-spec.md).
 - Interfaces and commands: [API index](docs/api/README.md) and
   [CLI reference](docs/api/cli-reference.md).
 - Development and operations:
-  [integration guide](docs/development/integration-guide.md) and
-  [M5 acceptance report](docs/development/m5-acceptance-report.md).
+  [integration guide](docs/development/integration-guide.md),
+  [participant runbook](docs/development/participant-runbook.zh-CN.md), and
+  [contract2 recommendations](docs/development/contract2-comparison-and-recommendations.md).
+- Technical background:
+  [LoveEngine technical architecture](docs/articles/loveengine-technical-architecture.zh-CN.md).
 - Provenance: [source inventory](docs/kb/source-inventory.md) and
   [SCC0 provenance](docs/reference/licenses/scc0-provenance.md).
 

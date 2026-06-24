@@ -38,6 +38,8 @@ h1{font-size:clamp(32px,5vw,52px);line-height:1;margin:6px 0}.subtitle{color:var
 .readonly{border:1px solid #3e5e3d;color:var(--green);padding:8px 11px;border-radius:99px}.metrics{display:grid;
 grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}.metric,.panel,.session{background:linear-gradient(145deg,#1b1f1b,var(--panel));
 border:1px solid var(--line)}.metric{padding:14px}.metric span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase}
+.language-switch{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-bottom:10px;color:var(--muted);font-size:12px}
+.language-switch a{color:var(--green);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:4px 8px}
 .metric strong{font:600 24px/1.3 Georgia,serif}.layout{display:grid;grid-template-columns:.8fr 1.4fr;gap:12px}.panel{padding:18px}
 .panel h2{margin:0 0 12px}.sessions{display:grid;gap:8px}.session{padding:14px;cursor:pointer;text-align:left;color:var(--text);font:inherit}
 .session:hover,.session.selected{border-color:var(--green)}.session-top{display:flex;justify-content:space-between;gap:10px}
@@ -56,7 +58,8 @@ footer{color:var(--muted);font-size:11px;margin-top:14px;display:flex;justify-co
 <div class="shell">
 <header><div><div class="eyebrow">LoveEngine / public read model</div><h1>Evidence console</h1>
 <p class="subtitle">Read-only evidence console for session continuity, artifact integrity and observable network state.</p></div>
-<div class="readonly">READ ONLY · no signing</div></header>
+<div><nav class="language-switch" aria-label="Language"><span>Language</span><a href="?lang=en">English</a><a href="?lang=zh-CN">中文</a></nav>
+<div class="readonly">READ ONLY · no signing</div></div></header>
 <section class="metrics"><div class="metric"><span>Sessions</span><strong id="metric-sessions">—</strong></div>
 <div class="metric"><span>Events</span><strong id="metric-events">—</strong></div><div class="metric"><span>Agents</span><strong id="metric-agents">—</strong></div>
 <div class="metric"><span>Relay ACK</span><strong id="metric-acked">—</strong></div></section>
@@ -108,6 +111,37 @@ async function refresh(){
 refresh();if(!new URLSearchParams(location.search).has('static'))setInterval(refresh,3000);
 </script>
 </body></html>"""
+
+
+DASHBOARD_ZH_REPLACEMENTS = {
+    '<html lang="en">': '<html lang="zh-CN">',
+    "Evidence console": "只读证据面板",
+    "Read-only evidence console for session continuity, artifact integrity and observable network state.": "用于查看 session 连续性、artifact 完整性和网络状态的只读证据面板。",
+    "Language": "语言",
+    "READ ONLY · no signing": "只读 · 不签名",
+    "Sessions": "Session",
+    "Events": "事件",
+    "Agents": "Agent",
+    "Relay ACK": "Relay ACK",
+    "Live sessions": "直播 Session",
+    "Loading sessions…": "正在加载 session…",
+    "Select a session to inspect its evidence chain.": "选择一个 session 查看证据链。",
+    "No sessions recorded.": "暂无 session。",
+    "Session detail is unavailable.": "Session 详情不可用。",
+    "Artifact integrity · ": "Artifact 完整性 · ",
+    "Selected session": "已选 session",
+    "Committed event timeline": "已提交事件时间线",
+    "No committed events.": "暂无已提交事件。",
+}
+
+
+def localized_dashboard_html(lang: str | None) -> str:
+    if lang != "zh-CN":
+        return DASHBOARD_HTML
+    html = DASHBOARD_HTML
+    for source, target in DASHBOARD_ZH_REPLACEMENTS.items():
+        html = html.replace(source, target)
+    return html
 
 
 @web.middleware
@@ -287,7 +321,10 @@ async def get_artifact(request: web.Request) -> web.Response:
 
 
 async def dashboard_index(request: web.Request) -> web.Response:
-    return web.Response(text=DASHBOARD_HTML, content_type="text/html")
+    return web.Response(
+        text=localized_dashboard_html(request.query.get("lang")),
+        content_type="text/html",
+    )
 
 
 async def dashboard_sessions(request: web.Request) -> web.Response:
