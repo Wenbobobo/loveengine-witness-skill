@@ -18,6 +18,9 @@ contract WitnessDAO is EIP712 {
     error DuplicateVote();
     error NotCorporateAdmin();
     error OutsideBroadcastWindow();
+    error ProposalExpired();
+    error ProposalNotExpired();
+    error RefundWithdrawalFailed();
 
     enum ProposalType {
         USER_COUNT,
@@ -55,9 +58,14 @@ contract WitnessDAO is EIP712 {
         bytes32 payloadHash;
         uint256 totalVotes;
         uint256 supportVotes;
+        uint256 createdAt;
+        uint256 votingDeadline;
         bool active;
         bool executed;
     }
+
+    uint256 public constant VOTING_PERIOD = 1 days;
+    uint256 public constant REFUND_BASE_OVERHEAD = 25_000;
 
     bytes32 public constant REGISTER_TYPEHASH =
         keccak256(
@@ -82,6 +90,9 @@ contract WitnessDAO is EIP712 {
     mapping(address => uint256) public voteNonces;
     mapping(uint256 => Proposal) private proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
+    mapping(address => bool) public relayerRefundAllowed;
+    mapping(address => uint256) public relayerRefundMaxWeiPerCall;
+    mapping(address => uint256) public relayerRefundCredits;
 
     event WitnessRegistered(address indexed witness);
     event ProposalCreated(
@@ -103,6 +114,18 @@ contract WitnessDAO is EIP712 {
         uint256 supportVotes
     );
     event ProposalExecuted(uint256 indexed proposalId);
+    event ProposalFailed(
+        uint256 indexed proposalId,
+        uint256 totalVotes,
+        uint256 supportVotes
+    );
+    event RelayerRefundPolicySet(
+        address indexed relayer,
+        bool allowed,
+        uint256 maxWeiPerCall
+    );
+    event RelayerRefundCredited(address indexed relayer, uint256 amount);
+    event RelayerRefundWithdrawn(address indexed relayer, uint256 amount);
 
     constructor(
         address streamingEngine_,
@@ -166,7 +189,29 @@ contract WitnessDAO is EIP712 {
             );
     }
 
+    function setRelayerRefundPolicy(
+        address relayer,
+        bool allowed,
+        uint256 maxWeiPerCall
+    ) external {
+        if (msg.sender != corporateAdmin) revert NotCorporateAdmin();
+        relayerRefundAllowed[relayer] = allowed;
+        relayerRefundMaxWeiPerCall[relayer] = maxWeiPerCall;
+        emit RelayerRefundPolicySet(relayer, allowed, maxWeiPerCall);
+    }
+
+    function withdrawRelayerRefund() external {
+        uint256 amount = relayerRefundCredits[msg.sender];
+        relayerRefundCredits[msg.sender] = 0;
+        (bool success,) = payable(msg.sender).call{value: amount}("");
+        if (!success) revert RefundWithdrawalFailed();
+        emit RelayerRefundWithdrawn(msg.sender, amount);
+    }
+
+    receive() external payable {}
+
     function batchRegister(RegisterSignature[] calldata signatures) external {
+        uint256 startGas = gasleft();
         for (uint256 index = 0; index < signatures.length; index++) {
             RegisterSignature calldata item = signatures[index];
             if (block.timestamp > item.deadline) revert SignatureExpired();
@@ -187,6 +232,7 @@ contract WitnessDAO is EIP712 {
             registeredWitnesses[item.witness] = true;
             emit WitnessRegistered(item.witness);
         }
+        _creditRelayerRefund(startGas);
     }
 
     function proposeUserCount(
@@ -236,6 +282,11 @@ contract WitnessDAO is EIP712 {
     }
 
     function batchVote(VoteSignature[] calldata signatures) external {
+        uint256 startGas = gasleft();
+        Proposal storage active = proposals[activeProposalId];
+        if (active.active && block.timestamp > active.votingDeadline) {
+            revert ProposalExpired();
+        }
         for (uint256 index = 0; index < signatures.length; index++) {
             VoteSignature calldata item = signatures[index];
             if (item.proposalId != activeProposalId) {
@@ -284,7 +335,6 @@ contract WitnessDAO is EIP712 {
             );
         }
 
-        Proposal storage active = proposals[activeProposalId];
         if (
             active.active &&
             active.totalVotes >= minValidVotes &&
@@ -293,6 +343,7 @@ contract WitnessDAO is EIP712 {
         ) {
             _execute(activeProposalId, active);
         }
+        _creditRelayerRefund(startGas);
     }
 
     function proposalPayloadHash(uint256 proposalId)
@@ -315,6 +366,22 @@ contract WitnessDAO is EIP712 {
         return proposals[proposalId].executed;
     }
 
+    function proposalCreatedAt(uint256 proposalId)
+        external
+        view
+        returns (uint256)
+    {
+        return proposals[proposalId].createdAt;
+    }
+
+    function proposalVotingDeadline(uint256 proposalId)
+        external
+        view
+        returns (uint256)
+    {
+        return proposals[proposalId].votingDeadline;
+    }
+
     function proposalVoteCounts(uint256 proposalId)
         external
         view
@@ -322,6 +389,35 @@ contract WitnessDAO is EIP712 {
     {
         Proposal storage proposal = proposals[proposalId];
         return (proposal.totalVotes, proposal.supportVotes);
+    }
+
+    function finalizeProposal(uint256 proposalId) external {
+        Proposal storage proposal = proposals[proposalId];
+        if (!proposal.active) revert ProposalNotActive();
+        if (block.timestamp <= proposal.votingDeadline) {
+            revert ProposalNotExpired();
+        }
+        if (
+            proposal.totalVotes >= minValidVotes &&
+            proposal.supportVotes * 10_000 >=
+            proposal.totalVotes * approvalThresholdBps
+        ) {
+            _execute(proposalId, proposal);
+            return;
+        }
+        proposal.active = false;
+        activeProposalId = 0;
+        emit ProposalFinalized(
+            proposalId,
+            false,
+            proposal.totalVotes,
+            proposal.supportVotes
+        );
+        emit ProposalFailed(
+            proposalId,
+            proposal.totalVotes,
+            proposal.supportVotes
+        );
     }
 
     function _requireCorporateAndWindow() internal view {
@@ -353,6 +449,8 @@ contract WitnessDAO is EIP712 {
             payloadHash: payloadHash,
             totalVotes: 0,
             supportVotes: 0,
+            createdAt: block.timestamp,
+            votingDeadline: block.timestamp + VOTING_PERIOD,
             active: true,
             executed: false
         });
@@ -368,6 +466,7 @@ contract WitnessDAO is EIP712 {
     function _execute(uint256 proposalId, Proposal storage proposal) internal {
         proposal.active = false;
         proposal.executed = true;
+        activeProposalId = 0;
         emit ProposalFinalized(
             proposalId,
             true,
@@ -384,5 +483,17 @@ contract WitnessDAO is EIP712 {
             );
         }
         emit ProposalExecuted(proposalId);
+    }
+
+    function _creditRelayerRefund(uint256 startGas) internal {
+        if (!relayerRefundAllowed[msg.sender]) return;
+        uint256 maxRefund = relayerRefundMaxWeiPerCall[msg.sender];
+        if (maxRefund == 0) return;
+        uint256 refund = (startGas - gasleft() + REFUND_BASE_OVERHEAD) *
+            tx.gasprice;
+        if (refund > maxRefund) refund = maxRefund;
+        if (refund == 0) return;
+        relayerRefundCredits[msg.sender] += refund;
+        emit RelayerRefundCredited(msg.sender, refund);
     }
 }

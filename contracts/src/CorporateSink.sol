@@ -16,9 +16,18 @@ contract CorporateSink {
     uint256 public immutable broadcastWindow;
     address public witnessDAO;
 
+    struct Broadcast {
+        uint256 timestamp;
+        bytes32 liveMetadataHash;
+        bytes32 certificateHash;
+        bytes32 certificateSessionHash;
+        bytes32 certificateEvidenceBundleHash;
+        bool certificateUploaded;
+    }
+
     uint256 public nextBroadcastTime;
     uint256 public compensation;
-    mapping(uint256 => bytes32) private certificates;
+    Broadcast[] private broadcasts;
 
     event WitnessDAOSet(address indexed witnessDAO);
     event BroadcastScheduled(
@@ -64,21 +73,77 @@ contract CorporateSink {
             )
         ) revert BroadcastTooSoon();
         nextBroadcastTime = timestamp;
+        broadcasts.push(
+            Broadcast({
+                timestamp: timestamp,
+                liveMetadataHash: liveMetadataHash,
+                certificateHash: bytes32(0),
+                certificateSessionHash: bytes32(0),
+                certificateEvidenceBundleHash: bytes32(0),
+                certificateUploaded: false
+            })
+        );
         emit BroadcastScheduled(timestamp, liveMetadataHash);
     }
 
     function uploadCertificate(uint256 index, bytes32 hash) external {
+        uploadCertificate(index, hash, bytes32(0), bytes32(0));
+    }
+
+    function uploadCertificate(
+        uint256 index,
+        bytes32 hash,
+        bytes32 sessionIdHash,
+        bytes32 evidenceBundleHash
+    ) public {
         if (msg.sender != corporateAdmin) revert NotCorporateAdmin();
         if (block.timestamp < nextBroadcastTime) revert BroadcastNotReached();
-        if (certificates[index] != bytes32(0)) {
+        if (index >= broadcasts.length) revert BroadcastNotReached();
+        Broadcast storage broadcast = broadcasts[index];
+        if (broadcast.certificateUploaded) {
             revert CertificateAlreadySet();
         }
-        certificates[index] = hash;
+        broadcast.certificateHash = hash;
+        broadcast.certificateSessionHash = sessionIdHash;
+        broadcast.certificateEvidenceBundleHash = evidenceBundleHash;
+        broadcast.certificateUploaded = true;
         emit CertificateUploaded(index, hash);
     }
 
     function getCorporateCSR(uint256 index) external view returns (bytes32) {
-        return certificates[index];
+        return broadcasts[index].certificateHash;
+    }
+
+    function broadcastCount() external view returns (uint256) {
+        return broadcasts.length;
+    }
+
+    function broadcastAt(uint256 index) external view returns (uint256) {
+        return broadcasts[index].timestamp;
+    }
+
+    function broadcastMetadataHash(uint256 index)
+        external
+        view
+        returns (bytes32)
+    {
+        return broadcasts[index].liveMetadataHash;
+    }
+
+    function certificateSessionHash(uint256 index)
+        external
+        view
+        returns (bytes32)
+    {
+        return broadcasts[index].certificateSessionHash;
+    }
+
+    function certificateEvidenceBundleHash(uint256 index)
+        external
+        view
+        returns (bytes32)
+    {
+        return broadcasts[index].certificateEvidenceBundleHash;
     }
 
     function getCompensation() external view returns (uint256) {
