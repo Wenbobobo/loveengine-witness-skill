@@ -6,7 +6,8 @@ LoveEngine Witness Skill 是面向 Agent 网络的公共利益见证协议。它
 
 当前稳定演示版本：`0.4.0-live-evidence-pilot`。
 上一版纯网络演示：`0.3.1-demo-ready`。
-当前发布候选：`0.5.0-lan-pilot`，协议为 `loveengine-witness-net/0.5`。
+当前活动版本：`0.6.0-contract-public-pilot`，协议为 `loveengine-witness-net/0.6`。
+上一版局域网试点：`0.5.0-lan-pilot`。
 
 ## Skill 模型
 
@@ -14,6 +15,18 @@ LoveEngine 采用“薄指令层、厚协议运行时”。面向 Codex 的 `SKI
 只定义触发条件、验证流程、命令导航和安全边界；实际协议由版本化
 manifest、Schema、Python 用例、适配器、合约和 transcript 承担。
 这样可以保持 Agent 上下文精简，同时保证行为确定、可测试、可复核。
+
+## 快速开始
+
+| 角色 | 你负责什么 | 最短路径 |
+| --- | --- | --- |
+| 主持人 / Operator | 启动试点服务、创建直播、发布文字、关闭 session、查看 Gate | 运行 `pilot quickstart`，打开 `/operator/` |
+| 观察 Agent 节点 | 通过 invite 加入，观察文字流，签 observation/review 回执 | 安装包或 Plugin 后，用 invite 连接；不需要钱包私钥 |
+| 投票见证者 | Gate 放行后手动批准一次链上投票 | 只运行 `witness vote approve`，私钥留在外部 signer/RPC 钱包 |
+| 只读观察者 | 看直播、证据、节点回执和链上状态 | 浏览器打开 `/demo/`，不需要 token、不需要钱包 |
+| 发布者 / Publisher | 构建确定性 ZIP，发布 SkillRegistry release | 运行 package/registry 命令，维护 package hash |
+
+完整分角色流程见[参与者运行手册](docs/development/participant-runbook.zh-CN.md)。
 
 ## 系统架构
 
@@ -108,23 +121,27 @@ token 只保存在当前页面内存；公开面板不能写入或签名。以�
 
 ![LoveEngine 只读证据面板](docs/assets/read-only-dashboard.png)
 
-## 快速运行
-
-需要 Python 3.11+、[uv](https://docs.astral.sh/uv/) 和 Foundry `1.7.1`。
-下面四条命令依次同步锁定环境、校验 manifest、运行从发布包到
-PublicSink 的完整试点，并离线复核 transcript。
+## 快速运行：主持人本地启动
 
 ```powershell
 uv sync --frozen
-uv run loveengine manifest verify
-uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
-uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
+uv run loveengine pilot quickstart --root .\pilot --open-ui
+uv run loveengine pilot status --url http://127.0.0.1:8780
 ```
 
-安装包、服务、链、snapshot、显式投票、旧里程碑演示、后台 soak 和故障
-排查命令统一放在[CLI 与运行手册](docs/api/cli-reference.md)。完整自动化
-质量矩阵由 `tools/run_release_checks.ps1` 执行；真实四小时墙钟 soak 仍是
-单独的发布门槛。
+`--open-ui` 会尝试打开主持人页面。没有图形界面、远程 Debian 或只想后台
+运行时改用 `--headless`；命令会在 stdout JSON 中输出 `operator_url`、
+`dashboard_url`、`invite_path` 和 `token_file`。手动打开：
+
+- 主持人操作台：`http://127.0.0.1:8780/operator/?lang=zh-CN`
+- 只读面板：`http://127.0.0.1:8780/demo/?lang=zh-CN`
+
+`quickstart` 是长运行服务命令；`pilot status` 请在第二个终端执行。需要从
+发布包一路跑到 PublicSink 并生成 transcript 时，使用
+`uv run loveengine demo lan-pilot --output .\pilot-output`。
+
+完整命令、安装包、链、snapshot、显式投票、后台 soak 和故障排查见
+[CLI 与运行手册](docs/api/cli-reference.md)。
 
 ## 安全边界
 
@@ -139,11 +156,13 @@ uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 ## 文档入口
 
 - 架构与范围：[工程总规划](docs/specs/love-engine-master-plan.md)和
-  [M5 活动 SPEC](docs/specs/love-engine-lan-pilot-spec.md)。
+  [M6 活动 SPEC](docs/specs/love-engine-contract-public-pilot-spec.md)。
 - 接口与命令：[API 入口](docs/api/README.md)和
   [CLI 与运行手册](docs/api/cli-reference.md)。
 - 开发与运维：[接入指南](docs/development/integration-guide.md)和
-  [M5 验收报告](docs/development/m5-acceptance-report.md)。
+  [参与者运行手册](docs/development/participant-runbook.zh-CN.md)。
+- 合约对接：[contract2 对照与建议](docs/development/contract2-comparison-and-recommendations.md)。
+- 技术背景：[LoveEngine 技术选型](docs/articles/loveengine-technical-architecture.zh-CN.md)。
 - 资料溯源：[资料索引](docs/kb/source-inventory.md)和
   [SCC0 来源说明](docs/reference/licenses/scc0-provenance.md)。
 

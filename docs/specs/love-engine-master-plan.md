@@ -1,9 +1,11 @@
 # LoveEngine Witness Skill master plan
 
 状态：`current`  
-更新日期：2026-06-23
+更新日期：2026-06-24
 
-本文是唯一活动工程总规划。当前实施规格是 `love-engine-lan-pilot-spec.md`；已完成规格保存在 `docs/archive/specs/implemented/`。
+本文是唯一活动工程总规划。当前实施规格是
+`love-engine-contract-public-pilot-spec.md`；已完成规格保存在
+`docs/archive/specs/implemented/`。
 
 ## Direction
 
@@ -26,10 +28,11 @@ LoveEngine 首先是可被 Agent 网络验证、安装、传播和运行的 UAS 
 - **M3**：完成，标签 `v0.3.0-network-pilot`。SkillRegistry、Relay、三节点任务与 transcript 已实现。
 - **M3.1**：完成，标签 `v0.3.1-demo-ready`。Git、双语 README、演示入口和扩展接口已收口。
 - **M4**：完成，标签 `v0.4.0-live-evidence-pilot`。通用文字流、证据、三节点争议复核、ProposalGate、只读面板和 E2E 已实现。
-- **M5**：release candidate。标准 Skill、确定性发布包、局域网真实文字直播、观察回执、统一链上 E2E、故障恢复与加速 soak 已实现；`v0.5.0-lan-pilot` 仅等待真实四小时 soak 和 Release 资产。
-- **M6**：未来。企业补偿申请、表决、记录和公开查询。
+- **M5**：完成，标签 `v0.5.0-lan-pilot`。标准 Skill、确定性发布包、局域网真实文字直播、观察回执、统一链上 E2E、故障恢复与 soak 运行器已实现。
+- **M6**：进行中，目标 `0.6.0-contract-public-pilot`。吸收 contract-team v2 的业务结构和中文 NatSpec，同时保留当前签名安全边界；补齐参与者上手、Plugin 分发、Tailscale/Debian 真实试点与公网/测试网预备配置。
+- **M7**：未来。企业补偿申请、表决、记录和公开查询。
 
-## M5 acceptance
+## M5 acceptance baseline
 
 - Codex 可发现、跨平台可移植的薄 `SKILL.md`。
 - 可重复构建并由 SkillRegistry package hash 绑定的确定性 ZIP。
@@ -39,16 +42,19 @@ LoveEngine 首先是可被 Agent 网络验证、安装、传播和运行的 UAS 
 - 从 Skill 安装、文字直播到 PublicSink 查询的 `PilotTranscriptV1`。
 - 3 节点、10 观察者、4 小时正式试点运行器与验收报告。
 
-## Active scope
+## Active M6 scope
 
-包括 Skill 包、schemas、Python CLI、合约、Relay、局域网文字直播、观察回执、争议复核、Pilot Server、持久化 Anvil、只读面板和本地链统一 E2E。
+包括 contract2 preserved reference、合约融合、M6 target ABI、参与者运行手册、
+双语 operator/dashboard、PilotInvite、Plugin 包装、Tailscale/Debian 运行配置、
+公网 base URL 抽象、可选测试网 Gate 和统一 transcript 验收。
 
-当前不包括公共测试网、具体直播平台认证、视频处理、多模态推理、生产身份、生产密钥托管、P2P、HA、端到端加密、自动投票和链上争议门禁。
+当前不包括真实直播平台 SDK、视频处理、多模态推理、生产身份、生产密钥托管、
+P2P、HA、端到端加密、自动投票、主网部署和企业补偿深水区。
 
 ## Authority order
 
 1. 本文。
-2. `docs/specs/love-engine-lan-pilot-spec.md`。
+2. `docs/specs/love-engine-contract-public-pilot-spec.md`。
 3. `docs/api/`。
 4. `docs/reference/source-materials/current/`。
 5. `docs/archive/specs/implemented/`。

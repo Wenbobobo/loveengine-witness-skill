@@ -1,6 +1,6 @@
 # Integration guide
 
-本文给参与 LoveEngine Witness Skill M5 局域网试点及后续升级的开发者和 Agent 使用。
+本文给参与 LoveEngine Witness Skill M6 合约融合、公网预备和后续升级的开发者和 Agent 使用。
 
 ## 1. 初始化
 
@@ -17,7 +17,7 @@ uv run python .\tools\check.py
 1. `README.md`
 2. `docs/specs/love-engine-master-plan.md`
 3. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
-4. `docs/specs/love-engine-lan-pilot-spec.md`
+4. `docs/specs/love-engine-contract-public-pilot-spec.md`
 5. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
 6. `docs/api/README.md`
 7. `skills/loveengine-witness/skill-manifest.json`
@@ -98,6 +98,24 @@ uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 
 ```powershell
 uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
+```
+
+M6：
+
+1. 合约团队交付稿只保存在 `docs/reference/contracts/contract-team-v2/`，不要原地改写。
+2. 先写合约失败测试，再融合 contract2 的业务结构和 NatSpec。
+3. 保留 `VoteSignature` 的 proposalId、payloadHash、reasonHash、nonce 和 deadline。
+4. README/运行手册必须按角色说明参与流程。
+5. Plugin 只是分发入口；SkillRegistry package hash 仍是信任根。
+
+M6 快速验收：
+
+```powershell
+uv run pytest .\tests\test_cli.py .\tests\test_cli_commands.py .\tests\test_pilot_server.py
+cd contracts
+forge test
+cd ..
+uv run python .\tools\check.py
 ```
 
 ## 4. 接口规则

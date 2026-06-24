@@ -16,16 +16,29 @@ SKILL = ROOT / "skills" / "loveengine-witness"
 CURRENT = SKILL / "skill-manifest.json"
 M0 = SKILL / "skill-manifest.m0.json"
 
-M5_REFS = [
+M6_REFS = [
     "LICENSE",
-    "docs/specs/love-engine-lan-pilot-spec.md",
+    "docs/specs/love-engine-contract-public-pilot-spec.md",
+    "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
     "docs/api/lan-pilot-api.md",
     "docs/api/cli-reference.md",
+    "docs/api/loveengine-contract-api.md",
     "docs/development/m5-acceptance-report.md",
     "docs/development/m5-release-closeout-plan.md",
+    "docs/development/contract2-comparison-and-recommendations.md",
+    "docs/development/participant-runbook.zh-CN.md",
+    "docs/development/m6-demo-docs-publication-plan.md",
+    "docs/development/runbooks/operator-flow.zh-CN.md",
+    "docs/development/runbooks/observation-node-flow.zh-CN.md",
+    "docs/development/runbooks/voting-witness-flow.zh-CN.md",
+    "docs/development/runbooks/public-viewer-flow.zh-CN.md",
+    "docs/development/runbooks/publisher-flow.zh-CN.md",
+    "docs/articles/loveengine-technical-architecture.zh-CN.md",
+    "docs/reference/contracts/contract-team-v2/README.md",
     "docs/reference/licenses/scc0-provenance.md",
     "skills/loveengine-witness/SKILL.md",
     "skills/loveengine-witness/agents/openai.yaml",
+    "schemas/pilot-invite-v1.schema.json",
     "schemas/pilot-config-v1.schema.json",
     "schemas/observe-live-text-payload-v1.schema.json",
     "schemas/live-observation-receipt-v1.schema.json",
@@ -44,6 +57,9 @@ M5_REFS = [
     "src/loveengine_witness/pilot_soak.py",
     "src/loveengine_witness/pilot_soak_process.py",
     "src/loveengine_witness/ui_fixture.py",
+    "plugins/loveengine-witness/.codex-plugin/plugin.json",
+    "plugins/loveengine-witness/skills/loveengine-witness/SKILL.md",
+    "plugins/marketplace.example.json",
     "tools/refresh_manifests.py",
 ]
 
@@ -83,25 +99,27 @@ def package_hash(value: dict) -> str:
 
 def refresh_current() -> None:
     value = load(CURRENT)
+    moved_refs = {
+        "docs/specs/love-engine-live-evidence-pilot-spec.md": "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md",
+        "docs/specs/love-engine-lan-pilot-spec.md": "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
+    }
     refs = [
-        "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md"
-        if ref == "docs/specs/love-engine-live-evidence-pilot-spec.md"
-        else ref
+        moved_refs.get(ref, ref)
         for ref in value["source_refs"]
         if ref not in UNPROTECTED_DOC_ASSETS
     ]
-    for ref in M5_REFS:
+    for ref in M6_REFS:
         if ref not in refs:
             refs.append(ref)
     missing = [ref for ref in refs if not (ROOT / ref).is_file()]
     if missing:
         raise SystemExit(f"missing manifest refs: {missing}")
-    value["version"] = "0.5.0-lan-pilot"
-    value["protocol"] = "loveengine-witness-net/0.5"
+    value["version"] = "0.6.0-contract-public-pilot"
+    value["protocol"] = "loveengine-witness-net/0.6"
     value["source_refs"] = refs
     value["source_hashes"] = {ref: sha(ROOT / ref) for ref in refs}
     binding = value["registry_binding"]
-    binding["version_hash"] = "0x" + keccak(b"0.5.0-lan-pilot").hex()
+    binding["version_hash"] = "0x" + keccak(b"0.6.0-contract-public-pilot").hex()
     binding.pop("artifact_package_hash", None)
     binding.pop("hash_algorithm", None)
     binding["package_hash_source"] = "SkillRegistry.Release.packageHash"
@@ -119,6 +137,7 @@ def refresh_current() -> None:
             "package_verify": "loveengine package verify <archive>",
             "package_install": "loveengine package install <archive> --target <dir>",
             "pilot_serve": "loveengine pilot serve --config <path>",
+            "pilot_quickstart": "loveengine pilot quickstart --root <dir> --headless",
             "pilot_status": "loveengine pilot status --url <url>",
             "pilot_chain": "loveengine pilot chain init|start|status|snapshot|restore",
             "explicit_vote": "loveengine witness vote approve",

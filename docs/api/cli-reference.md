@@ -1,7 +1,7 @@
 # LoveEngine CLI and operations reference
 
-状态：M5 release candidate  
-适用版本：`0.5.0-lan-pilot`  
+状态：M6 active
+适用版本：`0.6.0-contract-public-pilot`
 输出约定：成功写 stdout JSON；错误写 stderr JSON，并使用稳定错误码。
 
 ## 1. 环境与来源诊断
@@ -26,7 +26,19 @@ forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
 cd ..
 ```
 
-## 2. 一条完整演示路径
+## 2. 最短主持人启动路径
+
+```powershell
+uv run loveengine pilot quickstart --root .\pilot --open-ui
+uv run loveengine pilot status --url http://127.0.0.1:8780
+```
+
+`--open-ui` 尝试打开主持人操作台。远程主机使用 `--headless`，stdout JSON
+会返回 `operator_url`、`dashboard_url`、`invite_path` 和 `token_file`。
+`quickstart` 是前台服务命令；`pilot status` 在第二个终端执行。完整 transcript
+由 `demo lan-pilot` 生成。
+
+## 3. 一条完整演示路径
 
 ```powershell
 uv run loveengine manifest verify
@@ -38,12 +50,12 @@ uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
 三个观察 Agent，摄取文字事件，生成 EvidenceBundle，完成争议复核和显式
 投票，执行 WitnessDAO 提案并查询 PublicSink。
 
-## 3. 发布包
+## 4. 发布包
 
 ```powershell
 uv run loveengine package build --output .\dist
-uv run loveengine package verify .\dist\loveengine-witness-0.5.0-lan-pilot.zip
-uv run loveengine package install .\dist\loveengine-witness-0.5.0-lan-pilot.zip --target .\installed
+uv run loveengine package verify .\dist\loveengine-witness-0.6.0-contract-public-pilot.zip
+uv run loveengine package install .\dist\loveengine-witness-0.6.0-contract-public-pilot.zip --target .\installed
 uv run loveengine package self-check --root .\installed
 ```
 
@@ -51,7 +63,7 @@ ZIP 路径排序、时间戳和权限固定；包内包含 `LICENSE`、checksums
 Schema、Python 运行时、Skill 入口及固定合约 ABI/bytecode。Registry 使用实际
 ZIP bytes 的 Keccak-256 作为 `packageHash`。
 
-## 4. Pilot Server
+## 5. Pilot Server
 
 配置遵循 `PilotConfigV1`。写 token 只能由受限文件通过 `token_file` 载入，
 不能作为 CLI 参数传递。
@@ -65,14 +77,26 @@ uv run loveengine pilot status --url http://127.0.0.1:8780
 
 - 主持人控制台：`http://127.0.0.1:8780/operator/`
 - 只读证据面板：`http://127.0.0.1:8780/demo/`
+- 中文入口：`/operator/?lang=zh-CN`、`/demo/?lang=zh-CN`
+- 英文入口：`/operator/?lang=en`、`/demo/?lang=en`
 - 健康检查：`/healthz`
 - 就绪检查：`/readyz`
 - 指标：`/v1/metrics`
 
-局域网只读接口可开放；写接口要求 Bearer token 和匹配的 Origin。M5 不提供
+局域网只读接口可开放；写接口要求 Bearer token 和匹配的 Origin。M6 不提供
 公网 TLS、生产身份认证或高可用。
 
-## 5. 持久化 Anvil
+## 6. 参与者加入
+
+主持人 quickstart 生成的 invite 文件不包含 token 或私钥。观察节点用它加入：
+
+```powershell
+uv run loveengine node connect --invite .\pilot-invite.json --profile .\signed-profile.json
+```
+
+角色流程见 `docs/development/participant-runbook.zh-CN.md`。
+
+## 7. 持久化 Anvil
 
 ```powershell
 uv run loveengine pilot chain init --root .\pilot-chain
@@ -85,7 +109,7 @@ uv run loveengine pilot chain restore --root .\pilot-chain --rpc-url http://127.
 `status` 会复核 chainId、合约地址和 code hash。损坏或不匹配的 state dump
 必须被拒绝。
 
-## 6. 系统 snapshot
+## 8. 系统 snapshot
 
 ```powershell
 uv run loveengine pilot snapshot create --config .\pilot-config.json --chain-root .\pilot-chain --output .\snapshots
@@ -97,7 +121,7 @@ uv run loveengine pilot snapshot prune --output .\snapshots --older-than-days 30
 系统 snapshot 包含 SQLite online backup、artifact、audit JSONL、Anvil
 deployment/state 和 checksums。恢复必须先验证完整性。
 
-## 7. 显式投票
+## 9. 显式投票
 
 ```powershell
 uv run loveengine witness vote approve `
@@ -111,7 +135,7 @@ uv run loveengine witness vote approve `
 `eth_signTypedData_v4` 请求外部 RPC signer。Agent 不自动签票，CLI 也不接受
 私钥参数。
 
-## 8. 旧里程碑演示与 transcript
+## 10. 旧里程碑演示与 transcript
 
 ```powershell
 uv run loveengine demo local-loop --output .\examples\transcripts
@@ -124,7 +148,7 @@ uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-sess
 uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
 ```
 
-## 9. 长时间 soak
+## 11. 长时间 soak
 
 前台正式四小时命令：
 
@@ -152,7 +176,7 @@ stdout、stderr 和报告路径。`passed` 只由完整 `pilot-soak-report.json`
 `observe_live_text` 的签名 payload 同时携带 `max_duration_seconds`；协议上限
 为 14,700 秒。这样长任务不会沿用旧的 30 秒短任务超时，也不会变成无界等待。
 
-## 10. 完整验证
+## 12. 完整验证
 
 长测试矩阵由脚本统一执行，避免手工漏项：
 
@@ -161,10 +185,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 ```
 
 脚本依次运行仓库/hash 检查、Python 单元测试、Foundry、M2/M3/M4 E2E 和
-M5 chain/demo/accelerated-soak。正式四小时墙钟运行不属于 CI 快速门，必须
+M5/M6 chain/demo/accelerated-soak。正式四小时墙钟运行不属于 CI 快速门，必须
 单独执行并保存报告。
 
-## 11. 稳定命令树
+## 13. 稳定命令树
 
 ```text
 version

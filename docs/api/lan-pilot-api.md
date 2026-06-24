@@ -1,7 +1,7 @@
 # LAN Pilot API
 
-状态：M5 implemented release candidate  
-协议：`loveengine-witness-net/0.5`
+状态：M6 active, M5 implemented
+协议：`loveengine-witness-net/0.6`
 
 ## PilotConfigV1
 
@@ -55,6 +55,23 @@ POST /v1/live/sessions/{sessionId}/close
 
 `/operator/` 是主持人写入控制台，token 只保存在页面内存；
 `/demo/` 是只读证据面板，不包含 POST、签名或交易操作。
+两者支持 `?lang=zh-CN` 与 `?lang=en`。语言偏好只来自 query 参数或页面内存，
+不得写入 localStorage。
+
+## PilotInviteV1
+
+Schema：`schemas/pilot-invite-v1.schema.json`。
+
+invite 文件用于把节点或只读参与者带入同一试点。它包含：
+
+- `server_url`、`relay_url`、`dashboard_url`；
+- 期望的 `chain_id`、`registry`、`publisher`；
+- `skill_id`、`version`、`package_hash`；
+- `issued_at` 与 `expires_at`。
+
+invite 不包含 bearer token、私钥、助记词或 keystore。Tailscale IP、
+局域网 IP 和未来公网域名都应通过同一个 `public_base_url` 派生，避免手工拼错
+Relay、dashboard 与 artifact URL。
 
 ## Observation protocol
 
@@ -113,6 +130,7 @@ ObservationSet、EvidenceBundle、dispute、ProposalGate、proposal、五个
 ```text
 loveengine version
 loveengine package build|verify|install|self-check
+loveengine pilot quickstart
 loveengine pilot serve|status
 loveengine pilot chain init|start|status|snapshot|restore
 loveengine pilot snapshot create|verify|restore|prune

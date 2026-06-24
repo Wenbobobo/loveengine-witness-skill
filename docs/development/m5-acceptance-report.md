@@ -1,6 +1,6 @@
 # M5 LAN pilot acceptance report
 
-状态：release-candidate verification  
+状态：implemented baseline; four-hour soak evidence remains separate
 日期：2026-06-23  
 目标：`0.5.0-lan-pilot`
 
@@ -20,7 +20,7 @@
 
 ## Automated gates
 
-The release candidate is accepted only when all of these pass:
+The M5 automated baseline is accepted when all of these pass:
 
 ```powershell
 uv sync --frozen
@@ -37,18 +37,19 @@ uv run pytest .\tests\integration\test_pilot_demo.py
 uv run pytest .\tests\integration\test_pilot_soak.py
 ```
 
-## Release gate
+## Four-hour run evidence
 
 The accelerated fault/observer soak is a CI gate, not a substitute for elapsed
-time. Tagging `v0.5.0-lan-pilot` additionally requires:
+time. A release-quality public report should still include:
 
 ```powershell
 uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
 ```
 
 The resulting `pilot-soak-report.json`, PilotTranscript, ZIP, checksums and SBOM
-are release assets. Until this real four-hour command completes, the version is
-a release candidate and must not be described as a completed four-hour trial.
+are release assets. If the real four-hour command has not been rerun in a fresh
+environment, describe M5 as implemented with accelerated and one-hour preflight
+evidence, not as a completed four-hour field trial.
 
 ## Wall-clock preflight findings
 
@@ -84,5 +85,5 @@ gate:
 - Transcript verification returned 60 events, three observation receipts, five
   explicit vote approvals and `valid: true`; secret scan returned zero.
 
-The one-hour merge gate is therefore satisfied. The separate four-hour tag gate
-is unchanged.
+The one-hour merge gate is therefore satisfied. The separate four-hour field
+evidence remains useful for future operational reports.

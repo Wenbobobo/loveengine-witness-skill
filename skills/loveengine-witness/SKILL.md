@@ -19,7 +19,9 @@ protocol runtime. Do not reproduce protocol logic in prompts.
 
 - Verify or install a release with `loveengine package verify`, `package install`,
   and `package self-check`.
-- Operate the LAN service with `loveengine pilot serve` and `pilot status`.
+- Operate the LAN service with `loveengine pilot quickstart`, `pilot serve`,
+  and `pilot status`.
+- Join a pilot node with `loveengine node connect --invite <file> --profile <signed-profile>`.
 - Observe text only through signed `observe_live_text` tasks.
 - Build and finalize evidence before opening a dispute.
 - Verify every transcript before reporting an outcome.

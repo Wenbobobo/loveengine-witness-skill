@@ -397,11 +397,12 @@
       "M3",
       "M4",
       "M5",
+      "M6",
       "manifest"
     ],
     "status": "current",
-    "canonical_role": "Current LAN-pilot Skill manifest",
-    "summary": "0.5.0-lan-pilot manifest with M0-M4 compatibility and M5 package, observation, recovery and unified E2E bindings."
+    "canonical_role": "Current contract-public pilot Skill manifest",
+    "summary": "0.6.0-contract-public-pilot manifest with M0-M5 compatibility and M6 contract-fusion, onboarding, plugin and public-pilot bindings."
   },
   {
     "id": "protocol-schemas",
@@ -626,7 +627,11 @@
     "path": "contracts/src/SkillRegistry.sol",
     "source_group": "implementation",
     "layer": "contracts",
-    "domain_tags": ["M3", "SkillRegistry", "release"],
+    "domain_tags": [
+      "M3",
+      "SkillRegistry",
+      "release"
+    ],
     "status": "current",
     "canonical_role": "Publisher-scoped release trust root",
     "summary": "Publishes immutable release hashes and manages active, deprecated, revoked, current, and replacement state per Publisher."
@@ -637,7 +642,11 @@
     "path": "schemas/network-transcript-v1.schema.json",
     "source_group": "implementation",
     "layer": "schema",
-    "domain_tags": ["M3", "JSON Schema", "Agent network"],
+    "domain_tags": [
+      "M3",
+      "JSON Schema",
+      "Agent network"
+    ],
     "status": "current",
     "canonical_role": "Network protocol schema set",
     "summary": "Entry in the Draft 2020-12 schema set for releases, signed profiles, bootstrap, tasks, receipts, and network transcripts."
@@ -648,7 +657,12 @@
     "path": "src/loveengine_witness/relay_server.py",
     "source_group": "implementation",
     "layer": "transport",
-    "domain_tags": ["M3", "Relay Hub", "WebSocket", "SQLite"],
+    "domain_tags": [
+      "M3",
+      "Relay Hub",
+      "WebSocket",
+      "SQLite"
+    ],
     "status": "current",
     "canonical_role": "Central outbound-only network transport",
     "summary": "HTTP artifact/bootstrap endpoints, WebSocket challenge-response, signed task delivery, receipts, ack, and metrics."
@@ -659,7 +673,11 @@
     "path": "src/loveengine_witness/event_bridge.py",
     "source_group": "implementation",
     "layer": "application",
-    "domain_tags": ["M3", "events", "idempotency"],
+    "domain_tags": [
+      "M3",
+      "events",
+      "idempotency"
+    ],
     "status": "current",
     "canonical_role": "Chain event to NetworkTask mapping",
     "summary": "Maps release and broadcast events to the two allowed task types and deduplicates by chainId, transaction hash, and log index."
@@ -670,7 +688,12 @@
     "path": "examples/transcripts/network-pilot.fixture.json",
     "source_group": "implementation",
     "layer": "fixture",
-    "domain_tags": ["M3", "Anvil", "Relay Hub", "transcript"],
+    "domain_tags": [
+      "M3",
+      "Anvil",
+      "Relay Hub",
+      "transcript"
+    ],
     "status": "current",
     "canonical_role": "Auditable three-process network fixture",
     "summary": "Secret-free transcript linking SkillRegistry release, broadcast event, six signed tasks, six receipts, recovery behavior, and delivery metrics."
@@ -681,7 +704,11 @@
     "path": "README.zh-CN.md",
     "source_group": "developer-docs",
     "layer": "entrypoint",
-    "domain_tags": ["M3", "M4", "README"],
+    "domain_tags": [
+      "M3",
+      "M4",
+      "README"
+    ],
     "status": "current",
     "canonical_role": "Chinese repository entrypoint",
     "summary": "Chinese architecture, workflow, commands, safety rules, and documentation navigation."
@@ -692,7 +719,11 @@
     "path": "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md",
     "source_group": "developer-docs",
     "layer": "specification",
-    "domain_tags": ["M4", "live evidence", "dispute review"],
+    "domain_tags": [
+      "M4",
+      "live evidence",
+      "dispute review"
+    ],
     "status": "implemented",
     "canonical_role": "Implemented M4 specification",
     "summary": "Provider-neutral live text, content-addressed evidence, three-node review, ProposalGate, dashboard, and E2E acceptance."
@@ -700,12 +731,17 @@
   {
     "id": "lan-pilot-spec",
     "title": "LoveEngine M5 LAN Pilot SPEC",
-    "path": "docs/specs/love-engine-lan-pilot-spec.md",
+    "path": "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
     "source_group": "developer-docs",
     "layer": "specification",
-    "domain_tags": ["M5", "LAN", "packaging", "operations"],
-    "status": "current",
-    "canonical_role": "Active implementation specification",
+    "domain_tags": [
+      "M5",
+      "LAN",
+      "packaging",
+      "operations"
+    ],
+    "status": "implemented",
+    "canonical_role": "Implemented M5 specification archive",
     "summary": "Deterministic Skill packaging, LAN live service, signed observations, persistent Anvil, unified E2E, observability and recovery."
   },
   {
@@ -714,7 +750,11 @@
     "path": "docs/api/extension-interfaces.md",
     "source_group": "developer-docs",
     "layer": "api",
-    "domain_tags": ["ports", "adapters", "M4"],
+    "domain_tags": [
+      "ports",
+      "adapters",
+      "M4"
+    ],
     "status": "current",
     "canonical_role": "Replaceable infrastructure contracts",
     "summary": "Transport, signer, live source, artifact store, metadata store, chain event and dashboard boundaries."
@@ -725,7 +765,11 @@
     "path": "docs/development/m3-demo-runbook.md",
     "source_group": "developer-docs",
     "layer": "development",
-    "domain_tags": ["M3", "demo", "operations"],
+    "domain_tags": [
+      "M3",
+      "demo",
+      "operations"
+    ],
     "status": "current",
     "canonical_role": "External demonstration procedure",
     "summary": "Preparation, command sequence, narrative order, and safety boundaries for the M3 demo."
@@ -736,7 +780,11 @@
     "path": "docs/development/m3-acceptance-report.md",
     "source_group": "developer-docs",
     "layer": "verification",
-    "domain_tags": ["M3", "acceptance", "E2E"],
+    "domain_tags": [
+      "M3",
+      "acceptance",
+      "E2E"
+    ],
     "status": "current",
     "canonical_role": "Verified presentation baseline",
     "summary": "Python, Foundry, local-loop, network-loop, GitHub delivery, and known-warning evidence."
@@ -747,7 +795,11 @@
     "path": "docs/api/live-evidence-api.md",
     "source_group": "developer-docs",
     "layer": "api",
-    "domain_tags": ["M4", "LiveGateway", "ProposalGate"],
+    "domain_tags": [
+      "M4",
+      "LiveGateway",
+      "ProposalGate"
+    ],
     "status": "current",
     "canonical_role": "M4 public interface contract",
     "summary": "HTTP, SSE, CLI, artifact, signed review, dashboard and stable error semantics."
@@ -758,7 +810,11 @@
     "path": "src/loveengine_witness/live_protocol.py",
     "source_group": "implementation",
     "layer": "domain",
-    "domain_tags": ["M4", "hash chain", "events"],
+    "domain_tags": [
+      "M4",
+      "hash chain",
+      "events"
+    ],
     "status": "current",
     "canonical_role": "LiveSession and LiveEvent domain rules",
     "summary": "Builds and verifies append-only canonical Keccak event chains."
@@ -769,7 +825,11 @@
     "path": "src/loveengine_witness/live_store.py",
     "source_group": "implementation",
     "layer": "adapter",
-    "domain_tags": ["M4", "SQLite", "content addressing"],
+    "domain_tags": [
+      "M4",
+      "SQLite",
+      "content addressing"
+    ],
     "status": "current",
     "canonical_role": "ArtifactStore and MetadataStore adapters",
     "summary": "Stores SHA-256 addressed artifacts and live protocol metadata."
@@ -780,7 +840,12 @@
     "path": "src/loveengine_witness/live_gateway.py",
     "source_group": "implementation",
     "layer": "application",
-    "domain_tags": ["M4", "HTTP", "SSE", "dashboard"],
+    "domain_tags": [
+      "M4",
+      "HTTP",
+      "SSE",
+      "dashboard"
+    ],
     "status": "current",
     "canonical_role": "Provider-neutral live HTTP boundary",
     "summary": "Accepts JSON and NDJSON, streams SSE and exposes read-only dashboard data."
@@ -791,7 +856,11 @@
     "path": "src/loveengine_witness/dispute.py",
     "source_group": "implementation",
     "layer": "domain",
-    "domain_tags": ["M4", "review", "gate"],
+    "domain_tags": [
+      "M4",
+      "review",
+      "gate"
+    ],
     "status": "current",
     "canonical_role": "Fail-closed dispute aggregation",
     "summary": "Requires three distinct nodes and only permits dismissed critical disputes."
@@ -802,7 +871,11 @@
     "path": "src/loveengine_witness/live_demo.py",
     "source_group": "implementation",
     "layer": "integration",
-    "domain_tags": ["M4", "Anvil", "E2E"],
+    "domain_tags": [
+      "M4",
+      "Anvil",
+      "E2E"
+    ],
     "status": "current",
     "canonical_role": "Auditable local M4 trial",
     "summary": "Deploys five contracts, ingests twelve events and runs signed reviews in independent processes."
@@ -813,7 +886,11 @@
     "path": "examples/live/live-session.fixture.ndjson",
     "source_group": "implementation",
     "layer": "fixture",
-    "domain_tags": ["M4", "NDJSON", "live text"],
+    "domain_tags": [
+      "M4",
+      "NDJSON",
+      "live text"
+    ],
     "status": "current",
     "canonical_role": "Deterministic twelve-event input",
     "summary": "Ordered source, summary and derived text events for M4 acceptance."
@@ -824,7 +901,11 @@
     "path": "schemas/live-review-transcript-v1.schema.json",
     "source_group": "implementation",
     "layer": "schema",
-    "domain_tags": ["M4", "transcript", "verification"],
+    "domain_tags": [
+      "M4",
+      "transcript",
+      "verification"
+    ],
     "status": "current",
     "canonical_role": "M4 audit artifact contract",
     "summary": "Defines the secret-free end-to-end live evidence transcript."
@@ -835,7 +916,11 @@
     "path": "examples/transcripts/live-review.fixture.json",
     "source_group": "implementation",
     "layer": "fixture",
-    "domain_tags": ["M4", "Anvil", "transcript"],
+    "domain_tags": [
+      "M4",
+      "Anvil",
+      "transcript"
+    ],
     "status": "current",
     "canonical_role": "Auditable live evidence result",
     "summary": "Links five contract addresses, twelve events, evidence hash, five signed receipts, resolved and unresolved disputes, and both gate outcomes."
@@ -846,7 +931,12 @@
     "path": "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
     "source_group": "developer-docs",
     "layer": "supervision",
-    "domain_tags": ["M4", "Skill packaging", "distribution", "E2E"],
+    "domain_tags": [
+      "M4",
+      "Skill packaging",
+      "distribution",
+      "E2E"
+    ],
     "status": "current",
     "canonical_role": "Next-stage SPEC supervision baseline",
     "summary": "Explains the protocol-package Skill model, current workflow, six known gaps, and the required direction for packaging, distribution, live-source and local/public-testnet E2E."
@@ -857,10 +947,17 @@
     "path": "docs/api/lan-pilot-api.md",
     "source_group": "docs/api",
     "layer": "interface",
-    "domain_tags": ["M5", "LAN", "observation", "recovery"],
+    "domain_tags": [
+      "M5",
+      "M6",
+      "LAN",
+      "Tailscale",
+      "observation",
+      "recovery"
+    ],
     "status": "current",
-    "canonical_role": "M5 public interface contract",
-    "summary": "Defines PilotConfig, authenticated writes, observation, persistent chain, explicit voting, snapshots and PilotTranscript."
+    "canonical_role": "LAN/Tailscale public interface contract",
+    "summary": "Defines PilotConfig, PilotInvite, authenticated writes, observation, persistent chain, explicit voting, snapshots and PilotTranscript."
   },
   {
     "id": "m5-acceptance-report",
@@ -868,9 +965,14 @@
     "path": "docs/development/m5-acceptance-report.md",
     "source_group": "developer-docs",
     "layer": "acceptance",
-    "domain_tags": ["M5", "E2E", "soak", "release"],
-    "status": "current",
-    "canonical_role": "Release-candidate evidence and formal soak gate",
+    "domain_tags": [
+      "M5",
+      "E2E",
+      "soak",
+      "release"
+    ],
+    "status": "implemented",
+    "canonical_role": "M5 verification evidence",
     "summary": "Separates automated accelerated acceptance from the required real four-hour release run."
   },
   {
@@ -879,9 +981,15 @@
     "path": "docs/development/m5-release-closeout-plan.md",
     "source_group": "developer-docs",
     "layer": "execution-plan",
-    "domain_tags": ["M5", "CLI", "soak", "UI", "release"],
-    "status": "current",
-    "canonical_role": "Active release closeout plan",
+    "domain_tags": [
+      "M5",
+      "CLI",
+      "soak",
+      "UI",
+      "release"
+    ],
+    "status": "implemented",
+    "canonical_role": "M5 closeout plan archive",
     "summary": "Defines the testable milestones for CLI diagnosis, background soak, observable UI, SCC0 documentation, long-run evidence, PR delivery and Git cleanup."
   },
   {
@@ -890,7 +998,11 @@
     "path": "LICENSE",
     "source_group": "license",
     "layer": "legal",
-    "domain_tags": ["SCC0", "CC0", "license"],
+    "domain_tags": [
+      "SCC0",
+      "CC0",
+      "license"
+    ],
     "status": "current",
     "canonical_role": "Repository license",
     "summary": "Verbatim legal text adopted from the archived DAism2019 SCC0-License repository."
@@ -901,7 +1013,11 @@
     "path": "docs/reference/licenses/scc0-provenance.md",
     "source_group": "reference",
     "layer": "provenance",
-    "domain_tags": ["SCC0", "license", "provenance"],
+    "domain_tags": [
+      "SCC0",
+      "license",
+      "provenance"
+    ],
     "status": "current",
     "canonical_role": "License source traceability",
     "summary": "Records the SCC0 source repository, commit, archive date and original file hash."
@@ -912,7 +1028,12 @@
     "path": "docs/api/cli-reference.md",
     "source_group": "docs/api",
     "layer": "interface",
-    "domain_tags": ["CLI", "operations", "soak", "M5"],
+    "domain_tags": [
+      "CLI",
+      "operations",
+      "soak",
+      "M5"
+    ],
     "status": "current",
     "canonical_role": "Complete command reference",
     "summary": "Documents source diagnosis, package, server, chain, voting, transcript, background soak and release verification commands."
@@ -923,7 +1044,11 @@
     "path": "docs/assets/operator-console.png",
     "source_group": "developer-docs",
     "layer": "visual-evidence",
-    "domain_tags": ["M5", "UI", "operator"],
+    "domain_tags": [
+      "M5",
+      "UI",
+      "operator"
+    ],
     "status": "current",
     "canonical_role": "Observable operator UI evidence",
     "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
@@ -934,7 +1059,11 @@
     "path": "docs/assets/read-only-dashboard.png",
     "source_group": "developer-docs",
     "layer": "visual-evidence",
-    "domain_tags": ["M5", "UI", "dashboard"],
+    "domain_tags": [
+      "M5",
+      "UI",
+      "dashboard"
+    ],
     "status": "current",
     "canonical_role": "Observable public read-model evidence",
     "summary": "Screenshot rendered from the secret-free local Pilot UI fixture."
@@ -945,7 +1074,11 @@
     "path": "skills/loveengine-witness/SKILL.md",
     "source_group": "skill",
     "layer": "instruction",
-    "domain_tags": ["M5", "Codex", "Skill"],
+    "domain_tags": [
+      "M5",
+      "Codex",
+      "Skill"
+    ],
     "status": "current",
     "canonical_role": "Thin Agent instruction layer",
     "summary": "Declares triggers, verification flow, command routing and safety boundaries without duplicating runtime logic."
@@ -956,7 +1089,12 @@
     "path": "src/loveengine_witness/package.py",
     "source_group": "implementation",
     "layer": "distribution",
-    "domain_tags": ["M5", "ZIP", "SBOM", "checksum"],
+    "domain_tags": [
+      "M5",
+      "ZIP",
+      "SBOM",
+      "checksum"
+    ],
     "status": "current",
     "canonical_role": "Safe deterministic build and install adapter",
     "summary": "Builds reproducible archives and rejects unsafe paths, missing checksums, symlinks and tampering."
@@ -967,7 +1105,12 @@
     "path": "src/loveengine_witness/pilot_server.py",
     "source_group": "implementation",
     "layer": "application",
-    "domain_tags": ["M5", "aiohttp", "auth", "metrics"],
+    "domain_tags": [
+      "M5",
+      "aiohttp",
+      "auth",
+      "metrics"
+    ],
     "status": "current",
     "canonical_role": "Single-process LAN control plane",
     "summary": "Combines live, Relay, dashboard, operator, health, readiness, metrics and hash-chained audit logging."
@@ -978,7 +1121,12 @@
     "path": "src/loveengine_witness/observation.py",
     "source_group": "implementation",
     "layer": "domain",
-    "domain_tags": ["M5", "SSE", "cursor", "receipt"],
+    "domain_tags": [
+      "M5",
+      "SSE",
+      "cursor",
+      "receipt"
+    ],
     "status": "current",
     "canonical_role": "Independent event and artifact verifier",
     "summary": "Validates stream continuity, artifacts, durable cursors and three-node ObservationSet agreement."
@@ -989,7 +1137,12 @@
     "path": "src/loveengine_witness/pilot_chain.py",
     "source_group": "implementation",
     "layer": "adapter",
-    "domain_tags": ["M5", "Anvil", "snapshot", "code hash"],
+    "domain_tags": [
+      "M5",
+      "Anvil",
+      "snapshot",
+      "code hash"
+    ],
     "status": "current",
     "canonical_role": "Local chain persistence adapter",
     "summary": "Initializes, restores and verifies fixed-chain deployments and code hashes."
@@ -1000,7 +1153,11 @@
     "path": "src/loveengine_witness/pilot_demo.py",
     "source_group": "implementation",
     "layer": "integration",
-    "domain_tags": ["M5", "E2E", "fault injection"],
+    "domain_tags": [
+      "M5",
+      "E2E",
+      "fault injection"
+    ],
     "status": "current",
     "canonical_role": "Unified system acceptance path",
     "summary": "Runs package install, ten observers, three Agents, evidence, review, explicit votes, restarts and PublicSink verification."
@@ -1011,9 +1168,452 @@
     "path": "src/loveengine_witness/pilot_transcript.py",
     "source_group": "implementation",
     "layer": "verification",
-    "domain_tags": ["M5", "transcript", "offline verification"],
+    "domain_tags": [
+      "M5",
+      "transcript",
+      "offline verification"
+    ],
     "status": "current",
     "canonical_role": "Cross-phase audit verifier",
     "summary": "Cross-checks package, events, observations, evidence, proposal, votes, transactions and final state."
+  },
+  {
+    "id": "contract-public-pilot-spec",
+    "title": "LoveEngine M6 Contract and Public Pilot SPEC",
+    "path": "docs/specs/love-engine-contract-public-pilot-spec.md",
+    "source_group": "developer-docs",
+    "layer": "specification",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "plugin",
+      "tailscale",
+      "public-pilot"
+    ],
+    "status": "current",
+    "canonical_role": "Active implementation specification",
+    "summary": "Contract-team v2 fusion, participant onboarding, plugin distribution, Tailscale/Debian trial, public-domain configuration and optional testnet gate."
+  },
+  {
+    "id": "contract2-comparison-recommendations",
+    "title": "contract2 comparison and recommendations",
+    "path": "docs/development/contract2-comparison-and-recommendations.md",
+    "source_group": "developer-docs",
+    "layer": "handoff",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team",
+      "security"
+    ],
+    "status": "current",
+    "canonical_role": "Contract collaborator recommendation document",
+    "summary": "Compares contract-team v2 against the current secured ABI, explains required fixes and documents SkillRegistry."
+  },
+  {
+    "id": "contract-team-v2-reference",
+    "title": "contract-team v2 preserved source index",
+    "path": "docs/reference/contracts/contract-team-v2/README.md",
+    "source_group": "reference",
+    "layer": "source-material",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved collaborator input index",
+    "summary": "Documents the moved contract-team v2 Solidity sources and compile command without rewriting their code."
+  },
+  {
+    "id": "contract-team-v2-witnessdao",
+    "title": "contract-team v2 WitnessDAO",
+    "path": "docs/reference/contracts/contract-team-v2/contracts/WitnessDAO.sol",
+    "source_group": "reference",
+    "layer": "source-material",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved collaborator Solidity source",
+    "summary": "Unmodified contract-team v2 WitnessDAO source used for M6 comparison."
+  },
+  {
+    "id": "contract-team-v2-corporatesink",
+    "title": "contract-team v2 CorporateSink",
+    "path": "docs/reference/contracts/contract-team-v2/contracts/CorporateSink.sol",
+    "source_group": "reference",
+    "layer": "source-material",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved collaborator Solidity source",
+    "summary": "Unmodified contract-team v2 CorporateSink source used for M6 comparison."
+  },
+  {
+    "id": "contract-team-v2-streamingengine",
+    "title": "contract-team v2 StreamingEngine",
+    "path": "docs/reference/contracts/contract-team-v2/contracts/StreamingEngine.sol",
+    "source_group": "reference",
+    "layer": "source-material",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved collaborator Solidity source",
+    "summary": "Unmodified contract-team v2 StreamingEngine source used for M6 comparison."
+  },
+  {
+    "id": "contract-team-v2-publicsink",
+    "title": "contract-team v2 PublicSink",
+    "path": "docs/reference/contracts/contract-team-v2/contracts/PublicSink.sol",
+    "source_group": "reference",
+    "layer": "source-material",
+    "domain_tags": [
+      "M6",
+      "contracts",
+      "contract-team"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved collaborator Solidity source",
+    "summary": "Unmodified contract-team v2 PublicSink source used for M6 comparison."
+  },
+  {
+    "id": "participant-runbook-zh-cn",
+    "title": "LoveEngine participant runbook zh-CN",
+    "path": "docs/development/participant-runbook.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "onboarding",
+      "operator",
+      "node",
+      "viewer"
+    ],
+    "status": "current",
+    "canonical_role": "Role-based participant guide",
+    "summary": "Explains operator, observation node, voting witness, public viewer and publisher workflows in Chinese."
+  },
+  {
+    "id": "pilot-invite-schema",
+    "title": "PilotInviteV1 schema",
+    "path": "schemas/pilot-invite-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "schema",
+    "domain_tags": [
+      "M6",
+      "invite",
+      "Tailscale",
+      "public-base-url"
+    ],
+    "status": "current",
+    "canonical_role": "Invite file schema",
+    "summary": "Defines secret-free pilot invite files for LAN, Tailscale and future public-domain participants."
+  },
+  {
+    "id": "loveengine-plugin-manifest",
+    "title": "LoveEngine Codex plugin manifest",
+    "path": "plugins/loveengine-witness/.codex-plugin/plugin.json",
+    "source_group": "plugin",
+    "layer": "distribution",
+    "domain_tags": [
+      "M6",
+      "Codex",
+      "Plugin",
+      "Skill"
+    ],
+    "status": "current",
+    "canonical_role": "Codex plugin distribution wrapper",
+    "summary": "Pilot plugin manifest that exposes LoveEngine Witness as a Codex workflow without becoming the protocol trust root."
+  },
+  {
+    "id": "loveengine-plugin-skill",
+    "title": "LoveEngine plugin Skill entry",
+    "path": "plugins/loveengine-witness/skills/loveengine-witness/SKILL.md",
+    "source_group": "plugin",
+    "layer": "distribution",
+    "domain_tags": [
+      "M6",
+      "Codex",
+      "Plugin",
+      "Skill"
+    ],
+    "status": "current",
+    "canonical_role": "Thin plugin Skill entry",
+    "summary": "Plugin-local Skill instructions that route users to safe verification and role-based commands."
+  },
+  {
+    "id": "loveengine-plugin-marketplace-example",
+    "title": "LoveEngine plugin marketplace example",
+    "path": "plugins/marketplace.example.json",
+    "source_group": "plugin",
+    "layer": "distribution",
+    "domain_tags": [
+      "M6",
+      "Codex",
+      "Plugin",
+      "marketplace"
+    ],
+    "status": "example",
+    "canonical_role": "Local marketplace example",
+    "summary": "Example marketplace entry for sharing or importing the local LoveEngine Witness plugin."
+  },
+  {
+    "id": "m6-demo-docs-publication-plan",
+    "title": "M6 demo docs publication plan",
+    "path": "docs/development/m6-demo-docs-publication-plan.md",
+    "source_group": "developer-docs",
+    "layer": "release-plan",
+    "domain_tags": [
+      "M6",
+      "runbook",
+      "screenshots",
+      "publication"
+    ],
+    "status": "current",
+    "canonical_role": "M6.8 closeout checklist",
+    "summary": "Tracks branch closeout, screenshot runbooks, technical article, validation and PR publication work."
+  },
+  {
+    "id": "operator-flow-runbook-zh-cn",
+    "title": "Operator flow runbook zh-CN",
+    "path": "docs/development/runbooks/operator-flow.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "screenshots",
+      "pilot"
+    ],
+    "status": "current",
+    "canonical_role": "Host operator walkthrough",
+    "summary": "Step-by-step host operator guide with screenshots for quickstart, token entry, session creation, event publishing, closing and dashboard checks."
+  },
+  {
+    "id": "observation-node-flow-runbook-zh-cn",
+    "title": "Observation node flow runbook zh-CN",
+    "path": "docs/development/runbooks/observation-node-flow.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "Agent",
+      "observation",
+      "invite"
+    ],
+    "status": "current",
+    "canonical_role": "Observation node walkthrough",
+    "summary": "Explains invite validation, manifest/package checks, profile signing, dry-run connection and durable reconnect behavior."
+  },
+  {
+    "id": "voting-witness-flow-runbook-zh-cn",
+    "title": "Voting witness flow runbook zh-CN",
+    "path": "docs/development/runbooks/voting-witness-flow.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "witness",
+      "vote",
+      "signer"
+    ],
+    "status": "current",
+    "canonical_role": "Explicit voting witness walkthrough",
+    "summary": "Explains proposal plan review, chain status checks, explicit witness vote approval and relayer boundaries."
+  },
+  {
+    "id": "public-viewer-flow-runbook-zh-cn",
+    "title": "Public viewer flow runbook zh-CN",
+    "path": "docs/development/runbooks/public-viewer-flow.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "viewer",
+      "dashboard",
+      "screenshots"
+    ],
+    "status": "current",
+    "canonical_role": "Public read-only viewer walkthrough",
+    "summary": "Explains read-only dashboard access, event timeline review, artifact integrity and red error states."
+  },
+  {
+    "id": "publisher-flow-runbook-zh-cn",
+    "title": "Publisher flow runbook zh-CN",
+    "path": "docs/development/runbooks/publisher-flow.zh-CN.md",
+    "source_group": "developer-docs",
+    "layer": "runbook",
+    "domain_tags": [
+      "M6",
+      "publisher",
+      "package",
+      "SkillRegistry"
+    ],
+    "status": "current",
+    "canonical_role": "Package and registry publisher walkthrough",
+    "summary": "Explains deterministic ZIP build, package verify, install self-check, registry publish/verify and Plugin trust boundary."
+  },
+  {
+    "id": "loveengine-technical-architecture-zh-cn",
+    "title": "LoveEngine technical architecture zh-CN",
+    "path": "docs/articles/loveengine-technical-architecture.zh-CN.md",
+    "source_group": "articles",
+    "layer": "architecture",
+    "domain_tags": [
+      "M6",
+      "architecture",
+      "contracts",
+      "Agent network",
+      "evidence"
+    ],
+    "status": "current",
+    "canonical_role": "Technical architecture article",
+    "summary": "Explains why LoveEngine uses SkillRegistry, deterministic packages, EIP-712, Python/aiohttp/SQLite, Foundry contracts, Relay and evidence transcripts."
+  },
+  {
+    "id": "runbook-operator-open-console-zh",
+    "title": "Operator console screenshot zh step 1",
+    "path": "docs/assets/runbooks/operator/operator-01-open-console-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of the Chinese operator console."
+  },
+  {
+    "id": "runbook-operator-create-session-zh",
+    "title": "Operator create session screenshot zh",
+    "path": "docs/assets/runbooks/operator/operator-02-create-session-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of the operator session creation area."
+  },
+  {
+    "id": "runbook-operator-publish-event-zh",
+    "title": "Operator publish event screenshot zh",
+    "path": "docs/assets/runbooks/operator/operator-03-publish-event-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of operator event publication and evidence state."
+  },
+  {
+    "id": "runbook-operator-close-session-zh",
+    "title": "Operator close session screenshot zh",
+    "path": "docs/assets/runbooks/operator/operator-04-close-session-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of closed session and ProposalGate state."
+  },
+  {
+    "id": "runbook-viewer-dashboard-zh",
+    "title": "Viewer dashboard screenshot zh",
+    "path": "docs/assets/runbooks/viewer/viewer-01-dashboard-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "viewer",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of the Chinese read-only dashboard."
+  },
+  {
+    "id": "runbook-viewer-evidence-detail-zh",
+    "title": "Viewer evidence detail screenshot zh",
+    "path": "docs/assets/runbooks/viewer/viewer-02-evidence-detail-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "viewer",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of session event timeline and artifact integrity."
+  },
+  {
+    "id": "runbook-viewer-gate-status-zh",
+    "title": "Viewer gate status screenshot zh",
+    "path": "docs/assets/runbooks/viewer/viewer-03-gate-status-zh.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "viewer",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot used for gate/final-state explanation."
+  },
+  {
+    "id": "runbook-operator-overview-en",
+    "title": "Operator overview screenshot en",
+    "path": "docs/assets/runbooks/common/operator-en-overview.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "operator",
+      "English",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of the English operator console."
+  },
+  {
+    "id": "runbook-viewer-overview-en",
+    "title": "Viewer overview screenshot en",
+    "path": "docs/assets/runbooks/common/viewer-en-overview.png",
+    "source_group": "docs-assets",
+    "layer": "screenshot",
+    "domain_tags": [
+      "M6",
+      "viewer",
+      "English",
+      "screenshot"
+    ],
+    "status": "generated",
+    "canonical_role": "Runbook screenshot",
+    "summary": "Deterministic UI fixture screenshot of the English read-only dashboard."
   }
 ]
