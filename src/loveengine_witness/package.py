@@ -60,6 +60,13 @@ FORBIDDEN_ARCHIVE_NAMES = {
     "keystore",
 }
 FORBIDDEN_ARCHIVE_SUFFIXES = {".key", ".pem", ".p12", ".pfx"}
+IGNORED_INSTALL_ROOTS = {".venv"}
+IGNORED_INSTALL_CACHE_DIRS = {
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+}
 
 
 @dataclass(frozen=True)
@@ -761,18 +768,42 @@ def package_self_check(
         raise LoveEngineError("package_checksums_invalid", str(root)) from exc
     names: set[str] = set()
     total_size = 0
-    for entry in root.rglob("*"):
-        if entry.is_symlink():
-            raise LoveEngineError(
-                "package_symlink_forbidden", entry.relative_to(root).as_posix()
-            )
-        if entry.is_file():
-            name = entry.relative_to(root).as_posix()
+    for current, directory_names, file_names in os.walk(root, topdown=True):
+        current_path = Path(current)
+        relative_current = current_path.relative_to(root)
+        kept_directories: list[str] = []
+        for directory_name in directory_names:
+            directory = current_path / directory_name
+            relative = relative_current / directory_name
+            if directory.is_symlink():
+                raise LoveEngineError(
+                    "package_symlink_forbidden", relative.as_posix()
+                )
+            if (
+                (
+                    relative_current == Path(".")
+                    and directory_name in IGNORED_INSTALL_ROOTS
+                )
+                or directory_name in IGNORED_INSTALL_CACHE_DIRS
+            ):
+                continue
+            kept_directories.append(directory_name)
+        directory_names[:] = kept_directories
+
+        for file_name in file_names:
+            entry = current_path / file_name
+            relative = relative_current / file_name
+            if entry.is_symlink():
+                raise LoveEngineError(
+                    "package_symlink_forbidden", relative.as_posix()
+                )
+            name = relative.as_posix()
             _safe_archive_path(name)
-            if entry.stat().st_size > MAX_ARCHIVE_FILE_SIZE:
+            size = entry.stat().st_size
+            if size > MAX_ARCHIVE_FILE_SIZE:
                 raise LoveEngineError("package_file_too_large", name)
             names.add(name)
-            total_size += entry.stat().st_size
+            total_size += size
             if len(names) > MAX_ARCHIVE_FILES or total_size > MAX_ARCHIVE_UNCOMPRESSED_SIZE:
                 raise LoveEngineError("package_archive_too_large", str(root))
     required_missing = REQUIRED_ARCHIVE_PATHS - names

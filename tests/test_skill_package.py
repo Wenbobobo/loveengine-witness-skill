@@ -86,6 +86,24 @@ def test_deterministic_package_build_verify_install_and_self_check(
     assert package_self_check(
         target, expected_package_hash=first.keccak256
     )["valid"] is True
+    dependency_certificate = (
+        target / ".venv" / "lib" / "site-packages" / "certifi" / "cacert.pem"
+    )
+    dependency_certificate.parent.mkdir(parents=True)
+    dependency_certificate.write_text("dependency trust store", encoding="utf-8")
+    bytecode_cache = target / "src" / "loveengine_witness" / "__pycache__"
+    bytecode_cache.mkdir()
+    (bytecode_cache / "package.cpython-312.pyc").write_bytes(b"generated")
+    assert package_self_check(
+        target, expected_package_hash=first.keccak256
+    )["valid"] is True
+
+    (target / ".env").write_text("TOKEN=unsafe", encoding="utf-8")
+    with pytest.raises(LoveEngineError) as error:
+        package_self_check(target, expected_package_hash=first.keccak256)
+    assert error.value.code == "package_secret_file_forbidden"
+    (target / ".env").unlink()
+
     assert (target / "skills" / "loveengine-witness" / "SKILL.md").is_file()
     assert (target / "LICENSE").is_file()
     assert (target / "checksums.json").is_file()

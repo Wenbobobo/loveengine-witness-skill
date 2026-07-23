@@ -103,20 +103,51 @@ jobs:
           forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
           forge build
       - name: Build twice and verify deterministic package
+        id: package
+        shell: bash
         run: |
-          uv run loveengine package build --output dist-a
-          uv run loveengine package build --output dist-b
-          cmp dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip dist-b/loveengine-witness-0.6.0-contract-public-pilot.zip
-          uv run loveengine package verify dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip
+          first_build="$(uv run loveengine package build --output dist-a)"
+          second_build="$(uv run loveengine package build --output dist-b)"
+          FIRST_BUILD="$first_build" SECOND_BUILD="$second_build" uv run python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          first = json.loads(os.environ["FIRST_BUILD"])
+          second = json.loads(os.environ["SECOND_BUILD"])
+          for field in ("archive_sha256", "archive_keccak256"):
+              if first[field] != second[field]:
+                  raise SystemExit(f"non-deterministic package {field}")
+
+          archive = Path(first["archive"])
+          if not archive.is_file():
+              raise SystemExit(f"package archive not found: {archive}")
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+              print(f"archive={archive}", file=output)
+              print(f"package_hash={first['archive_keccak256']}", file=output)
+          PY
+          archive="$(FIRST_BUILD="$first_build" uv run python -c \
+            'import json, os; print(json.loads(os.environ["FIRST_BUILD"])["archive"])')"
+          package_hash="$(FIRST_BUILD="$first_build" uv run python -c \
+            'import json, os; print(json.loads(os.environ["FIRST_BUILD"])["archive_keccak256"])')"
+          uv run loveengine package verify \
+            "$archive" \
+            --expected-package-hash "$package_hash"
       - name: Package security and CLI integration tests
         run: |
           uv run pytest tests/test_skill_package.py
           uv run pytest tests/test_cli_commands.py::test_package_cli_build_verify_install_and_self_check
       - name: Clean install and frozen sync
         run: |
-          uv run loveengine package install dist-a/loveengine-witness-0.6.0-contract-public-pilot.zip --target installed
+          uv run loveengine package install \
+            "${{ steps.package.outputs.archive }}" \
+            --target installed \
+            --expected-package-hash "${{ steps.package.outputs.package_hash }}"
           uv sync --frozen --project installed
-          uv run --project installed loveengine package self-check --root installed
+          uv run --project installed loveengine package self-check \
+            --root installed \
+            --expected-package-hash "${{ steps.package.outputs.package_hash }}"
 
   m5-lan-pilot:
     runs-on: ubuntu-latest

@@ -239,7 +239,7 @@
     "schemas/observation-set-v1.schema.json": "sha256:2ffacdfae5fc89834ae91104e307493ca20bc96538e897860d7189c718094d96",
     "schemas/onchain-proposal-plan-v1.schema.json": "sha256:104931dde3db2cc1b36652347e4f95770c480f293c1217618ad77507313f9690",
     "schemas/pilot-transcript-v1.schema.json": "sha256:546c34cf5e1c232e1fe683ee9e092a72fe3eb0bae8f6aad9aaa4738a71786343",
-    "src/loveengine_witness/package.py": "sha256:6a80b89d9dd4cebaa81a10ac781d52f1287caee2294a3141f3f5807212b31bbe",
+    "src/loveengine_witness/package.py": "sha256:f8a1f58b4a59bd89d63fd6157f90a1b0c9ceeb2c96535381347e47b1fbc28b24",
     "src/loveengine_witness/pilot_server.py": "sha256:c30b3e0004c3d5aabe931830f8687c63183fa19e159781140f080464d0592e96",
     "src/loveengine_witness/observation.py": "sha256:1f60dcaa454cf29dc42e35af928dbe0ad0432181f171e3a63e497f632955fb43",
     "src/loveengine_witness/live_observation_node.py": "sha256:113491277b42d1b7d1a8a1d3b7320d67c1c8aa97fd13a7b104a297029515dfd1",
@@ -404,7 +404,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:f5d0fe1698e5a5de3a79b056486ea201446556d15a39885a6c3e672f2bb90d20",
+  "package_hash": "sha256:3bc0996e8588881d4a8a1d171845756f865e6ef5cd7c1a1f0824b7bf46604e43",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,
