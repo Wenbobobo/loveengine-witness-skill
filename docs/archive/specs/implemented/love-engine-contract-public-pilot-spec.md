@@ -1,15 +1,17 @@
-# LoveEngine M6 Contract Fusion and Public Pilot Readiness SPEC
+# LoveEngine 0.6.1 Contract Public Pilot Hardening SPEC
 
-Status: active
-Target version: `0.6.0-contract-public-pilot`
+Status: active hardening; external deployment gates remain open
+Target version: `0.6.1-contract-public-pilot`
 Protocol: `loveengine-witness-net/0.6`
-Updated: 2026-06-24
+Updated: 2026-07-21
 
 ## 1. Core goal
 
-M6 turns the M5 LAN pilot into a participant-ready pilot that can absorb the
-contract team's second contract handoff, explain the remaining changes needed
-for protocol safety, and run through a clearer installation/onboarding path.
+`v0.6.0-contract-public-pilot` completed the local contract-fusion and LAN code
+baseline. `0.6.1` hardens its trust boundaries and makes the honest local path
+usable without changing the `0.6` wire protocol or deleting historical schemas.
+Tailscale, public Internet, testnet, production identity and HA remain separate
+external gates; this SPEC does not infer them from a local Anvil run.
 
 The trust root remains:
 
@@ -20,7 +22,8 @@ deterministic package hash
 → evidence hash chain
 → explicit witness vote
 → on-chain execution
-→ offline transcript verification
+→ PilotTranscriptV2 offline verification
+→ optional RPC verification of Registry, receipts, code and PublicSink
 ```
 
 Web pages, Relay, plugin marketplace entries and package mirrors are convenience
@@ -36,6 +39,25 @@ layers, not trust roots.
   counted as one of the four UAS business contracts.
 - Tailscale Debian and public testnet validation require external resources and
   are explicit gates, not assumed local checks.
+
+## 2.1 0.6.1 hardening acceptance
+
+- Package verification requires either a trusted Registry ZIP Keccak or an
+  explicit `integrity_only` declaration; only the former is trust-bound.
+- Nodes verify the active release before connecting and never trust a task's
+  self-declared issuer or manifest hash.
+- Relay membership comes only from the signed bootstrap directory; receipts are
+  bound to the authenticated connection and its accepted pending task.
+- Evidence finalization is an authenticated POST that rereads and rehashes each
+  artifact. GET requests remain read-only.
+- `PilotTranscriptV1` reports historical consistency only. V2 verifies the
+  package/release anchor, bootstrap, tasks, receipts, artifacts, disputes,
+  ProposalGate, independent vote signatures, transaction receipts and code
+  hashes; `--rpc-url` enables chain verification.
+- Quickstart is a real loopback-only runtime. Dry-run writes no state and
+  `--headless` controls only browser launch.
+- Publisher commands generate a transaction plan and perform read-only chain
+  verification. External signer submission is not implemented here.
 
 ## 3. Milestones
 

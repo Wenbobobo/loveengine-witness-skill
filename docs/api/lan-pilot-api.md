@@ -1,144 +1,141 @@
-# LAN Pilot API
+# Local Pilot API
 
-状态：M6 active, M5 implemented
-协议：`loveengine-witness-net/0.6`
+状态：0.6.1-contract-public-pilot candidate；仅本机
+协议：loveengine-witness-net/0.6
 
-## PilotConfigV1
+名称中的历史 “LAN Pilot” 不表示 Tailscale、公网或远程部署已完成。当前默认实验
+只绑定 loopback；governance stage 是可选层。
 
-Schema：`schemas/pilot-config-v1.schema.json`。
+## Runtime files
 
-配置固定数据库、Relay 数据库、artifact 根目录、audit 日志、RPC、
-chainId、监听地址和允许的 Origin。`bootstrap_file`、`release_file` 和
-`package_archive` 为同进程 Relay 提供节点目录、发布元数据和实际 ZIP；
-启动时必须复算 ZIP Keccak 并匹配 release。写入 token 只从
-`token_file` 读取。
-绑定 `0.0.0.0` 或 `::` 必须显式设置 `allow_all_interfaces=true`。
+PilotConfigV1 固定 pilot.sqlite、relay.sqlite、artifact root、audit log、RPC、
+chain ID、监听地址、Origin、bootstrap/release/ZIP 和 restricted token file。
+绑定 0.0.0.0 或 :: 必须显式 allow_all_interfaces=true，但这本身不构成安全部署。
 
-## HTTP
+Quickstart 生成：
+
+- pilot-invite.json：server/operator/dashboard/relay URL 和公开 release 提示；
+- pilot-trust-policy.json：独立信任策略；
+- release/ 下的 actual deterministic ZIP 和 release metadata；
+- profiles/ 下的本机实验 signed profiles；
+- token file、config、SQLite、artifact、audit 与持久 Anvil 状态。
+
+## Invite 与 trust policy
+
+PilotInviteV1 实际字段是 schema_version、server_url、operator_url、
+dashboard_url、relay_url、chain_id、registry、publisher、skill_id、version 和
+package_hash。它没有 issued_at、expires_at 或 public_base_url 字段，也不包含
+token、私钥、助记词或 keystore。
+
+NodeTrustPolicyV1 必须通过可信旁路获得，字段为：
+
+- chain_id、registry、publisher；
+- skill_id、version；
+- actual ZIP Keccak package_hash；
+- canonical manifest Keccak manifest_hash；
+- 非空、唯一 allowed_issuers。
+
+live node connect 要求 policy。节点比较 invite/policy/profile/RPC release/actual
+ZIP，随后才连接；任务 issuer 必须属于 allowed_issuers。dry-run 可以不带 policy，
+但只输出 connection_plan 且 trust_bound: false。
+
+## HTTP 与 Relay
 
 只读：
 
-```text
-GET /healthz
-GET /readyz
-GET /v1/metrics
-GET /operator/
-GET /demo/
-GET /v1/live/sessions/{sessionId}
-GET /v1/live/sessions/{sessionId}/events
-GET /v1/live/sessions/{sessionId}/stream
-GET /v1/live/sessions/{sessionId}/evidence
-GET /v1/live/artifacts/{sha256Digest}
-GET /v1/bootstrap
-GET /v1/ws
-```
+    GET /healthz
+    GET /readyz
+    GET /v1/metrics
+    GET /operator/
+    GET /demo/
+    GET /v1/live/sessions/{sessionId}
+    GET /v1/live/sessions/{sessionId}/events
+    GET /v1/live/sessions/{sessionId}/stream
+    GET /v1/live/sessions/{sessionId}/evidence
+    GET /v1/live/artifacts/{sha256Digest}
+    GET /v1/bootstrap
+    GET /v1/artifacts/{packageHash}
+    GET /v1/ws
 
-`stream` 使用最长一秒的 SSE long-poll：有新事件时立即返回，空闲时返回
-keepalive，客户端继续携带 `Last-Event-ID`/`after` 重连。这样保留 cursor
-恢复语义，同时避免空 session 上的高频 busy polling。
+鉴权写入：
 
-写入：
+    POST /v1/live/sessions
+    POST /v1/live/sessions/{sessionId}/events
+    POST /v1/live/sessions/{sessionId}/close
+    POST /v1/live/sessions/{sessionId}/evidence/finalize
 
-```text
-POST /v1/live/sessions
-POST /v1/live/sessions/{sessionId}/events
-POST /v1/live/sessions/{sessionId}/close
-```
+写请求需要 Authorization: Bearer [token]；浏览器请求还必须匹配 allowed Origin。
+响应带 X-Correlation-ID。token 只来自受限文件和页面内存，不进入 URL、
+localStorage、日志或 transcript。
 
-写入必须同时满足：
+SSE 通过 Last-Event-ID/after 恢复。Relay 只接受 bootstrap profile，区分接收 ACK
+和最终 receipt；它可在连接建立后继续推送任务。receipt 必须属于当前连接、当前
+节点和已接受 pending task，伪造、重复或错绑均拒绝。
 
-- `Authorization: Bearer <token>`。
-- 浏览器请求的 `Origin` 与配置一致。
-- token 不写日志、不进入页面存储、不进入 transcript。
+## Observation
 
-每个响应带 `X-Correlation-ID`。调用方可传入同名 header 关联请求。
+ObserveLiveTextPayloadV1 绑定 session、SSE/session/artifact URL、起始 cursor、
+initial head 和 max_duration_seconds。节点验证：
 
-`/operator/` 是主持人写入控制台，token 只保存在页面内存；
-`/demo/` 是只读证据面板，不包含 POST、签名或交易操作。
-两者支持 `?lang=zh-CN` 与 `?lang=en`。语言偏好只来自 query 参数或页面内存，
-不得写入 localStorage。
+1. sequence 与 previous_event_hash；
+2. canonical event Keccak；
+3. content/artifact SHA-256 和 exact bytes；
+4. 关闭后 bundle 的 head、event count 和 bundle hash；
+5. 任务的 policy/issuer/recipient/nonce/deadline。
 
-## PilotInviteV1
+当前核心实验聚合三个不同签名节点；结果不一致则 ObservationSet 失败。固定三节点
+是实验 quorum，不是通用共识算法。
 
-Schema：`schemas/pilot-invite-v1.schema.json`。
+## Core 与 governance stages
 
-invite 文件用于把节点或只读参与者带入同一试点。它包含：
+~~~text
+core:
+release -> policy/bootstrap -> public node connect -> event/artifact
+-> ObservationSet -> EvidenceBundle -> dispute review -> ProposalGate
+-> WitnessCoreTranscriptV1
 
-- `server_url`、`relay_url`、`dashboard_url`；
-- 期望的 `chain_id`、`registry`、`publisher`；
-- `skill_id`、`version`、`package_hash`；
-- `issued_at` 与 `expires_at`。
+governance:
+core -> witness registration -> explicit approvals -> WitnessDAO execution
+-> PublicSink -> PilotTranscriptV2
+~~~
 
-invite 不包含 bearer token、私钥、助记词或 keystore。Tailscale IP、
-局域网 IP 和未来公网域名都应通过同一个 `public_base_url` 派生，避免手工拼错
-Relay、dashboard 与 artifact URL。
+core 是 demo lan-pilot 默认 stage。两个 stage 均标记 local_anvil 和
+actors_simulated。Operator/Viewer UI 不执行 finalize、Gate、vote 或 PublicSink
+读取；这些由 API/CLI 和 transcript 验证。
 
-## Observation protocol
+## Transcript verification levels
 
-`ObserveLiveTextPayloadV1` 绑定 session、SSE URL、session URL、artifact
-URL、起始 cursor、初始 head hash 和可选 `max_duration_seconds`。该时长
-进入签名 payload，最大为 14,700 秒，允许四小时 session 加五分钟收口；
-缺省值 30 秒仅用于兼容早期短任务。`NetworkTaskV2` 继续绑定 chainId、
-Registry、issuer、recipient、nonce、deadline 和 payload hash。
+| 输入 | verification_level | chain_verified | trust_bound |
+| --- | --- | --- | --- |
+| PilotTranscriptV1 | legacy_consistency | false | false |
+| Core/V2 offline | offline_integrity | false | false |
+| Core/V2 + RPC | chain_consistency | true | false |
+| Core/V2 + RPC + trust policy | chain_verified | true | true |
 
-Agent 必须依次验证：
+Core transcript 在 ProposalGate 结束；V2 额外包含 proposal、独立 witness approvals、
+transactions、contract code 和 PublicSink final state。RPC 模式在 transcript
+记录的 final block number 读取并核对 block hash/timestamp，避免使用易漂移的
+“当前状态”验证历史记录。
 
-1. sequence 单调连续；
-2. `previousEventHash`；
-3. canonical event Keccak；
-4. content SHA-256；
-5. artifact bytes 与 artifact SHA-256；
-6. 关闭后的 EvidenceBundleV2 head、数量和 bundle hash。
+## Snapshot
 
-三个不同签名节点的结果聚合为 `ObservationSetV1`。节点结果不一致时
-聚合失败。
-
-Relay 将任务接收与任务完成分开观测：
-
-- Agent 校验 task 的 chainId、Registry、recipient、nonce、deadline 和
-  payload 后，立即发送 `ack`/`accepted`。
-- `latency_ms` 只计算下发到接受 ACK 的延迟。
-- session 关闭、证据校验和签名回执完成后再发送 `TaskReceiptV2`；
-  该总耗时记录在 `completion_latency_ms`。
-- `observe_live_text` 运行期间客户端持续服务 WebSocket heartbeat，不能因
-  长直播阻塞 Relay 连接。
-
-## Chain and voting
-
-`pilot chain init` 部署四个核心合约和 SkillRegistry，并保存地址、部署
-交易和 code hash。`start` 从校验后的 Anvil state 恢复；`status` 重新
-计算全部 code hash。
-
-`witness vote approve` 读取 `OnchainProposalPlanV1`，查询链上 active
-proposal、payload hash、witness 注册状态和 nonce，再通过
-`eth_signTypedData_v4` 请求显式签名。该命令不接受私钥。
-
-## Snapshot and transcript
-
-系统 snapshot 包含 SQLite online backup、artifact、hash-chained audit
-JSONL、Anvil deployment/state 与 checksums。恢复前必须验证所有文件。
-
-Audit JSONL 记录写操作、拒绝和关键状态变化；成功的只读 GET 只计入 metrics，
-不逐请求写入审计链。审计校验逐行流式执行，长时间试点不会把完整日志载入内存。
-
-`PilotTranscriptV1` 交叉校验 package、session/event chain、
-ObservationSet、EvidenceBundle、dispute、ProposalGate、proposal、五个
-显式批准、交易和 PublicSink 最终状态。
+snapshot 包含 SQLite online backup、artifact、hash-linked audit JSONL、Anvil
+deployment/state 和完整 checksums。verify 拒绝空清单、缺失文件、symlink、路径
+逃逸和非法 run ID；negative retention 拒绝。restore 先验证并准备 rollback，再
+替换正式状态。该机制只解决单机恢复，不是跨主机 HA。
 
 ## Stable CLI
 
-```text
-loveengine version
+~~~text
 loveengine package build|verify|install|self-check
-loveengine pilot quickstart
-loveengine pilot serve|status
+loveengine registry publish|verify
+loveengine pilot quickstart|serve|status
 loveengine pilot chain init|start|status|snapshot|restore
 loveengine pilot snapshot create|verify|restore|prune
 loveengine pilot transcript verify
-loveengine pilot soak [--background]
-loveengine pilot soak-status <state>
+loveengine node connect
 loveengine witness vote approve
-loveengine demo lan-pilot
-```
+loveengine demo lan-pilot --stage core|governance
+~~~
 
-完整参数、后台 soak 和故障排查见 `docs/api/cli-reference.md`。
+完整参数见 [CLI reference](cli-reference.md)。

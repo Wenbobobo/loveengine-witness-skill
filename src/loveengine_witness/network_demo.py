@@ -19,6 +19,7 @@ from .canonical import canonical_json_bytes
 from .demo import (
     RATE_PER_USER,
     CONTRACTS,
+    ROOT,
     deploy,
     free_port,
     start_anvil,
@@ -41,12 +42,16 @@ from .network_typed_data import (
     build_node_profile_typed_data,
     build_task_typed_data,
 )
+from .package import build_package
+from .pilot_server import build_pilot_invite
 from .relay import RelayStore
 from .relay_server import RelayHub
+from .release_identity import SKILL_VERSION
 from .toolchain import foundry_binary
+from .trust_policy import build_node_trust_policy
 
 
-NETWORK_VERSION = "0.3.1-demo-ready"
+NETWORK_VERSION = SKILL_VERSION
 
 
 def _rpc_sign_typed_data(
@@ -78,6 +83,7 @@ async def _run_relay_pilot(
     chain_id: str,
     registry_address: str,
     release: dict[str, Any],
+    artifact_path: Path,
     artifact_bytes: bytes,
     w3: Web3,
     publisher: str,
@@ -192,6 +198,32 @@ async def _run_relay_pilot(
     port = free_port()
     await hub.start("127.0.0.1", port)
     base_url = f"http://127.0.0.1:{port}"
+    invite_path = output / "network-pilot-invite.json"
+    write_json(
+        invite_path,
+        build_pilot_invite(
+            base_url=base_url,
+            chain_id=chain_id,
+            registry=registry_address,
+            publisher=publisher,
+            version=release["version"],
+            package_hash=release["package_hash"],
+        ),
+    )
+    trust_policy_path = output / "network-pilot-trust-policy.json"
+    write_json(
+        trust_policy_path,
+        build_node_trust_policy(
+            chain_id=chain_id,
+            registry=registry_address,
+            publisher=publisher,
+            skill_id=release["skill_id"],
+            version=release["version"],
+            package_hash=release["package_hash"],
+            manifest_hash=release["manifest_hash"],
+            allowed_issuers=[publisher],
+        ),
+    )
     try:
         async with ClientSession() as session:
             health = await (await session.get(base_url + "/v1/health")).json()
@@ -233,8 +265,12 @@ async def _run_relay_pilot(
                         "loveengine_witness.cli",
                         "node",
                         "connect",
-                        "--url",
-                        f"{base_url}/v1/ws",
+                        "--invite",
+                        str(invite_path),
+                        "--trust-policy",
+                        str(trust_policy_path),
+                        "--package",
+                        str(artifact_path),
                         "--profile",
                         str(profile_path),
                         "--rpc-url",
@@ -250,6 +286,8 @@ async def _run_relay_pilot(
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     creationflags=creationflags,
                 )
             )
@@ -312,6 +350,8 @@ def run_network_demo(output: Path, nodes: int = 3) -> dict[str, Any]:
         [str(forge), "build"],
         cwd=CONTRACTS,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -319,14 +359,9 @@ def run_network_demo(output: Path, nodes: int = 3) -> dict[str, Any]:
         raise LoveEngineError("forge_build_failed", build.stderr, 4)
 
     output.mkdir(parents=True, exist_ok=True)
-    artifact_path = output / "loveengine-network-pilot.package.json"
-    artifact_value = {
-        "skill_id": "loveengine-witness",
-        "version": NETWORK_VERSION,
-        "protocol": "loveengine-witness-net/0.3",
-    }
-    artifact_bytes = canonical_json_bytes(artifact_value)
-    artifact_path.write_bytes(artifact_bytes)
+    package = build_package(ROOT, output / "release")
+    artifact_path = package.archive
+    artifact_bytes = artifact_path.read_bytes()
 
     port = free_port()
     process = start_anvil(port)
@@ -424,6 +459,7 @@ def run_network_demo(output: Path, nodes: int = 3) -> dict[str, Any]:
                 chain_id,
                 registry.address,
                 release,
+                artifact_path,
                 artifact_bytes,
                 w3,
                 publisher,

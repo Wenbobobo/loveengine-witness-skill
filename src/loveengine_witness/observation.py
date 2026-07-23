@@ -184,6 +184,13 @@ async def observe_live_session(
                     if state["head_event_hash"].lower() != head.lower():
                         raise LoveEngineError("hash_chain_broken", session_id)
                     async with session.get(payload["session_url"] + "/evidence") as response:
+                        if response.status in {400, 404, 409}:
+                            await asyncio.sleep(poll_interval)
+                            continue
+                        if response.status != 200:
+                            raise LoveEngineError(
+                                "evidence_unavailable", str(response.status), 4
+                            )
                         bundle = await response.json()
                     if bundle["bundle_hash"] != evidence_bundle_hash(bundle):
                         raise LoveEngineError("bundle_hash_mismatch", session_id)

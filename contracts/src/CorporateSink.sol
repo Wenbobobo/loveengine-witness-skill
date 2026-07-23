@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 contract CorporateSink {
+    error ZeroAddress();
     error NotBootstrapper();
     error WitnessDAOAlreadySet();
     error NotWitnessDAO();
@@ -46,6 +47,7 @@ contract CorporateSink {
         uint256 minBroadcastInterval_,
         uint256 broadcastWindow_
     ) {
+        if (corporateAdmin_ == address(0)) revert ZeroAddress();
         bootstrapper = msg.sender;
         corporateAdmin = corporateAdmin_;
         minBroadcastInterval = minBroadcastInterval_;
@@ -97,9 +99,11 @@ contract CorporateSink {
         bytes32 evidenceBundleHash
     ) public {
         if (msg.sender != corporateAdmin) revert NotCorporateAdmin();
-        if (block.timestamp < nextBroadcastTime) revert BroadcastNotReached();
         if (index >= broadcasts.length) revert BroadcastNotReached();
         Broadcast storage broadcast = broadcasts[index];
+        if (block.timestamp < broadcast.timestamp) {
+            revert BroadcastNotReached();
+        }
         if (broadcast.certificateUploaded) {
             revert CertificateAlreadySet();
         }

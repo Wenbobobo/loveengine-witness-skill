@@ -23,8 +23,10 @@ def main() -> None:
     run([python, "tools/validate_loveengine_m0.py"])
     run([python, "tools/validate_loveengine_m0.py", "--tamper-check"])
     run([python, "tools/loveengine_m0_self_check.py"])
+    run([python, "-m", "loveengine_witness.cli", "manifest", "verify"])
     run([python, "tools/validate_sources.py"])
     run([python, "tools/validate_docs.py"])
+    run([python, "tools/scan_secrets.py"])
 
 
 if __name__ == "__main__":

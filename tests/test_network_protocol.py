@@ -114,6 +114,8 @@ def test_network_task_binds_registry_recipient_nonce_deadline_and_payload() -> N
         expected_chain_id=CHAIN_ID,
         expected_registry=REGISTRY,
         expected_recipient=recipient.address,
+        expected_issuer=issuer.address,
+        expected_manifest_hash=task["manifest_hash"],
         now=1_900_000_000,
     ) == issuer.address
 
@@ -132,5 +134,47 @@ def test_network_task_binds_registry_recipient_nonce_deadline_and_payload() -> N
                 expected_chain_id=CHAIN_ID,
                 expected_registry=REGISTRY,
                 expected_recipient=recipient.address,
+                expected_issuer=issuer.address,
+                expected_manifest_hash=task["manifest_hash"],
                 now=1_900_000_000,
             )
+
+    malicious_issuer = Account.create()
+    malicious = build_task(
+        chain_id=CHAIN_ID,
+        registry=REGISTRY,
+        task_id="task-malicious",
+        task_type="propagate_skill",
+        issuer=malicious_issuer.address,
+        recipient=recipient.address,
+        manifest_hash=task["manifest_hash"],
+        payload={"package_hash": "sha256:" + "3" * 64},
+        nonce="8",
+        deadline="2000000000",
+    )
+    malicious["signature"] = sign(
+        malicious_issuer, build_task_typed_data(malicious)
+    )
+    with pytest.raises(LoveEngineError) as exc:
+        verify_task(
+            malicious,
+            expected_chain_id=CHAIN_ID,
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=task["manifest_hash"],
+            now=1_900_000_000,
+        )
+    assert exc.value.code == "wrong_issuer"
+
+    with pytest.raises(LoveEngineError) as exc:
+        verify_task(
+            task,
+            expected_chain_id=CHAIN_ID,
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash="0x" + "9" * 64,
+            now=1_900_000_000,
+        )
+    assert exc.value.code == "wrong_manifest_hash"

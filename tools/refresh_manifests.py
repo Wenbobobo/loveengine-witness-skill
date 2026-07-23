@@ -10,6 +10,7 @@ from pathlib import Path
 
 from eth_hash.auto import keccak
 from loveengine_witness.hashes import source_sha256_prefixed
+from loveengine_witness.release_identity import PROTOCOL_VERSION, SKILL_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,18 +18,21 @@ SKILL = ROOT / "skills" / "loveengine-witness"
 CURRENT = SKILL / "skill-manifest.json"
 M0 = SKILL / "skill-manifest.m0.json"
 
-M6_REFS = [
+RELEASE_ROOT_REFS = [
     "LICENSE",
-    "docs/specs/love-engine-contract-public-pilot-spec.md",
+    "QA.md",
+    "docs/kb/sources.json",
+    "docs/specs/love-engine-witness-core-optimization.md",
+    "docs/architecture/witness-core-and-data-flow.zh-CN.md",
     "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
     "docs/api/lan-pilot-api.md",
     "docs/api/cli-reference.md",
     "docs/api/loveengine-contract-api.md",
     "docs/development/m5-acceptance-report.md",
-    "docs/development/m5-release-closeout-plan.md",
+    "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
     "docs/development/contract2-comparison-and-recommendations.md",
     "docs/development/participant-runbook.zh-CN.md",
-    "docs/development/m6-demo-docs-publication-plan.md",
+    "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
     "docs/development/runbooks/operator-flow.zh-CN.md",
     "docs/development/runbooks/observation-node-flow.zh-CN.md",
     "docs/development/runbooks/voting-witness-flow.zh-CN.md",
@@ -46,6 +50,20 @@ M6_REFS = [
     "schemas/observation-set-v1.schema.json",
     "schemas/onchain-proposal-plan-v1.schema.json",
     "schemas/pilot-transcript-v1.schema.json",
+    "schemas/pilot-transcript-v2.schema.json",
+    "schemas/witness-core-transcript-v1.schema.json",
+    "schemas/node-trust-policy-v1.schema.json",
+    "schemas/pilot-snapshot-v1.schema.json",
+    "schemas/pilot-snapshot-checksums-v1.schema.json",
+    "src/loveengine_witness/release_identity.py",
+    "src/loveengine_witness/cli_trust.py",
+    "src/loveengine_witness/cli_pilot.py",
+    "src/loveengine_witness/agent_session.py",
+    "src/loveengine_witness/pilot_runtime.py",
+    "src/loveengine_witness/pilot_config.py",
+    "src/loveengine_witness/pilot_auth.py",
+    "src/loveengine_witness/pilot_audit.py",
+    "src/loveengine_witness/pilot_ui.py",
     "src/loveengine_witness/package.py",
     "src/loveengine_witness/pilot_server.py",
     "src/loveengine_witness/observation.py",
@@ -54,7 +72,10 @@ M6_REFS = [
     "src/loveengine_witness/witness_vote.py",
     "src/loveengine_witness/pilot_snapshot.py",
     "src/loveengine_witness/pilot_transcript.py",
+    "src/loveengine_witness/core_transcript.py",
+    "src/loveengine_witness/trust_policy.py",
     "src/loveengine_witness/pilot_demo.py",
+    "src/loveengine_witness/pilot_phases.py",
     "src/loveengine_witness/pilot_soak.py",
     "src/loveengine_witness/pilot_soak_process.py",
     "src/loveengine_witness/ui_fixture.py",
@@ -62,6 +83,10 @@ M6_REFS = [
     "plugins/loveengine-witness/skills/loveengine-witness/SKILL.md",
     "plugins/marketplace.example.json",
     "tools/refresh_manifests.py",
+    "tools/check.py",
+    "tools/scan_secrets.py",
+    "tools/run_release_checks.ps1",
+    "tools/run_core_experiments.ps1",
 ]
 
 # Documentation screenshots are tracked through the source inventory, but they
@@ -98,29 +123,49 @@ def package_hash(value: dict) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def inventory_current_files() -> list[str]:
+    inventory = load(ROOT / "docs" / "kb" / "sources.json")
+    refs: list[str] = []
+    for record in inventory:
+        if record.get("status") != "current":
+            continue
+        ref = record.get("path")
+        if (
+            isinstance(ref, str)
+            and ref not in UNPROTECTED_DOC_ASSETS
+            and ref != CURRENT.relative_to(ROOT).as_posix()
+            and (ROOT / ref).is_file()
+        ):
+            refs.append(ref)
+    return refs
+
+
 def refresh_current() -> None:
     value = load(CURRENT)
     moved_refs = {
         "docs/specs/love-engine-live-evidence-pilot-spec.md": "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md",
         "docs/specs/love-engine-lan-pilot-spec.md": "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
+        "docs/specs/love-engine-contract-public-pilot-spec.md": "docs/archive/specs/implemented/love-engine-contract-public-pilot-spec.md",
+        "docs/development/m5-release-closeout-plan.md": "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
+        "docs/development/m6-demo-docs-publication-plan.md": "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
     }
     refs = [
         moved_refs.get(ref, ref)
         for ref in value["source_refs"]
         if ref not in UNPROTECTED_DOC_ASSETS
     ]
-    for ref in M6_REFS:
+    for ref in [*inventory_current_files(), *RELEASE_ROOT_REFS]:
         if ref not in refs:
             refs.append(ref)
     missing = [ref for ref in refs if not (ROOT / ref).is_file()]
     if missing:
         raise SystemExit(f"missing manifest refs: {missing}")
-    value["version"] = "0.6.0-contract-public-pilot"
-    value["protocol"] = "loveengine-witness-net/0.6"
+    value["version"] = SKILL_VERSION
+    value["protocol"] = PROTOCOL_VERSION
     value["source_refs"] = refs
     value["source_hashes"] = {ref: sha(ROOT / ref) for ref in refs}
     binding = value["registry_binding"]
-    binding["version_hash"] = "0x" + keccak(b"0.6.0-contract-public-pilot").hex()
+    binding["version_hash"] = "0x" + keccak(SKILL_VERSION.encode("utf-8")).hex()
     binding.pop("artifact_package_hash", None)
     binding.pop("hash_algorithm", None)
     binding["package_hash_source"] = "SkillRegistry.Release.packageHash"
@@ -132,19 +177,31 @@ def refresh_current() -> None:
         "sbom": "sbom.spdx.json",
         "registry_hash": "keccak256(actual_zip_bytes)",
     }
+    value["network"]["task_types"] = [
+        "observe_live_text",
+        "review_dispute",
+    ]
+    for legacy_command in ("local_loop", "network_demo", "live_demo"):
+        value["commands"].pop(legacy_command, None)
     value["commands"].update(
         {
             "package_build": "loveengine package build --output <dir>",
-            "package_verify": "loveengine package verify <archive>",
-            "package_install": "loveengine package install <archive> --target <dir>",
+            "package_verify": "loveengine package verify <archive> --expected-package-hash <registry-keccak>",
+            "package_install": "loveengine package install <archive> --target <dir> --expected-package-hash <registry-keccak>",
+            "package_self_check": "loveengine package self-check --root <dir> --expected-package-hash <registry-keccak>",
+            "registry_publish": "loveengine registry publish --input <release> --dry-run",
+            "registry_verify": "loveengine registry verify --artifact <archive> --rpc-url <url> --chain-id <id> --registry <address> --publisher <address>",
+            "node_connect": "loveengine node connect --invite <file> --trust-policy <policy> --package <archive> --profile <profile> --rpc-url <url> --address <node>",
             "pilot_serve": "loveengine pilot serve --config <path>",
             "pilot_quickstart": "loveengine pilot quickstart --root <dir> --headless",
             "pilot_status": "loveengine pilot status --url <url>",
             "pilot_chain": "loveengine pilot chain init|start|status|snapshot|restore",
             "explicit_vote": "loveengine witness vote approve",
-            "pilot_demo": "loveengine demo lan-pilot --events 12 --observers 10",
-            "pilot_transcript_verify": "loveengine pilot transcript verify <path>",
+            "pilot_demo": "loveengine demo lan-pilot --stage core --events 12 --observers 10",
+            "governance_demo": "loveengine demo lan-pilot --stage governance --events 12 --observers 10",
+            "pilot_transcript_verify": "loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]",
             "pilot_soak": "loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10",
+            "core_experiment": "powershell -File tools/run_core_experiments.ps1",
         }
     )
     value["package_hash"] = package_hash(value)
@@ -173,8 +230,8 @@ def refresh_m0() -> None:
 
 
 def main() -> None:
-    refresh_current()
     refresh_m0()
+    refresh_current()
     print("LoveEngine current and M0 manifest hashes refreshed")
 
 

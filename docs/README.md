@@ -1,42 +1,53 @@
 # LoveEngine documentation
 
-## Active specifications
+## Start here
 
-- `specs/love-engine-master-plan.md`: authoritative roadmap and status.
-- `specs/love-engine-contract-public-pilot-spec.md`: active M6 contract fusion and public pilot readiness specification.
+- [Repository README](../README.md)：项目边界、版本状态和本机入口。
+- [Meeting Q&A](../QA.md)：基于现有 33:42-51:06 会议片段的代码事实回答。
+- [Core architecture and data flow](architecture/witness-core-and-data-flow.zh-CN.md)：
+  角色、时序、存储、hash、合约和失败模式。
+- [Developer experiments](development/integration-guide.md)：从 package trust 到可选
+  governance 的五个实验。
 
-## API
+## Active authority
 
-- `api/loveengine-contract-api.md`: four UAS core contracts.
-- `api/agent-skill-api.md`: package, node, evidence and local-loop interfaces.
-- `api/agent-network-api.md`: SkillRegistry, Relay and M3 network protocol.
-- `api/extension-interfaces.md`: replaceable transport, signer, live, storage and read-model ports.
-- `api/lan-pilot-api.md`: package, LAN/Tailscale control plane, invite, observation, chain, voting and recovery interfaces.
-- `api/cli-reference.md`: complete CLI, operational, background soak and verification commands.
+1. [Engineering master plan](specs/love-engine-master-plan.md)
+2. [Witness Core Optimization SPEC](specs/love-engine-witness-core-optimization.md)
+3. [API documents](api/README.md)
+4. [Role runbooks](development/participant-runbook.zh-CN.md)
 
-## Development
+0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。公司直播、
+SSH/Tailscale、公网和测试网不属于当前已完成能力。
 
-- `development/integration-guide.md`: developer onboarding and verification.
-- `development/repository-structure.md`: current layout and authority boundaries.
-- `development/contract-team-handoff.md`: contract mapping and governance questions.
-- `development/m6-demo-docs-publication-plan.md`: M6.8 closeout, screenshot runbook and publication checklist.
-- `development/m3-demo-runbook.md`: presentation sequence.
-- `development/m3-acceptance-report.md`: verified M3 evidence.
-- `development/m4-skill-supervision-and-next-stage-gaps.md`: M4 architecture review, missing pieces and next-stage supervision baseline.
-- `development/m5-acceptance-report.md`: M5 verification report.
-- `development/participant-runbook.zh-CN.md`: role-based operator, node, voting witness and viewer instructions.
-- `development/runbooks/`: detailed Chinese role walkthroughs with UI screenshots.
-- `development/contract2-comparison-and-recommendations.md`: contract-team v2 comparison and fusion recommendations.
+## Development and operations
 
-## Articles
+- [Repository structure](development/repository-structure.md)
+- [Contract-team v2 comparison](development/contract2-comparison-and-recommendations.md)
+- [Operator](development/runbooks/operator-flow.zh-CN.md)
+- [Observation node](development/runbooks/observation-node-flow.zh-CN.md)
+- [Voting witness](development/runbooks/voting-witness-flow.zh-CN.md)
+- [Read-only viewer](development/runbooks/public-viewer-flow.zh-CN.md)
+- [Publisher](development/runbooks/publisher-flow.zh-CN.md)
+- [Technical architecture article](articles/loveengine-technical-architecture.zh-CN.md)
 
-- `articles/loveengine-technical-architecture.zh-CN.md`: technical architecture and stack rationale for the M6 pilot.
+## Historical evidence
 
-## Sources and archive
+M3-M6 runbooks, supervision notes, acceptance reports and closeout plans are historical
+records, not current authority:
 
-- `reference/source-materials/current/`: current preserved source constraints.
-- `reference/licenses/scc0-provenance.md`: adopted SCC0 license source and exact provenance.
-- `archive/source-materials/2026-06-22/`: historical source materials.
-- `archive/specs/implemented/`: implemented M1/M2/M3/M4/M5 specifications.
-- `archive/planning/2026-06-21/`: superseded plans.
-- `kb/source-inventory.md` and `kb/sources.json`: inventories.
+- development/m3-demo-runbook.md
+- development/m3-acceptance-report.md
+- development/m4-skill-supervision-and-next-stage-gaps.md
+- development/m5-acceptance-report.md
+- archive/planning/2026-06-23/m5-release-closeout-plan.md
+- archive/planning/2026-06-24/m6-demo-docs-publication-plan.md
+
+Implemented specs live under archive/specs/implemented/. Superseded plans and older source
+materials remain under archive/ and are not rewritten.
+
+## Preserved sources
+
+- reference/source-materials/current/：当前业务来源约束。
+- reference/source-materials/meeting-transcripts/：原样会议转写材料。
+- reference/contracts/contract-team-v2/：原样协作者合约输入。
+- [Source inventory](kb/source-inventory.md) / kb/sources.json：来源、状态和角色清单。

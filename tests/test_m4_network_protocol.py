@@ -5,11 +5,46 @@ from eth_account import Account
 from eth_account.messages import encode_typed_data
 
 from loveengine_witness.errors import LoveEngineError
-from loveengine_witness.m4_network import build_task_v2, verify_task_v2
+from loveengine_witness.m4_network import (
+    build_node_profile_v2,
+    build_task_v2,
+    verify_task_v2,
+)
 from loveengine_witness.m4_typed_data import build_task_v2_typed_data
 
 
 REGISTRY = "0x00000000000000000000000000000000000000aa"
+
+
+@pytest.mark.parametrize("task_type", ["propagate_skill", "observe_broadcast"])
+def test_v2_rejects_task_types_owned_by_v1(task_type: str) -> None:
+    with pytest.raises(LoveEngineError) as exc:
+        build_task_v2(
+            chain_id="31337",
+            registry=REGISTRY,
+            task_id=f"legacy-{task_type}",
+            task_type=task_type,
+            issuer=Account.create().address,
+            recipient=Account.create().address,
+            manifest_hash="0x" + "11" * 32,
+            payload={},
+            nonce="1",
+            deadline="1770000100",
+        )
+
+    assert exc.value.code == "unsupported_task_type"
+
+
+def test_v2_profile_rejects_capabilities_owned_by_v1() -> None:
+    with pytest.raises(LoveEngineError) as exc:
+        build_node_profile_v2(
+            Account.create().address,
+            ["observe_live_text", "observe_broadcast"],
+            "1",
+            "1770000100",
+        )
+
+    assert exc.value.code == "unsupported_capability"
 
 
 def test_v2_task_uses_domain_version_two_and_detects_tampering() -> None:
@@ -37,6 +72,8 @@ def test_v2_task_uses_domain_version_two_and_detects_tampering() -> None:
         expected_chain_id="31337",
         expected_registry=REGISTRY,
         expected_recipient=recipient.address,
+        expected_issuer=issuer.address,
+        expected_manifest_hash=task["manifest_hash"],
         now=1770000000,
     ) == issuer.address
 
@@ -47,6 +84,37 @@ def test_v2_task_uses_domain_version_two_and_detects_tampering() -> None:
             expected_chain_id="31337",
             expected_registry=REGISTRY,
             expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=task["manifest_hash"],
             now=1770000000,
         )
     assert exc.value.code == "payload_hash_mismatch"
+
+    malicious_issuer = Account.create()
+    malicious = build_task_v2(
+        chain_id="31337",
+        registry=REGISTRY,
+        task_id="review-d1-node-2",
+        task_type="review_dispute",
+        issuer=malicious_issuer.address,
+        recipient=recipient.address,
+        manifest_hash="0x" + "11" * 32,
+        payload={"dispute_id": "d1", "bundle_hash": "0x" + "22" * 32},
+        nonce="2",
+        deadline="1770000100",
+    )
+    malicious["signature"] = "0x" + Account.sign_message(
+        encode_typed_data(full_message=build_task_v2_typed_data(malicious)),
+        malicious_issuer.key,
+    ).signature.hex()
+    with pytest.raises(LoveEngineError) as exc:
+        verify_task_v2(
+            malicious,
+            expected_chain_id="31337",
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=malicious["manifest_hash"],
+            now=1770000000,
+        )
+    assert exc.value.code == "wrong_issuer"

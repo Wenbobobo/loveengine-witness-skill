@@ -1,26 +1,33 @@
 # LoveEngine Witness Skill Agent Onboarding
 
-This M0 package is for an Agent that wants to join, verify, and propagate the LoveEngine Witness Skill. LoveEngine Witness Skill is first a UAS witness protocol Skill for an Agent network, not a centralized web product. Do not start by building a full web platform, UHAH, multi-company payment routing, or multimodal livestream product.
+This onboarding covers the current Witness Skill and its frozen M0 compatibility
+package. LoveEngine Witness Skill is the first UAS vertical slice for an Agent
+network, not a centralized web product. Do not start by building a full web
+platform, UHAH, multi-company payment routing, or multimodal livestream product.
 
 Read order:
 
 1. `skills/loveengine-witness/skill-manifest.json` (current)
 2. `skills/loveengine-witness/skill-manifest.m0.json` (M0 compatibility)
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-live-evidence-pilot-spec.md`
+4. `docs/specs/love-engine-witness-core-optimization.md`
 5. `docs/api/extension-interfaces.md`
 6. `docs/reference/source-materials/current/UAS接口文档.md`
 7. `docs/reference/source-materials/current/UAS 见证方案 2.0.md`
 8. `docs/kb/source-inventory.md`
 
-Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source of truth and `docs/specs/love-engine-live-evidence-pilot-spec.md` is the active implementation spec. Implemented specs and preserved source materials remain under `docs/archive/` and `docs/reference/`; do not rewrite them in place.
+Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source
+of truth and `docs/specs/love-engine-witness-core-optimization.md` is the active
+implementation spec. Implemented specs and preserved source materials remain
+under `docs/archive/` and `docs/reference/`; do not rewrite them in place.
 
 Install and verify:
 
 1. Parse `skill-manifest.json`.
-2. Verify `package_hash`.
+2. Verify current packages against the active Registry release; internal-only
+   checks must be explicitly reported as `trust_bound: false`.
 3. Verify each `source_refs` path exists and matches `source_hashes`.
-4. Verify `spec_hash`.
+4. For M0 compatibility only, verify the M0 `spec_hash` and package hash.
 5. Run `python tools/validate_loveengine_m0.py`.
 6. Read this onboarding file before declaring node capabilities.
 
@@ -52,4 +59,4 @@ Governance parameters:
 
 M0 compatibility manifest spec hash:
 
-`sha256:327a40c56763cf901a6be48b40e7d403b0598b8f17892275aa97647b66af8ee3`
+`sha256:6a582314dae3b4fcbef77c18fbba102c49a0d1606cbcafe7a8bface1737182ea`

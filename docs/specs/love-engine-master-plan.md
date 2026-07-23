@@ -1,61 +1,94 @@
-# LoveEngine Witness Skill master plan
+# LoveEngine engineering master plan
 
-状态：`current`  
-更新日期：2026-06-24
+状态：current
+工作目标：0.6.1-contract-public-pilot candidate
+最新 Git tag：v0.6.0-contract-public-pilot
+更新日期：2026-07-23
 
 本文是唯一活动工程总规划。当前实施规格是
-`love-engine-contract-public-pilot-spec.md`；已完成规格保存在
-`docs/archive/specs/implemented/`。
+[Witness Core Optimization SPEC](love-engine-witness-core-optimization.md)。
+已完成规格在 ../archive/specs/implemented/，原始资料在 ../reference/ 和
+../archive/source-materials/，不得原地改写。
 
-## Direction
+## 三层关系
 
-LoveEngine 首先是可被 Agent 网络验证、安装、传播和运行的 UAS 见证协议 Skill，不是中心化福利网站。
+1. **NaturalDAO / Proof of Love（PoL）**是总体社会协作愿景，关注公共善意、
+   教育和协作怎样形成可持续制度。
+2. **LoveEngine / UAS**是愿景中的公共见证、治理输入和会计协议层。UTO 是公共
+   会计单位，不是可交易资产。
+3. **LoveEngine Witness Skill**是本仓库实现的第一条可验证纵向切片。Agent
+   见证、存证和整理公众反馈，不替用户执行、投票或裁决事实。
 
-所有阶段遵守：
+本仓库当前只有一个正式 Skill。第二个通用 LoveEngine consensus Skill 仍是愿景，
+不属于已实现能力。
 
-- 私钥不进入 Agent context、日志、fixture 或 transcript。
-- 任务和签名绑定 chainId、verifying contract、主体、payload hash、nonce 和 deadline。
-- 原始证据不上链，只保存 hash。
-- Relay、直播平台、存储和展示层不是信任根。
-- UTO 是公共记账单位，不是可交易资产。
-- 治理值保持部署或治理可配置。
+## 当前基线
 
-## Current baseline
+- M0-M4：兼容 schema、codec、fixture 和 transcript reader 保留，默认文档不再
+  以阶段历史组织使用流程。
+- M5 / v0.5.0-lan-pilot：确定性包、Relay、证据、三 Agent 观察、snapshot 和
+  package-to-chain 实验基线。
+- M6 / v0.6.0-contract-public-pilot：最新发布 tag，是本机 Anvil/LAN 合约融合
+  基线，不代表 Tailscale、公网或测试网部署。
+- 0.6.1 candidate：修复信任边界、拆分核心/治理实验、建立可解释实验和文档。
+  wire protocol 保持 loveengine-witness-net/0.6。
 
-- **M0**：完成，兼容版本 `0.1.1-m0`。manifest/source/package hash 可复算，篡改被拒绝。
-- **M1**：完成。JSON Schema、canonical JSON、hash、CLI 和稳定错误码已实现。
-- **M2**：完成，标签 `v0.2.0-local-loop`。四合约、五见证者 E2E 和 69 签名测试已实现。
-- **M3**：完成，标签 `v0.3.0-network-pilot`。SkillRegistry、Relay、三节点任务与 transcript 已实现。
-- **M3.1**：完成，标签 `v0.3.1-demo-ready`。Git、双语 README、演示入口和扩展接口已收口。
-- **M4**：完成，标签 `v0.4.0-live-evidence-pilot`。通用文字流、证据、三节点争议复核、ProposalGate、只读面板和 E2E 已实现。
-- **M5**：完成，标签 `v0.5.0-lan-pilot`。标准 Skill、确定性发布包、局域网真实文字直播、观察回执、统一链上 E2E、故障恢复与 soak 运行器已实现。
-- **M6**：进行中，目标 `0.6.0-contract-public-pilot`。吸收 contract-team v2 的业务结构和中文 NatSpec，同时保留当前签名安全边界；补齐参与者上手、Plugin 分发、Tailscale/Debian 真实试点与公网/测试网预备配置。
-- **M7**：未来。企业补偿申请、表决、记录和公开查询。
+当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
+签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
+还能验证本机交易、code hash 和 PublicSink 状态。
 
-## M5 acceptance baseline
+当前代码不能证明远程网络已部署、生产身份可信、公众陈述为真、Agent 在社会关系
+上独立、artifact 长期可用，或公司直播已接入。
 
-- Codex 可发现、跨平台可移植的薄 `SKILL.md`。
-- 可重复构建并由 SkillRegistry package hash 绑定的确定性 ZIP。
-- 带写入 token、操作页面、readiness、指标和审计日志的局域网 Pilot Server。
-- 三个 Agent 通过 Relay 执行真实 `observe_live_text` 并签名观察回执。
-- 持久化 Anvil、显式 CLI 投票批准和重启恢复。
-- 从 Skill 安装、文字直播到 PublicSink 查询的 `PilotTranscriptV1`。
-- 3 节点、10 观察者、4 小时正式试点运行器与验收报告。
+## 默认主路径
 
-## Active M6 scope
+    source inventory -> deterministic ZIP -> SkillRegistry release
+    -> NodeTrustPolicyV1 + bootstrap
+    -> signed Agent tasks/receipts
+    -> content-addressed evidence
+    -> critical dispute review
+    -> ProposalGate
+    -> WitnessCoreTranscriptV1
 
-包括 contract2 preserved reference、合约融合、M6 target ABI、参与者运行手册、
-双语 operator/dashboard、PilotInvite、Plugin 包装、Tailscale/Debian 运行配置、
-公网 base URL 抽象、可选测试网 Gate 和统一 transcript 验收。
+默认路径在 ProposalGate 结束。ProposalGate 只检查 finalized evidence 和未解决的
+critical dispute；它不裁决事实、不签名、不提交交易，也不是链上权限控制。
 
-当前不包括真实直播平台 SDK、视频处理、多模态推理、生产身份、生产密钥托管、
-P2P、HA、端到端加密、自动投票、主网部署和企业补偿深水区。
+可选 governance stage 才进入 explicit witness approvals、WitnessDAO 和 PublicSink，
+并生成 PilotTranscriptV2。四个 UAS 业务合约不再代表 Witness Skill 本体。
+
+## 不可破坏的边界
+
+- 私钥、助记词、keystore 和写 token 不进入 Agent context、CLI 参数、日志、
+  fixture、snapshot 或 transcript。
+- invite 不是信任根；节点执行任务前必须用外部 NodeTrustPolicyV1 和 RPC
+  Registry 事实绑定 release。
+- Relay 只接受 bootstrap 成员，并把 receipt 绑定到鉴权连接及 pending task。
+- finalize 必须重新读取 artifact；GET 接口不改变 evidence。
+- Observation Agent 不签 vote；治理投票只能由 witness 通过外部 RPC signer
+  显式批准。
+- PublicSink 只读；UTO 不是可交易资产。
+- contract-team v2 preserved copy 不原地修改；融合判断记录在开发文档。
+
+## 后续路线
+
+完成 0.6.1 本机核心实验后，下一阶段仍需逐项决策和验收：
+
+- 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
+- PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
+- UHAH：只在真实需求和独立安全审计成立后评估。
+- 单支付公司真实合作：先明确合规、数据来源、调度和 signer，再接一个受约束
+  合作方；本轮不实现。
+- 部署门：SSH/Tailscale、外部 signer、公共测试网、TLS、生产身份、监控、备份
+  和 HA 分别验收，不能由本机 demo 推断。
+- 治理协议：多场排期和链上强制 Gate 需要独立合约设计与审计，不在 0.6.1 修改
+  ABI。
 
 ## Authority order
 
 1. 本文。
-2. `docs/specs/love-engine-contract-public-pilot-spec.md`。
-3. `docs/api/`。
-4. `docs/reference/source-materials/current/`。
-5. `docs/archive/specs/implemented/`。
-6. `docs/archive/source-materials/`。
+2. [Witness Core Optimization SPEC](love-engine-witness-core-optimization.md)。
+3. [核心架构与数据流](../architecture/witness-core-and-data-flow.zh-CN.md)。
+4. ../api/ 下的当前接口文档。
+5. ../development/contract2-comparison-and-recommendations.md。
+6. ../reference/source-materials/current/。
+7. ../archive/specs/implemented/ 和 ../archive/source-materials/。

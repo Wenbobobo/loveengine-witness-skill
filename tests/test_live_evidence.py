@@ -116,6 +116,17 @@ def test_finalize_is_stable_and_closed_session_is_immutable(tmp_path: Path) -> N
     assert exc.value.code == "session_closed"
 
     artifact_path = artifacts.path_for(first["events"][0]["artifact_hash"])
+    artifact_path.write_bytes(b"tampered")
+    with pytest.raises(LoveEngineError) as exc:
+        finalize_evidence_bundle(
+            metadata,
+            artifacts,
+            "session-2",
+            revision="2",
+            finalized_at=str(int(NOW) + 21),
+        )
+    assert exc.value.code == "artifact_hash_mismatch"
+
     artifact_path.unlink()
     with pytest.raises(LoveEngineError) as exc:
         finalize_evidence_bundle(
@@ -126,3 +137,34 @@ def test_finalize_is_stable_and_closed_session_is_immutable(tmp_path: Path) -> N
             finalized_at=str(int(NOW) + 21),
         )
     assert exc.value.code == "artifact_missing"
+
+
+def test_finalize_reloads_artifact_and_rejects_content_mismatch(
+    tmp_path: Path,
+) -> None:
+    metadata, artifacts = _store(tmp_path)
+    metadata.create_session(build_live_session("session-3", "fixture", NOW))
+    artifact_hash = artifacts.put(b"different bytes")
+    event = build_live_event(
+        event_id="event-1",
+        session_id="session-3",
+        sequence="1",
+        occurred_at=NOW,
+        category="source",
+        source_type="fixture",
+        content="claimed content",
+        artifact_hash=artifact_hash,
+        previous_event_hash="0x" + "00" * 32,
+    )
+    metadata.append_event(event)
+    metadata.close_session("session-3", str(int(NOW) + 1))
+
+    with pytest.raises(LoveEngineError) as exc:
+        finalize_evidence_bundle(
+            metadata,
+            artifacts,
+            "session-3",
+            revision="1",
+            finalized_at=str(int(NOW) + 2),
+        )
+    assert exc.value.code == "artifact_content_mismatch"

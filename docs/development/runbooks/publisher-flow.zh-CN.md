@@ -1,77 +1,42 @@
 # 发布者流程
 
-适用角色：发布者 / Publisher
-适用版本：`0.6.0-contract-public-pilot`
+适用目标：0.6.1-contract-public-pilot candidate
 
-发布者负责构建确定性 ZIP，发布 SkillRegistry release，并维护版本状态。Plugin
-或 marketplace 只是分发入口；协议信任根仍是 SkillRegistry 上的 package hash。
+Publisher 构建确定性 ZIP、生成未提交的 Registry publish plan，并在外部 signer
+提交后执行只读验证。仓库 CLI 当前不会直接发送 publish transaction。
 
-## 1. 构建确定性 ZIP
+## Build 与本地完整性
 
 ```powershell
-uv sync --frozen
 uv run loveengine package build --output .\dist
+uv run loveengine package verify <archive.zip> --integrity-only
 ```
 
-构建器会固定路径顺序、时间戳、权限和分隔符，并拒绝：
+integrity-only 验证完整、非空 checksums，manifest/source hashes，release metadata、
+必要文件、路径/大小和秘密文件规则，但必须返回 trust_bound: false。
 
-- 绝对路径；
-- 路径穿越；
-- 符号链接；
-- `.venv`、缓存、日志、token、私钥、keystore 等秘密文件。
-
-## 2. 校验 ZIP
+## 可信验证与安装
 
 ```powershell
-uv run loveengine package verify .\dist\loveengine-witness-0.6.0-contract-public-pilot.zip
+uv run loveengine package verify <archive.zip> --expected-package-hash <registry-keccak>
+uv run loveengine package install <archive.zip> --target .\install-smoke --expected-package-hash <registry-keccak>
+uv run loveengine package self-check --root .\install-smoke --expected-package-hash <registry-keccak>
 ```
 
-预期输出包含 ZIP 的 `keccak256`、checksums 和 SBOM 结果。相同提交重复构建应得
-到相同 archive hash。
+expected-package-hash 是 actual ZIP bytes 的 Keccak-256，不是 manifest 中
+sha256:... 的自引用 package hash。安装在临时目录完成全部验证后才切换 target。
 
-## 3. 安装到全新目录自检
+## Registry plan 与只读确认
 
 ```powershell
-uv run loveengine package install `
-  .\dist\loveengine-witness-0.6.0-contract-public-pilot.zip `
-  --target .\install-smoke
-
-uv run loveengine package self-check --root .\install-smoke
+uv run loveengine registry publish --input .\release-plan.json --dry-run
+uv run loveengine registry verify --rpc-url <rpc-url> --artifact <archive.zip> --chain-id <chain-id> --registry <registry> --publisher <publisher> --skill-id loveengine-witness --version 0.6.1-contract-public-pilot
 ```
 
-全新目录不能跳过 self-check。缺文件、checksum 错误或秘密文件都会失败。
+publish 只输出 calldata/交易计划；外部 signer 提交并确认后，verify 查询指定
+SkillRegistry 的 active release，比较 ZIP Keccak 和 manifest Keccak。旧
+--release 本地模式只返回 release_file_consistency 与 trust_bound: false。
 
-## 4. 发布 Registry release
-
-```powershell
-uv run loveengine registry publish --input .\release-plan.json
-uv run loveengine registry verify --input .\release-plan.json
-```
-
-release plan 必须绑定：
-
-- publisher；
-- skillId；
-- versionHash；
-- packageHash；
-- manifestHash；
-- previousVersionHash；
-- status。
-
-节点从 Relay 或其他镜像下载包，但必须用链上 packageHash 校验。
-
-## 5. 分发 Plugin 或 invite
-
-Codex 用户可通过 Plugin 发现工作流；非 Codex 或 headless 节点可使用 ZIP。两条
-路径都不能取代 Registry 校验。
-
-英文概览页面：
-
-![英文 operator 概览](../../assets/runbooks/common/operator-en-overview.png)
-
-![英文 viewer 概览](../../assets/runbooks/common/viewer-en-overview.png)
-
-## 6. 撤销或替换
-
-如果版本有问题，发布者应在 SkillRegistry 中把 release 标为 deprecated 或
-revoked，并指向 replacementVersionHash。revoked 版本不能重新激活。
+Plugin、marketplace、invite 或镜像只负责发现/传输，不能替代 Registry 和独立
+NodeTrustPolicyV1。出现问题时 Publisher 可把 release 标为 deprecated/revoked；
+revoked 不可恢复。

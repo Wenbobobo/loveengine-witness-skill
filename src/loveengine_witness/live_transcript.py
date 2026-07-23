@@ -52,12 +52,17 @@ def verify_live_transcript(value: dict[str, Any]) -> dict[str, Any]:
     }
     tasks_by_id: dict[str, dict[str, Any]] = {}
     issuer_nonces: set[tuple[str, str]] = set()
+    if not value["tasks"]:
+        raise LoveEngineError("task_quorum_missing", "review tasks are required")
+    expected_manifest_hash = value["tasks"][0]["manifest_hash"]
     for task in value["tasks"]:
         verify_task_v2(
             task,
             expected_chain_id=value["chain_id"],
             expected_registry=registry,
             expected_recipient=task["recipient"],
+            expected_issuer=value["bootstrap"]["publisher"],
+            expected_manifest_hash=expected_manifest_hash,
             now=int(task["deadline"]) - 1,
         )
         if task["task_id"] in tasks_by_id:

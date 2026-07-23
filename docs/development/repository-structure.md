@@ -4,11 +4,13 @@
 .
 ├── README.md
 ├── README.zh-CN.md
+├── QA.md
 ├── AGENTS.md
 ├── CONTRIBUTING.md
 ├── contracts/
 ├── docs/
 │   ├── api/
+│   ├── architecture/
 │   ├── archive/
 │   ├── decisions/
 │   ├── development/
@@ -25,9 +27,11 @@
 
 ## Active development
 
-- `docs/specs/`: master plan and active M4 SPEC only.
+- `docs/specs/`: the master plan and active Witness core optimization SPEC.
+- `docs/architecture/`: canonical core/data-flow explanations.
 - `docs/api/`: public protocol and replaceable port contracts.
-- `src/loveengine_witness/`: framework-independent domain/use cases plus adapters.
+- `src/loveengine_witness/`: domain/use cases, release trust, Agent session,
+  local pilot runtime and adapters.
 - `schemas/`: versioned wire contracts.
 - `contracts/`: four UAS contracts and SkillRegistry.
 - `examples/`: secret-free fixtures and transcripts.
@@ -35,6 +39,8 @@
 ## Preserved provenance
 
 - `docs/reference/source-materials/current/`: current source constraints.
+- `docs/reference/source-materials/meeting-transcripts/`: preserved meeting
+  transcripts; their header claims must be checked against the available body.
 - `docs/archive/source-materials/`: historical original material.
 - `docs/archive/specs/implemented/`: completed implementation specifications.
 - `docs/archive/planning/`: superseded plans.

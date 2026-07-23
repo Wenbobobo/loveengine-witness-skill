@@ -1,7 +1,7 @@
-# LoveEngine 的技术选型：把“可验证见证”做成可安装协议
+# LoveEngine Witness Skill 技术博客：把可验证见证做成可安装协议
 
 状态：`current`
-适用版本：`0.6.0-contract-public-pilot`
+适用版本：`0.6.1-contract-public-pilot`
 
 ## 1. 问题定义
 
@@ -167,7 +167,7 @@ uv run pytest -m "not integration" -q
 
 ```powershell
 uv run loveengine package build --output .\dist
-uv run loveengine package verify .\dist\loveengine-witness-0.6.0-contract-public-pilot.zip
+uv run loveengine package verify .\dist\loveengine-witness-0.6.1-contract-public-pilot.zip --expected-package-hash <registry-keccak>
 ```
 
 ```powershell

@@ -11,6 +11,7 @@ from typing import Any
 from aiohttp import web
 
 from .errors import LoveEngineError
+from .hashes import sha256_prefixed
 from .live_evidence import finalize_evidence_bundle
 from .live_protocol import build_live_event, build_live_session
 from .live_store import LocalArtifactStore, LiveMetadataStore
@@ -194,6 +195,23 @@ async def append_events(request: web.Request) -> web.Response:
     accepted = duplicates = 0
     results = []
     for raw in await _input_events(request):
+        content_bytes = raw["content"].encode("utf-8")
+        artifact_hash = sha256_prefixed(content_bytes)
+        claimed_artifact_hash = raw.get("artifact_hash")
+        if (
+            claimed_artifact_hash is not None
+            and claimed_artifact_hash != artifact_hash
+        ):
+            raise LoveEngineError(
+                "artifact_hash_mismatch",
+                "event artifact hash does not match its content",
+            )
+        stored_artifact_hash = artifacts.put(content_bytes)
+        if stored_artifact_hash != artifact_hash:
+            raise LoveEngineError(
+                "artifact_hash_mismatch",
+                "artifact store returned a non-content-addressed hash",
+            )
         existing = metadata.get_event(raw["event_id"])
         if existing is not None and all(
             existing.get(key) == raw.get(key)
@@ -203,7 +221,6 @@ async def append_events(request: web.Request) -> web.Response:
             results.append(existing)
             continue
         session = metadata.get_session(session_id)
-        artifact_hash = artifacts.put(raw["content"].encode("utf-8"))
         event = build_live_event(
             event_id=raw["event_id"],
             session_id=session_id,
@@ -212,7 +229,7 @@ async def append_events(request: web.Request) -> web.Response:
             category=raw["category"],
             source_type=raw.get("source_type", session["source_type"]),
             content=raw["content"],
-            artifact_hash=raw.get("artifact_hash", artifact_hash),
+            artifact_hash=artifact_hash,
             previous_event_hash=raw.get(
                 "previous_event_hash", session["head_event_hash"]
             ),
@@ -294,22 +311,26 @@ async def stream_events(request: web.Request) -> web.Response:
 
 
 async def get_evidence(request: web.Request) -> web.Response:
+    metadata, _ = _services(request)
+    return web.json_response(
+        metadata.get_bundle(request.match_info["session_id"])
+    )
+
+
+async def finalize_evidence(request: web.Request) -> web.Response:
     metadata, artifacts = _services(request)
     session_id = request.match_info["session_id"]
-    try:
-        bundle = metadata.get_bundle(session_id)
-    except LoveEngineError as exc:
-        if exc.code != "bundle_not_found":
-            raise
-        session = metadata.get_session(session_id)
-        bundle = finalize_evidence_bundle(
+    body = await request.json() if request.can_read_body else {}
+    session = metadata.get_session(session_id)
+    return web.json_response(
+        finalize_evidence_bundle(
             metadata,
             artifacts,
             session_id,
-            revision="1",
-            finalized_at=session["closed_at"],
+            revision=str(body.get("revision", "1")),
+            finalized_at=str(body.get("finalized_at", session["closed_at"])),
         )
-    return web.json_response(bundle)
+    )
 
 
 async def get_artifact(request: web.Request) -> web.Response:
@@ -375,6 +396,10 @@ def create_live_app(database: Path, artifact_root: Path) -> web.Application:
             web.get("/v1/live/sessions/{session_id}/events", get_events),
             web.get("/v1/live/sessions/{session_id}/stream", stream_events),
             web.get("/v1/live/sessions/{session_id}/evidence", get_evidence),
+            web.post(
+                "/v1/live/sessions/{session_id}/evidence/finalize",
+                finalize_evidence,
+            ),
             web.get("/v1/live/artifacts/{digest}", get_artifact),
             web.get("/demo/", dashboard_index),
             web.get("/v1/dashboard/sessions", dashboard_sessions),

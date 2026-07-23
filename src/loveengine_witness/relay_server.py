@@ -5,34 +5,29 @@ from __future__ import annotations
 import json
 import asyncio
 import secrets
-import time
 import math
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Awaitable, Callable, TypeVar
 
-from aiohttp import ClientSession, WSMsgType, web
+from aiohttp import WSMsgType, web
 from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
 from eth_utils import to_checksum_address
 
+from .agent_session import run_agent_session, run_with_keepalive
+from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
 from .network_protocol import (
-    build_receipt,
     verify_node_profile,
     verify_receipt,
     verify_task,
 )
-from .network_typed_data import build_receipt_typed_data
-from .hashes import keccak256_hex
 from .m4_network import (
-    build_receipt_v2,
     verify_node_profile_v2,
     verify_receipt_v2,
     verify_task_v2,
 )
-from .m4_typed_data import build_receipt_v2_typed_data
-from .observation import ObservationCursorStore, observe_live_session
 from .relay import RelayStore
 
 
@@ -46,31 +41,11 @@ async def _run_with_relay_keepalive(
     *,
     interval: float = 3.0,
 ) -> T:
-    """Run a long task while continuing to service the Relay WebSocket."""
+    """Compatibility wrapper around the shared session keepalive."""
 
-    task = asyncio.create_task(operation)
-    try:
-        while not task.done():
-            try:
-                message = await ws.receive_json(timeout=interval)
-            except TimeoutError:
-                if not task.done():
-                    await ws.send_json({"type": "heartbeat"})
-                continue
-            message_type = message.get("type")
-            if message_type == "task":
-                pending_messages.append(message)
-            elif message_type == "error":
-                raise LoveEngineError(
-                    str(message.get("code", "relay_error")),
-                    str(message.get("message", "Relay rejected long-running task")),
-                    4,
-                )
-        return await task
-    finally:
-        if not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+    return await run_with_keepalive(
+        ws, operation, pending_messages, interval=interval
+    )
 
 
 def parse_client_message(value: str) -> dict[str, Any]:
@@ -99,32 +74,94 @@ def verify_relay_profile_binding(
         bootstrap["registry"]
     ):
         raise LoveEngineError("wrong_registry", "profile Registry mismatch")
+    encoded = canonical_json_bytes(signed_profile)
+    if not any(
+        canonical_json_bytes(member) == encoded
+        for member in bootstrap.get("directory", [])
+    ):
+        raise LoveEngineError(
+            "profile_not_in_directory",
+            "profile is not a member of the signed bootstrap directory",
+        )
 
 
 def verify_task_for_node(
     task: dict[str, Any],
     signed_profile: dict[str, Any],
+    *,
+    expected_issuer: str | None,
+    allowed_issuers: list[str] | tuple[str, ...] | None = None,
+    expected_manifest_hash: str,
 ) -> str:
-    return verify_task(
+    schema_version = task.get("schema_version")
+    verifier = {
+        "loveengine.network-task/1": verify_task,
+        "loveengine.network-task/2": verify_task_v2,
+    }.get(schema_version)
+    if verifier is None:
+        raise LoveEngineError(
+            "unsupported_schema_version", str(schema_version)
+        )
+    expected_task_schema = {
+        "loveengine.signed-agent-node-profile/1": "loveengine.network-task/1",
+        "loveengine.signed-agent-node-profile/2": "loveengine.network-task/2",
+    }.get(signed_profile.get("schema_version"))
+    if schema_version != expected_task_schema:
+        raise LoveEngineError(
+            "task_profile_schema_mismatch",
+            "task codec does not match the authenticated profile codec",
+        )
+    signer = verifier(
         task,
         expected_chain_id=signed_profile["chain_id"],
         expected_registry=signed_profile["registry"],
         expected_recipient=signed_profile["profile"]["node"],
+        expected_issuer=expected_issuer,
+        expected_manifest_hash=expected_manifest_hash,
     )
+    if allowed_issuers is not None and signer.lower() not in {
+        to_checksum_address(issuer).lower() for issuer in allowed_issuers
+    }:
+        raise LoveEngineError("wrong_issuer", "task issuer is not allowed by policy")
+    if task["task_type"] not in signed_profile["profile"]["capabilities"]:
+        raise LoveEngineError(
+            "capability_not_declared",
+            f"node did not declare {task['task_type']}",
+        )
+    return signer
 
 
 def verify_profile(signed_profile: dict[str, Any]) -> str:
-    if signed_profile.get("schema_version") == "loveengine.signed-agent-node-profile/2":
+    schema_version = signed_profile.get("schema_version")
+    if schema_version == "loveengine.signed-agent-node-profile/2":
         return verify_node_profile_v2(signed_profile)
-    return verify_node_profile(signed_profile)
+    if schema_version == "loveengine.signed-agent-node-profile/1":
+        return verify_node_profile(signed_profile)
+    raise LoveEngineError("unsupported_schema_version", str(schema_version))
 
 
 def verify_relay_receipt(
-    receipt: dict[str, Any], chain_id: str, registry: str
+    receipt: dict[str, Any],
+    chain_id: str,
+    registry: str,
+    *,
+    expected_node: str | None = None,
 ) -> str:
-    if receipt.get("schema_version") == "loveengine.task-receipt/2":
-        return verify_receipt_v2(receipt, chain_id, registry)
-    return verify_receipt(receipt, chain_id, registry)
+    schema_version = receipt.get("schema_version")
+    if schema_version == "loveengine.task-receipt/2":
+        signer = verify_receipt_v2(receipt, chain_id, registry)
+    elif schema_version == "loveengine.task-receipt/1":
+        signer = verify_receipt(receipt, chain_id, registry)
+    else:
+        raise LoveEngineError(
+            "unsupported_schema_version", str(schema_version)
+        )
+    if expected_node is not None and signer != to_checksum_address(expected_node):
+        raise LoveEngineError(
+            "wrong_receipt_node",
+            "receipt signer does not match the authenticated node",
+        )
+    return signer
 
 
 def _signature_hex(value: bytes) -> str:
@@ -234,20 +271,33 @@ class RelayHub:
             return ws
 
         self.connected.add(node)
+        delivery_task: asyncio.Task[None] | None = None
         try:
-            await ws.send_json(
+            send_lock = asyncio.Lock()
+
+            async def send_json(value: dict[str, Any]) -> None:
+                async with send_lock:
+                    await ws.send_json(value)
+
+            await send_json(
                 {"type": "ack", "status": "authenticated", "node": node}
             )
             starts: dict[str, float] = {}
-            for message in self.store.pending(node):
-                starts[message.task_id] = perf_counter()
-                await ws.send_json(
-                    {
-                        "type": "task",
-                        "attempt": message.attempts,
-                        "task": json.loads(message.payload),
-                    }
-                )
+
+            async def deliver_pending() -> None:
+                while not ws.closed:
+                    for queued in self.store.pending(node, set(starts)):
+                        starts[queued.task_id] = perf_counter()
+                        await send_json(
+                            {
+                                "type": "task",
+                                "attempt": queued.attempts,
+                                "task": json.loads(queued.payload),
+                            }
+                        )
+                    await asyncio.sleep(0.05)
+
+            delivery_task = asyncio.create_task(deliver_pending())
 
             async for message in ws:
                 if message.type != WSMsgType.TEXT:
@@ -256,12 +306,12 @@ class RelayHub:
                     value = parse_client_message(message.data)
                 except LoveEngineError as exc:
                     self.rejected += 1
-                    await ws.send_json(
+                    await send_json(
                         {"type": "error", "code": exc.code, "message": exc.message}
                     )
                     continue
                 if value.get("type") == "heartbeat":
-                    await ws.send_json({"type": "heartbeat"})
+                    await send_json({"type": "heartbeat"})
                     continue
                 if value.get("type") == "ack":
                     task_id = value.get("task_id")
@@ -271,7 +321,7 @@ class RelayHub:
                         or task_id not in starts
                     ):
                         self.rejected += 1
-                        await ws.send_json(
+                        await send_json(
                             {"type": "error", "code": "invalid_task_ack"}
                         )
                         continue
@@ -282,44 +332,123 @@ class RelayHub:
                     continue
                 if value.get("type") != "receipt":
                     self.rejected += 1
-                    await ws.send_json(
+                    await send_json(
                         {"type": "error", "code": "unsupported_message"}
                     )
                     continue
                 try:
                     receipt = value["receipt"]
+                    task_id = receipt.get("task_id")
+                    if not isinstance(task_id, str) or task_id not in starts:
+                        raise LoveEngineError(
+                            "unassigned_receipt",
+                            "receipt does not match a task delivered to this connection",
+                        )
+                    state = self.store.task_state(node, task_id)
+                    if state is None:
+                        raise LoveEngineError(
+                            "unassigned_receipt",
+                            "receipt task is not assigned to the authenticated node",
+                        )
+                    if state["acked"] or state["receipt"] is not None:
+                        raise LoveEngineError(
+                            "duplicate_receipt", "task already has a receipt"
+                        )
+                    if not state["accepted"]:
+                        raise LoveEngineError(
+                            "task_not_accepted",
+                            "task must be accepted before submitting a receipt",
+                        )
+                    queued_task = json.loads(str(state["payload"]))
+                    if queued_task.get("task_id") != task_id:
+                        raise LoveEngineError(
+                            "queued_task_mismatch",
+                            "queued task ID does not match its Relay index",
+                        )
+                    if queued_task.get("chain_id") != self.bootstrap["chain_id"]:
+                        raise LoveEngineError(
+                            "wrong_chain_id", "queued task chainId mismatch"
+                        )
+                    if to_checksum_address(
+                        queued_task["registry"]
+                    ) != to_checksum_address(self.bootstrap["registry"]):
+                        raise LoveEngineError(
+                            "wrong_registry", "queued task Registry mismatch"
+                        )
+                    if to_checksum_address(
+                        queued_task["recipient"]
+                    ) != to_checksum_address(node):
+                        raise LoveEngineError(
+                            "wrong_recipient",
+                            "queued task recipient does not match authenticated node",
+                        )
+                    expected_receipt_schema = {
+                        "loveengine.network-task/1": "loveengine.task-receipt/1",
+                        "loveengine.network-task/2": "loveengine.task-receipt/2",
+                    }.get(queued_task.get("schema_version"))
+                    if receipt.get("schema_version") != expected_receipt_schema:
+                        raise LoveEngineError(
+                            "receipt_schema_mismatch",
+                            "receipt codec does not match the assigned task codec",
+                        )
                     verify_relay_receipt(
                         receipt,
                         self.bootstrap["chain_id"],
                         self.bootstrap["registry"],
+                        expected_node=node,
                     )
-                    self.store.ack(
+                    if receipt["nonce"] != queued_task["nonce"]:
+                        raise LoveEngineError(
+                            "receipt_nonce_mismatch",
+                            "receipt nonce does not match the assigned task",
+                        )
+                    if int(receipt["completed_at"]) > int(
+                        queued_task["deadline"]
+                    ):
+                        raise LoveEngineError(
+                            "receipt_after_deadline",
+                            "receipt completed after the assigned task deadline",
+                        )
+                    if not self.store.ack(
                         node,
-                        receipt["task_id"],
+                        task_id,
                         json.dumps(receipt, sort_keys=True),
-                    )
+                    ):
+                        raise LoveEngineError(
+                            "duplicate_receipt",
+                            "task receipt was already recorded",
+                        )
                     self.receipts.append(receipt)
-                    start = starts.get(receipt["task_id"])
+                    start = starts.get(task_id)
                     if start is not None:
                         self.completion_latencies_ms.append(
                             (perf_counter() - start) * 1000
                         )
-                    await ws.send_json(
+                    await send_json(
                         {
                             "type": "ack",
-                            "task_id": receipt["task_id"],
+                            "task_id": task_id,
                         }
                     )
                 except Exception as exc:
                     self.rejected += 1
-                    await ws.send_json(
+                    code = (
+                        exc.code if isinstance(exc, LoveEngineError) else "invalid_receipt"
+                    )
+                    message_text = (
+                        exc.message if isinstance(exc, LoveEngineError) else str(exc)
+                    )
+                    await send_json(
                         {
                             "type": "error",
-                            "code": "invalid_receipt",
-                            "message": str(exc),
+                            "code": code,
+                            "message": message_text,
                         }
                     )
         finally:
+            if delivery_task is not None:
+                delivery_task.cancel()
+                await asyncio.gather(delivery_task, return_exceptions=True)
             self.connected.discard(node)
         return ws
 
@@ -357,84 +486,20 @@ async def run_node_client(
     expected_tasks: int,
     sign_challenge: Callable[[str], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
+    *,
+    expected_issuer: str,
+    expected_manifest_hash: str,
 ) -> dict[str, Any]:
-    node = to_checksum_address(node_address)
-    completed: set[str] = set()
-    receipts: list[dict[str, Any]] = []
-    pending_messages: list[dict[str, Any]] = []
-    rejected = 0
-    async with ClientSession() as session:
-        async with session.ws_connect(url) as ws:
-            challenge = await ws.receive_json()
-            challenge_signature = sign_challenge(challenge["challenge"])
-            await ws.send_json(
-                {
-                    "type": "authenticate",
-                    "profile": signed_profile,
-                    "challenge_signature": challenge_signature,
-                }
-            )
-            authenticated = await ws.receive_json()
-            if authenticated.get("status") != "authenticated":
-                raise RuntimeError("relay authentication failed")
-            while len(receipts) < expected_tasks:
-                message = (
-                    pending_messages.pop(0)
-                    if pending_messages
-                    else await ws.receive_json(timeout=10)
-                )
-                if message.get("type") != "task":
-                    continue
-                task = message["task"]
-                if task["task_id"] in completed:
-                    rejected += 1
-                    continue
-                verify_task_for_node(task, signed_profile)
-                await ws.send_json(
-                    {
-                        "type": "ack",
-                        "task_id": task["task_id"],
-                        "status": "accepted",
-                    }
-                )
-                completed.add(task["task_id"])
-                receipt = build_receipt(
-                    chain_id=task["chain_id"],
-                    registry=task["registry"],
-                    task_id=task["task_id"],
-                    node=node,
-                    status="completed",
-                    result={
-                        "accepted_task_type": task["task_type"],
-                        "payload_hash": task["payload_hash"],
-                    },
-                    nonce=str(len(receipts)),
-                    completed_at=str(int(task["deadline"]) - 1),
-                )
-                receipt["signature"] = sign_typed_data(
-                    build_receipt_typed_data(receipt)
-                )
-                await ws.send_json({"type": "receipt", "receipt": receipt})
-                while True:
-                    ack = await ws.receive_json(timeout=10)
-                    if (
-                        ack.get("type") == "ack"
-                        and ack.get("task_id") == receipt["task_id"]
-                    ):
-                        break
-                    if ack.get("type") == "task":
-                        pending_messages.append(ack)
-                        continue
-                    raise RuntimeError(
-                        "relay did not acknowledge receipt: "
-                        + json.dumps(ack, sort_keys=True)
-                    )
-                receipts.append(receipt)
-    return {
-        "node": node,
-        "receipts": receipts,
-        "rejected": rejected,
-    }
+    return await run_agent_session(
+        url=url,
+        node_address=node_address,
+        signed_profile=signed_profile,
+        expected_tasks=expected_tasks,
+        expected_issuer=expected_issuer,
+        expected_manifest_hash=expected_manifest_hash,
+        sign_challenge=sign_challenge,
+        sign_typed_data=sign_typed_data,
+    )
 
 
 async def run_v2_review_client(
@@ -445,89 +510,21 @@ async def run_v2_review_client(
     verdicts: dict[str, str],
     sign_challenge: Callable[[str], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
+    *,
+    expected_issuer: str,
+    expected_manifest_hash: str,
 ) -> dict[str, Any]:
-    node = to_checksum_address(node_address)
-    completed: set[str] = set()
-    receipts: list[dict[str, Any]] = []
-    pending_messages: list[dict[str, Any]] = []
-    async with ClientSession() as session:
-        async with session.ws_connect(url) as ws:
-            challenge = await ws.receive_json()
-            await ws.send_json(
-                {
-                    "type": "authenticate",
-                    "profile": signed_profile,
-                    "challenge_signature": sign_challenge(challenge["challenge"]),
-                }
-            )
-            authenticated = await ws.receive_json()
-            if authenticated.get("status") != "authenticated":
-                raise RuntimeError("relay authentication failed")
-            while len(receipts) < expected_tasks:
-                message = (
-                    pending_messages.pop(0)
-                    if pending_messages
-                    else await ws.receive_json(timeout=10)
-                )
-                if message.get("type") != "task":
-                    continue
-                task = message["task"]
-                if task["task_id"] in completed:
-                    continue
-                verify_task_v2(
-                    task,
-                    expected_chain_id=signed_profile["chain_id"],
-                    expected_registry=signed_profile["registry"],
-                    expected_recipient=node,
-                )
-                await ws.send_json(
-                    {
-                        "type": "ack",
-                        "task_id": task["task_id"],
-                        "status": "accepted",
-                    }
-                )
-                completed.add(task["task_id"])
-                dispute_id = task["payload"]["dispute_id"]
-                verdict = verdicts[dispute_id]
-                result = {
-                    "dispute_id": dispute_id,
-                    "bundle_hash": task["payload"]["bundle_hash"],
-                    "verdict": verdict,
-                    "reason_hash": keccak256_hex(
-                        f"{dispute_id}:{verdict}".encode()
-                    ),
-                }
-                receipt = build_receipt_v2(
-                    chain_id=task["chain_id"],
-                    registry=task["registry"],
-                    task_id=task["task_id"],
-                    node=node,
-                    status="completed",
-                    result=result,
-                    nonce=task["nonce"],
-                    completed_at=str(int(task["deadline"]) - 1),
-                )
-                receipt["signature"] = sign_typed_data(
-                    build_receipt_v2_typed_data(receipt)
-                )
-                await ws.send_json({"type": "receipt", "receipt": receipt})
-                while True:
-                    ack = await ws.receive_json(timeout=10)
-                    if (
-                        ack.get("type") == "ack"
-                        and ack.get("task_id") == receipt["task_id"]
-                    ):
-                        break
-                    if ack.get("type") == "task":
-                        pending_messages.append(ack)
-                        continue
-                    raise RuntimeError(
-                        "relay did not acknowledge receipt: "
-                        + json.dumps(ack, sort_keys=True)
-                    )
-                receipts.append(receipt)
-    return {"node": node, "receipts": receipts}
+    return await run_agent_session(
+        url=url,
+        node_address=node_address,
+        signed_profile=signed_profile,
+        expected_tasks=expected_tasks,
+        expected_issuer=expected_issuer,
+        expected_manifest_hash=expected_manifest_hash,
+        sign_challenge=sign_challenge,
+        sign_typed_data=sign_typed_data,
+        verdicts=verdicts,
+    )
 
 
 async def run_v2_observation_client(
@@ -538,87 +535,21 @@ async def run_v2_observation_client(
     cursor_database: str,
     sign_challenge: Callable[[str], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
+    *,
+    expected_issuer: str,
+    expected_manifest_hash: str,
 ) -> dict[str, Any]:
-    node = to_checksum_address(node_address)
-    receipts: list[dict[str, Any]] = []
-    pending_messages: list[dict[str, Any]] = []
-    cursor_store = ObservationCursorStore(Path(cursor_database))
-    async with ClientSession() as session:
-        async with session.ws_connect(url) as ws:
-            challenge = await ws.receive_json()
-            await ws.send_json(
-                {
-                    "type": "authenticate",
-                    "profile": signed_profile,
-                    "challenge_signature": sign_challenge(challenge["challenge"]),
-                }
-            )
-            authenticated = await ws.receive_json()
-            if authenticated.get("status") != "authenticated":
-                raise RuntimeError("relay authentication failed")
-            while len(receipts) < expected_tasks:
-                message = (
-                    pending_messages.pop(0)
-                    if pending_messages
-                    else await ws.receive_json(timeout=30)
-                )
-                if message.get("type") != "task":
-                    continue
-                task = message["task"]
-                verify_task_v2(
-                    task,
-                    expected_chain_id=signed_profile["chain_id"],
-                    expected_registry=signed_profile["registry"],
-                    expected_recipient=node,
-                )
-                if task["task_type"] != "observe_live_text":
-                    raise LoveEngineError(
-                        "unsupported_task_type", task["task_type"]
-                    )
-                await ws.send_json(
-                    {
-                        "type": "ack",
-                        "task_id": task["task_id"],
-                        "status": "accepted",
-                    }
-                )
-                result = await _run_with_relay_keepalive(
-                    ws,
-                    observe_live_session(task["payload"], cursor_store, node),
-                    pending_messages,
-                )
-                receipt = build_receipt_v2(
-                    chain_id=task["chain_id"],
-                    registry=task["registry"],
-                    task_id=task["task_id"],
-                    node=node,
-                    status="completed",
-                    result=result,
-                    nonce=task["nonce"],
-                    completed_at=str(int(time.time())),
-                )
-                receipt["signature"] = sign_typed_data(
-                    build_receipt_v2_typed_data(receipt)
-                )
-                await ws.send_json({"type": "receipt", "receipt": receipt})
-                while True:
-                    ack = await ws.receive_json(timeout=10)
-                    if (
-                        ack.get("type") == "ack"
-                        and ack.get("task_id") == receipt["task_id"]
-                    ):
-                        break
-                    if ack.get("type") == "task":
-                        pending_messages.append(ack)
-                        continue
-                    if ack.get("type") == "heartbeat":
-                        continue
-                    raise RuntimeError(
-                        "relay did not acknowledge observation receipt: "
-                        + json.dumps(ack, sort_keys=True)
-                    )
-                receipts.append(receipt)
-    return {"node": node, "receipts": receipts}
+    return await run_agent_session(
+        url=url,
+        node_address=node_address,
+        signed_profile=signed_profile,
+        expected_tasks=expected_tasks,
+        expected_issuer=expected_issuer,
+        expected_manifest_hash=expected_manifest_hash,
+        sign_challenge=sign_challenge,
+        sign_typed_data=sign_typed_data,
+        cursor_database=Path(cursor_database),
+    )
 
 
 async def serve_forever(

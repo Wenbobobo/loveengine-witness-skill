@@ -7,6 +7,10 @@ import {ICorporateSink} from "./interfaces/ICorporateSink.sol";
 import {IStreamingEngine} from "./interfaces/IStreamingEngine.sol";
 
 contract WitnessDAO is EIP712 {
+    error ZeroAddress();
+    error InvalidMinimumVotes();
+    error InvalidApprovalThreshold();
+    error EmptyBatch();
     error InvalidSignature();
     error InvalidNonce();
     error SignatureExpired();
@@ -93,6 +97,7 @@ contract WitnessDAO is EIP712 {
     mapping(address => bool) public relayerRefundAllowed;
     mapping(address => uint256) public relayerRefundMaxWeiPerCall;
     mapping(address => uint256) public relayerRefundCredits;
+    uint256 public totalRelayerRefundCredits;
 
     event WitnessRegistered(address indexed witness);
     event ProposalCreated(
@@ -134,6 +139,16 @@ contract WitnessDAO is EIP712 {
         uint256 minValidVotes_,
         uint256 approvalThresholdBps_
     ) EIP712("LoveEngine WitnessDAO", "1") {
+        if (
+            streamingEngine_ == address(0) ||
+            corporateSink_ == address(0) ||
+            corporateAdmin_ == address(0)
+        ) revert ZeroAddress();
+        if (minValidVotes_ == 0) revert InvalidMinimumVotes();
+        if (
+            approvalThresholdBps_ == 0 ||
+            approvalThresholdBps_ > 10_000
+        ) revert InvalidApprovalThreshold();
         streamingEngine = IStreamingEngine(streamingEngine_);
         corporateSink = ICorporateSink(corporateSink_);
         corporateAdmin = corporateAdmin_;
@@ -203,6 +218,7 @@ contract WitnessDAO is EIP712 {
     function withdrawRelayerRefund() external {
         uint256 amount = relayerRefundCredits[msg.sender];
         relayerRefundCredits[msg.sender] = 0;
+        totalRelayerRefundCredits -= amount;
         (bool success,) = payable(msg.sender).call{value: amount}("");
         if (!success) revert RefundWithdrawalFailed();
         emit RelayerRefundWithdrawn(msg.sender, amount);
@@ -211,6 +227,7 @@ contract WitnessDAO is EIP712 {
     receive() external payable {}
 
     function batchRegister(RegisterSignature[] calldata signatures) external {
+        if (signatures.length == 0) revert EmptyBatch();
         uint256 startGas = gasleft();
         for (uint256 index = 0; index < signatures.length; index++) {
             RegisterSignature calldata item = signatures[index];
@@ -232,7 +249,7 @@ contract WitnessDAO is EIP712 {
             registeredWitnesses[item.witness] = true;
             emit WitnessRegistered(item.witness);
         }
-        _creditRelayerRefund(startGas);
+        _creditRelayerRefund(startGas, signatures.length);
     }
 
     function proposeUserCount(
@@ -282,6 +299,7 @@ contract WitnessDAO is EIP712 {
     }
 
     function batchVote(VoteSignature[] calldata signatures) external {
+        if (signatures.length == 0) revert EmptyBatch();
         uint256 startGas = gasleft();
         Proposal storage active = proposals[activeProposalId];
         if (active.active && block.timestamp > active.votingDeadline) {
@@ -343,7 +361,7 @@ contract WitnessDAO is EIP712 {
         ) {
             _execute(activeProposalId, active);
         }
-        _creditRelayerRefund(startGas);
+        _creditRelayerRefund(startGas, signatures.length);
     }
 
     function proposalPayloadHash(uint256 proposalId)
@@ -485,15 +503,23 @@ contract WitnessDAO is EIP712 {
         emit ProposalExecuted(proposalId);
     }
 
-    function _creditRelayerRefund(uint256 startGas) internal {
+    function _creditRelayerRefund(
+        uint256 startGas,
+        uint256 processedItems
+    ) internal {
+        if (processedItems == 0) return;
         if (!relayerRefundAllowed[msg.sender]) return;
         uint256 maxRefund = relayerRefundMaxWeiPerCall[msg.sender];
         if (maxRefund == 0) return;
         uint256 refund = (startGas - gasleft() + REFUND_BASE_OVERHEAD) *
             tx.gasprice;
         if (refund > maxRefund) refund = maxRefund;
+        uint256 availableBalance = address(this).balance -
+            totalRelayerRefundCredits;
+        if (refund > availableBalance) refund = availableBalance;
         if (refund == 0) return;
         relayerRefundCredits[msg.sender] += refund;
+        totalRelayerRefundCredits += refund;
         emit RelayerRefundCredited(msg.sender, refund);
     }
 }

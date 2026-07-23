@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/pilot-transcript-v2.schema.json",
+  "title": "PilotTranscriptV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "run_id", "version", "verified_at", "environment",
+    "actors_simulated", "verification_anchor", "package",
+    "release_anchor", "bootstrap", "chain", "session", "events",
+    "artifacts", "network_tasks", "observation_receipts",
+    "observation_set", "evidence_bundle", "dispute", "review_receipts",
+    "proposal_gate", "proposal", "vote_approvals", "transaction_receipts",
+    "contract_code_hashes", "final_state", "metrics", "faults", "snapshots",
+    "transcript_hash"
+  ],
+  "$defs": {
+    "address": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
+    "bytes32": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "uint": {"type": "string", "pattern": "^[0-9]+$"}
+  },
+  "properties": {
+    "schema_version": {"const": "loveengine.pilot-transcript/2"},
+    "run_id": {"type": "string", "minLength": 1},
+    "version": {"const": "0.6.1-contract-public-pilot"},
+    "verified_at": {"$ref": "#/$defs/uint"},
+    "environment": {"const": "local_anvil"},
+    "actors_simulated": {"const": true},
+    "verification_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["block_number", "block_hash", "timestamp"],
+      "properties": {
+        "block_number": {"$ref": "#/$defs/uint"},
+        "block_hash": {"$ref": "#/$defs/bytes32"},
+        "timestamp": {"$ref": "#/$defs/uint"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["archive", "archive_sha256", "archive_keccak256", "manifest_hash"],
+      "properties": {
+        "archive": {"type": "string", "minLength": 1},
+        "archive_sha256": {"$ref": "#/$defs/sha256"},
+        "archive_keccak256": {"$ref": "#/$defs/bytes32"},
+        "manifest_hash": {"$ref": "#/$defs/bytes32"}
+      }
+    },
+    "release_anchor": {"type": "object"},
+    "bootstrap": {"type": "object"},
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_id", "registry", "publisher", "witness_dao", "public_sink", "witnesses", "min_valid_votes", "contracts"],
+      "properties": {
+        "chain_id": {"$ref": "#/$defs/uint"},
+        "registry": {"$ref": "#/$defs/address"},
+        "publisher": {"$ref": "#/$defs/address"},
+        "witness_dao": {"$ref": "#/$defs/address"},
+        "public_sink": {"$ref": "#/$defs/address"},
+        "witnesses": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/address"}},
+        "min_valid_votes": {"type": "integer", "minimum": 1},
+        "contracts": {"type": "object", "minProperties": 3, "additionalProperties": {"$ref": "#/$defs/address"}}
+      }
+    },
+    "session": {"type": "object"},
+    "events": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_hash", "size"],
+        "properties": {
+          "artifact_hash": {"$ref": "#/$defs/sha256"},
+          "size": {"type": "integer", "minimum": 0}
+        }
+      }
+    },
+    "network_tasks": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "observation_receipts": {"type": "array", "minItems": 3, "items": {"type": "object"}},
+    "observation_set": {"type": "object"},
+    "evidence_bundle": {"type": "object"},
+    "dispute": {"type": "object"},
+    "review_receipts": {"type": "array", "minItems": 3, "items": {"type": "object"}},
+    "proposal_gate": {"type": "object"},
+    "proposal": {"type": "object"},
+    "vote_approvals": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "transaction_receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "transaction_hash", "block_number", "block_hash", "status"],
+        "properties": {
+          "action": {"type": "string", "minLength": 1},
+          "transaction_hash": {"$ref": "#/$defs/bytes32"},
+          "block_number": {"$ref": "#/$defs/uint"},
+          "block_hash": {"$ref": "#/$defs/bytes32"},
+          "status": {"const": "1"}
+        }
+      }
+    },
+    "contract_code_hashes": {
+      "type": "object",
+      "minProperties": 3,
+      "additionalProperties": {"$ref": "#/$defs/bytes32"}
+    },
+    "final_state": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["proposal_executed", "total_uto"],
+      "properties": {
+        "proposal_executed": {"const": true},
+        "total_uto": {"$ref": "#/$defs/uint"}
+      }
+    },
+    "metrics": {"type": "object"},
+    "faults": {"type": "object"},
+    "snapshots": {"type": "array"},
+    "transcript_hash": {"$ref": "#/$defs/sha256"}
+  }
+}

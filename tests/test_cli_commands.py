@@ -40,7 +40,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.6.0-contract-public-pilot"
+    assert output["version"] == "0.6.1-contract-public-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -326,18 +326,26 @@ def test_package_cli_build_verify_install_and_self_check(tmp_path: Path) -> None
     assert archive.is_file()
     assert built["archive_keccak256"].startswith("0x")
 
-    verify = run_cli("package", "verify", str(archive))
+    package_hash = built["archive_keccak256"]
+    verify = run_cli(
+        "package", "verify", str(archive),
+        "--expected-package-hash", package_hash,
+    )
     assert verify.returncode == 0, verify.stderr
     assert json.loads(verify.stdout)["valid"] is True
 
     target = tmp_path / "installed"
     install = run_cli(
-        "package", "install", str(archive), "--target", str(target)
+        "package", "install", str(archive), "--target", str(target),
+        "--expected-package-hash", package_hash,
     )
     assert install.returncode == 0, install.stderr
-    check = run_cli("package", "self-check", "--root", str(target))
+    check = run_cli(
+        "package", "self-check", "--root", str(target),
+        "--expected-package-hash", package_hash,
+    )
     assert check.returncode == 0, check.stderr
-    assert json.loads(check.stdout)["version"] == "0.6.0-contract-public-pilot"
+    assert json.loads(check.stdout)["version"] == "0.6.1-contract-public-pilot"
 
 
 def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
@@ -350,36 +358,49 @@ def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
     assert json.loads(status.stderr)["error"]["code"] == "pilot_unavailable"
 
 
-def test_pilot_quickstart_dry_run_writes_invite_without_secrets(
+def test_pilot_quickstart_dry_run_is_local_and_writes_nothing(
     tmp_path: Path,
 ) -> None:
+    root = tmp_path / "pilot"
     result = run_cli(
         "pilot",
         "quickstart",
         "--root",
-        str(tmp_path / "pilot"),
+        str(root),
         "--headless",
         "--dry-run",
         "--base-url",
-        "http://100.64.0.10:8780",
+        "http://127.0.0.1:8780",
     )
 
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["started"] is False
-    assert output["operator_url"] == "http://100.64.0.10:8780/operator/"
-    assert output["dashboard_url"] == "http://100.64.0.10:8780/demo/"
+    assert output["operator_url"] == "http://127.0.0.1:8780/operator/"
+    assert output["dashboard_url"] == "http://127.0.0.1:8780/demo/"
     assert output["headless"] is True
-    assert Path(output["token_file"]).is_file()
-    assert Path(output["invite_path"]).is_file()
+    assert output["writes_state"] is False
+    assert not root.exists()
+    assert not Path(output["token_file"]).exists()
+    assert "write_token" not in json.dumps(output).lower()
+    assert "private_key" not in json.dumps(output).lower()
 
-    invite = json.loads(Path(output["invite_path"]).read_text(encoding="utf-8"))
-    load_schema("pilot-invite-v1.schema.json").validate(invite)
-    assert invite["server_url"] == "http://100.64.0.10:8780"
-    assert invite["dashboard_url"] == "http://100.64.0.10:8780/demo/"
-    raw = json.dumps(invite)
-    assert "token" not in raw.lower()
-    assert "private_key" not in raw.lower()
+
+def test_pilot_quickstart_rejects_remote_bind_even_in_dry_run(tmp_path: Path) -> None:
+    result = run_cli(
+        "pilot",
+        "quickstart",
+        "--root",
+        str(tmp_path / "pilot"),
+        "--host",
+        "0.0.0.0",
+        "--base-url",
+        "http://100.64.0.10:8780",
+        "--dry-run",
+    )
+
+    assert result.returncode == 2
+    assert json.loads(result.stderr)["error"]["code"] == "quickstart_local_only"
 
 
 def test_node_connect_accepts_invite_file_for_relay_url(tmp_path: Path) -> None:
@@ -419,7 +440,7 @@ def test_node_connect_accepts_invite_file_for_relay_url(tmp_path: Path) -> None:
         "registry": "0x" + "12" * 20,
         "publisher": "0x" + "34" * 20,
         "skill_id": "loveengine-witness",
-        "version": "0.6.0-contract-public-pilot",
+        "version": "0.6.1-contract-public-pilot",
         "package_hash": "sha256:" + "56" * 32,
     }
     invite_path = tmp_path / "pilot-invite.json"
@@ -543,4 +564,4 @@ def test_pilot_snapshot_cli_has_stable_missing_file_error(tmp_path: Path) -> Non
         "pilot", "snapshot", "verify", str(tmp_path / "missing-snapshot")
     )
     assert result.returncode == 3
-    assert json.loads(result.stderr)["error"]["code"] == "file_not_found"
+    assert json.loads(result.stderr)["error"]["code"] == "snapshot_not_found"

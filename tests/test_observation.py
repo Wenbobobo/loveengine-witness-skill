@@ -111,6 +111,11 @@ def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
                 json={"closed_at": "1770000010"},
             )
             assert closed.status == 200
+            finalized = await client.post(
+                f"/v1/live/sessions/{session_id}/evidence/finalize",
+                json={"revision": "1", "finalized_at": "1770000011"},
+            )
+            assert finalized.status == 200
 
             base = str(client.make_url("")).rstrip("/")
             payload = {

@@ -57,12 +57,24 @@ def build_node_profile(
 def verify_node_profile(
     signed_profile: dict[str, Any],
     now: int | None = None,
+    *,
+    expected_chain_id: str | None = None,
+    expected_registry: str | None = None,
 ) -> str:
     reject_secret_fields(signed_profile)
     validate_schema(
         signed_profile,
         "signed-agent-node-profile-v1.schema.json",
     )
+    if (
+        expected_chain_id is not None
+        and signed_profile["chain_id"] != str(expected_chain_id)
+    ):
+        raise LoveEngineError("wrong_chain_id", "profile chainId mismatch")
+    if expected_registry is not None and to_checksum_address(
+        signed_profile["registry"]
+    ) != to_checksum_address(expected_registry):
+        raise LoveEngineError("wrong_registry", "profile Registry mismatch")
     if int(signed_profile["profile"]["valid_until"]) < _now(now):
         raise LoveEngineError("profile_expired", "node profile expired")
     signer = _recover(
@@ -122,8 +134,17 @@ def verify_bootstrap(
         raise LoveEngineError("bootstrap_expired", "bootstrap expired")
     if bootstrap["directory_hash"] != payload_hash(bootstrap["directory"]):
         raise LoveEngineError("directory_hash_mismatch", "directory was modified")
+    nodes: set[str] = set()
     for signed_profile in bootstrap["directory"]:
-        verify_node_profile(signed_profile, now=now)
+        node = verify_node_profile(
+            signed_profile,
+            now=now,
+            expected_chain_id=bootstrap["chain_id"],
+            expected_registry=bootstrap["registry"],
+        )
+        if node in nodes:
+            raise LoveEngineError("duplicate_directory_node", node)
+        nodes.add(node)
     signer = _recover(
         build_bootstrap_typed_data(
             bootstrap["chain_id"],
@@ -171,18 +192,18 @@ def build_task(
     return value
 
 
-def verify_task(
+def verify_task_binding(
     task: dict[str, Any],
     *,
     expected_chain_id: str,
     expected_registry: str,
     expected_recipient: str,
+    expected_issuer: str | None = None,
+    expected_manifest_hash: str | None = None,
     now: int | None = None,
-) -> str:
-    reject_secret_fields(task)
-    validate_schema(task, "network-task-v1.schema.json")
-    if task["task_type"] not in TASK_TYPES:
-        raise LoveEngineError("unsupported_task_type", task["task_type"])
+) -> None:
+    """Verify task fields that are invariant across the V1 and V2 codecs."""
+
     if task["chain_id"] != str(expected_chain_id):
         raise LoveEngineError("wrong_chain_id", "task chainId mismatch")
     if to_checksum_address(task["registry"]) != to_checksum_address(
@@ -193,10 +214,44 @@ def verify_task(
         expected_recipient
     ):
         raise LoveEngineError("wrong_recipient", "task recipient mismatch")
+    if expected_issuer is not None and to_checksum_address(
+        task["issuer"]
+    ) != to_checksum_address(expected_issuer):
+        raise LoveEngineError("wrong_issuer", "task issuer mismatch")
+    if (
+        expected_manifest_hash is not None
+        and task["manifest_hash"].lower() != expected_manifest_hash.lower()
+    ):
+        raise LoveEngineError("wrong_manifest_hash", "task manifest hash mismatch")
     if int(task["deadline"]) < _now(now):
         raise LoveEngineError("task_expired", "task deadline passed")
     if task["payload_hash"] != payload_hash(task["payload"]):
         raise LoveEngineError("payload_hash_mismatch", "task payload was modified")
+
+
+def verify_task(
+    task: dict[str, Any],
+    *,
+    expected_chain_id: str,
+    expected_registry: str,
+    expected_recipient: str,
+    expected_issuer: str | None = None,
+    expected_manifest_hash: str | None = None,
+    now: int | None = None,
+) -> str:
+    reject_secret_fields(task)
+    validate_schema(task, "network-task-v1.schema.json")
+    if task["task_type"] not in TASK_TYPES:
+        raise LoveEngineError("unsupported_task_type", task["task_type"])
+    verify_task_binding(
+        task,
+        expected_chain_id=expected_chain_id,
+        expected_registry=expected_registry,
+        expected_recipient=expected_recipient,
+        expected_issuer=expected_issuer,
+        expected_manifest_hash=expected_manifest_hash,
+        now=now,
+    )
     signer = _recover(build_task_typed_data(task), task["signature"])
     if signer != to_checksum_address(task["issuer"]):
         raise LoveEngineError("invalid_signature", "task signature mismatch")

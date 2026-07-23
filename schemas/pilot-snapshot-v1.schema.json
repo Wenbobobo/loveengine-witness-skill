@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/pilot-snapshot-v1.schema.json",
+  "title": "PilotSnapshotV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "created_at", "retention_days"],
+  "properties": {
+    "schema_version": {"const": "loveengine.pilot-snapshot/1"},
+    "run_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"},
+    "created_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "retention_days": {"type": "string", "pattern": "^[0-9]+$"}
+  }
+}

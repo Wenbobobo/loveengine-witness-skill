@@ -1,67 +1,73 @@
 # Live evidence API
 
-状态：M4 local implemented  
-协议版本：`loveengine-witness-net/0.4`
+状态：本机实现
+当前 wire protocol：loveengine-witness-net/0.6（历史 M4 domain version 2 保留）
 
-## HTTP gateway
+## HTTP
 
-默认监听 `127.0.0.1:8780`。M4 仅用于本地试点，不提供生产鉴权。
-
-| Method | Path | Result |
+| Method | Path | 语义 |
 | --- | --- | --- |
-| POST | `/v1/live/sessions` | 创建 `LiveSessionV1` |
-| POST | `/v1/live/sessions/{sessionId}/events` | 摄取单条 JSON、JSON 数组或 NDJSON |
-| POST | `/v1/live/sessions/{sessionId}/close` | 关闭 session，之后拒绝写入 |
-| GET | `/v1/live/sessions/{sessionId}` | 查询 session |
-| GET | `/v1/live/sessions/{sessionId}/events?after=N` | 从 sequence cursor 查询 |
-| GET | `/v1/live/sessions/{sessionId}/stream?after=N` | SSE 只读事件流 |
-| GET | `/v1/live/sessions/{sessionId}/evidence` | 获取或 finalize revision 1 |
+| POST | /v1/live/sessions | 创建 LiveSessionV1 |
+| POST | /v1/live/sessions/{sessionId}/events | 摄取 JSON、JSON array 或 NDJSON |
+| POST | /v1/live/sessions/{sessionId}/close | 关闭 session；不 finalize |
+| POST | /v1/live/sessions/{sessionId}/evidence/finalize | 重新读取 artifact 并创建 finalized revision |
+| GET | /v1/live/sessions/{sessionId} | 读取 session |
+| GET | /v1/live/sessions/{sessionId}/events?after=N | 按 sequence cursor 读取 |
+| GET | /v1/live/sessions/{sessionId}/stream?after=N | SSE 只读事件流 |
+| GET | /v1/live/sessions/{sessionId}/evidence | 只读已有 evidence；不存在则 404 |
+| GET | /v1/live/artifacts/{sha256Digest} | 读取原始 artifact bytes |
+
+Pilot Server 上全部 POST 要求 restricted-file Bearer token；带 Origin 的请求还要
+匹配 allowed_origin。独立 loveengine live serve 只允许本机开发实验，不应暴露为
+生产服务。
 
 错误统一为：
 
-```json
+~~~json
 {"error":{"code":"sequence_gap","message":"3"}}
-```
+~~~
 
-稳定错误包括 `event_conflict`、`event_hash_mismatch`、`sequence_gap`、`hash_chain_broken`、`session_closed`、`artifact_missing` 和 `bundle_revision_conflict`。
+稳定错误包括 event_conflict、event_hash_mismatch、sequence_gap、
+hash_chain_broken、session_closed、artifact_missing、evidence_not_finalized 和
+bundle_revision_conflict。
 
-## Event and artifact rules
+## Event 与 artifact
 
-- `sequence` 从 1 连续递增。
-- `previous_event_hash` 必须等于 session 当前 head。
-- `event_hash` 是排除自身后的 canonical JSON Keccak-256。
-- `content_hash` 与 artifact 地址使用 SHA-256。
-- artifact 路径是 `artifacts/sha256/<前两位>/<完整 digest>`。
-- 完全相同的 `event_id` 重试是幂等成功；同 ID 不同内容拒绝。
-- `source`、`summary`、`derived` 不可混写。
-- 视频仅保存 URL、hash 和时间引用。
+- sequence 从 1 连续递增；previous_event_hash 必须等于 session head。
+- event_hash 是排除自身后的 canonical JSON Keccak-256。
+- content_hash 与 artifact 地址使用 exact source bytes 的 SHA-256。
+- artifact 路径是 artifacts/sha256/[前两位]/[完整 digest]。
+- 完全相同 event_id 重试幂等成功；同 ID 不同内容拒绝。
+- source、summary、derived 不可混写；视频只保存 URL/hash/time reference。
+- finalize 逐一重新读取 artifact bytes，复算 SHA-256 并核对事件内容；调用方
+  提供的 artifact hash 不能覆盖真实内容产生的 hash。
 
-## Signed review protocol
+## Observation 与争议复核
 
-M4 使用 EIP-712 domain version `2`。`NetworkTaskV2` 支持 `observe_live_text` 与 `review_dispute`，同时保留 M3 两种任务。`TaskReceiptV2` 对 result hash 签名。
+NetworkTaskV2 当前只允许 observe_live_text 和 review_dispute。旧 V1 的
+propagate_skill、observe_broadcast 保留历史兼容，但不属于 V2 执行集合。
+TaskReceiptV2 对 task、node、status、result hash、nonce 和 completedAt 签名。
 
-critical dispute 必须由 bootstrap 内三个不同节点复核：
+critical dispute 由 bootstrap 内三个不同节点复核：
 
-- 两票 `dismiss`：`dismissed`。
-- 两票 `uphold`：`upheld`。
-- 缺失、重复、无多数或无效签名：`unresolved`。
+- 至少两票 dismiss：dismissed；
+- 至少两票 uphold：upheld；
+- 缺失、重复、无多数或无效签名：unresolved。
 
-只有 `dismissed` 能通过服务层 ProposalGate。Gate 只返回 execution plan，不提交交易，也不请求投票签名。
+只有 dismissed critical disputes 能通过 ProposalGate。Gate 只返回 plan 或阻断
+原因，不裁决事实、不签投票、不提交交易，也不是 WitnessDAO 访问控制。
 
-## Dashboard
+## Read-only dashboard
 
-以下接口只读：
+    GET /demo/
+    GET /v1/dashboard/sessions
+    GET /v1/dashboard/sessions/{sessionId}
+    GET /v1/dashboard/disputes/{disputeId}
 
-```text
-GET /demo/
-GET /v1/dashboard/sessions
-GET /v1/dashboard/sessions/{sessionId}
-GET /v1/dashboard/disputes/{disputeId}
-```
+dashboard 展示 session、事件和 artifact integrity。它不执行 finalize、Gate、
+投票或 PublicSink 查询；截图不能代替 transcript/RPC 验证。
 
-session detail 同时返回 artifact 完整性状态。任何缺失 artifact 都必须显示为校验失败，不能静默降级。
-
-## CLI
+## Local CLI
 
 ```powershell
 uv run loveengine live serve --db .\var\live.sqlite --artifacts .\var\artifacts
@@ -69,6 +75,7 @@ uv run loveengine live session create --db .\var\live.sqlite --session-id demo -
 uv run loveengine live ingest --db .\var\live.sqlite --artifacts .\var\artifacts --session-id demo --input .\examples\live\live-session.fixture.ndjson
 uv run loveengine live close --db .\var\live.sqlite --session-id demo --closed-at 1770000020
 uv run loveengine evidence finalize --db .\var\live.sqlite --artifacts .\var\artifacts --session-id demo --finalized-at 1770000021
-uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
-uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
 ```
+
+这些直接数据库 CLI 是本机开发 adapter。服务运行时应使用鉴权 HTTP finalize，以
+便统一审计和权限边界。

@@ -74,7 +74,11 @@ class RelayStore:
         except sqlite3.IntegrityError:
             return False
 
-    def pending(self, recipient: str) -> list[RelayMessage]:
+    def pending(
+        self,
+        recipient: str,
+        exclude_task_ids: set[str] | None = None,
+    ) -> list[RelayMessage]:
         rows = self.connection.execute(
             """
             SELECT task_id, payload, attempts
@@ -86,6 +90,8 @@ class RelayStore:
         ).fetchall()
         result = []
         for task_id, payload, attempts in rows:
+            if exclude_task_ids and task_id in exclude_task_ids:
+                continue
             attempts += 1
             self.connection.execute(
                 """
@@ -98,15 +104,17 @@ class RelayStore:
         self.connection.commit()
         return result
 
-    def ack(self, recipient: str, task_id: str, receipt: str) -> None:
-        self.connection.execute(
+    def ack(self, recipient: str, task_id: str, receipt: str) -> bool:
+        cursor = self.connection.execute(
             """
             UPDATE messages SET acked = 1, receipt = ?
             WHERE recipient = ? AND task_id = ?
+              AND accepted = 1 AND acked = 0 AND receipt IS NULL
             """,
             (receipt, recipient, task_id),
         )
         self.connection.commit()
+        return cursor.rowcount == 1
 
     def accept(self, recipient: str, task_id: str) -> bool:
         cursor = self.connection.execute(
@@ -128,6 +136,24 @@ class RelayStore:
             (recipient, task_id),
         ).fetchone()
         return None if row is None else row[0]
+
+    def task_state(self, recipient: str, task_id: str) -> dict[str, object] | None:
+        row = self.connection.execute(
+            """
+            SELECT payload, accepted, acked, receipt
+            FROM messages
+            WHERE recipient = ? AND task_id = ?
+            """,
+            (recipient, task_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "payload": str(row[0]),
+            "accepted": bool(row[1]),
+            "acked": bool(row[2]),
+            "receipt": row[3],
+        }
 
     def metrics(self) -> dict[str, int]:
         queued, delivered, accepted, acked = self.connection.execute(

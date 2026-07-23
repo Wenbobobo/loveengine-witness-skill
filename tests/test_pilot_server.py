@@ -188,6 +188,67 @@ def test_pilot_artifact_download_and_origin_rejection(tmp_path: Path) -> None:
     asyncio.run(scenario())
 
 
+def test_pilot_evidence_finalize_requires_auth_and_get_does_not_write(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        config = load_pilot_config(_config(tmp_path))
+        app = create_pilot_app(config, readiness=lambda: (True, {}))
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        headers = {
+            "Authorization": f"Bearer {TOKEN}",
+            "Origin": "http://127.0.0.1:8780",
+        }
+        try:
+            created = await client.post(
+                "/v1/live/sessions",
+                json={
+                    "session_id": "evidence-auth",
+                    "source_type": "operator",
+                    "created_at": "1770000000",
+                },
+                headers=headers,
+            )
+            assert created.status == 201
+            closed = await client.post(
+                "/v1/live/sessions/evidence-auth/close",
+                json={"closed_at": "1770000001"},
+                headers=headers,
+            )
+            assert closed.status == 200
+
+            missing = await client.get(
+                "/v1/live/sessions/evidence-auth/evidence"
+            )
+            assert missing.status == 400
+            assert (await missing.json())["error"]["code"] == "bundle_not_found"
+            missing_again = await client.get(
+                "/v1/live/sessions/evidence-auth/evidence"
+            )
+            assert missing_again.status == 400
+
+            denied = await client.post(
+                "/v1/live/sessions/evidence-auth/evidence/finalize"
+            )
+            assert denied.status == 401
+            finalized = await client.post(
+                "/v1/live/sessions/evidence-auth/evidence/finalize",
+                json={"revision": "1", "finalized_at": "1770000002"},
+                headers=headers,
+            )
+            assert finalized.status == 200
+            fetched = await client.get(
+                "/v1/live/sessions/evidence-auth/evidence"
+            )
+            assert fetched.status == 200
+            assert (await fetched.json())["event_count"] == "0"
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
 def test_pilot_config_rejects_implicit_public_bind(tmp_path: Path) -> None:
     path = _config(tmp_path)
     value = json.loads(path.read_text(encoding="utf-8"))

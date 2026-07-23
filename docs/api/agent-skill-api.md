@@ -1,8 +1,8 @@
 # Agent and Skill API
 
 本文定义 LoveEngine Witness Skill 面向 Agent adapter、本地 CLI、Codex Skill
-和 Codex Plugin loader 的数据结构。状态：M0–M5 已实现，M6 正在增加
-合约融合、参与者上手、Plugin 包装和公网预备。
+和 Codex Plugin loader 的数据结构。M0-M6 格式保留历史兼容；当前
+0.6.1 candidate 默认验证核心证据闭环，治理合约是可选实验。公网未实现。
 
 ## 标准 Skill 入口
 
@@ -133,7 +133,8 @@ Rules:
 
 - `manifest_hash` and `payload_hash` must match the M0 compatibility manifest package hash.
 - M0 does not preassign nodes.
-- Future versions should include task issuer, signature, expiration policy, and replay protection.
+- 这条 M0 fixture 不含 issuer/signature/deadline；当前 V1/V2 network task 已实现
+  issuer、EIP-712 signature、deadline、recipient、nonce 和 replay protection。
 
 ## EvidenceBundle
 
@@ -199,10 +200,10 @@ loveengine relayer batch-vote --dry-run
 loveengine transcript verify <path>
 loveengine demo local-loop --output <dir>
 loveengine package build --output <dir>
-loveengine package verify <archive>
-loveengine package install <archive> --target <dir>
-loveengine package self-check --root <dir>
-loveengine pilot quickstart --root <dir> --open-ui|--headless
+loveengine package verify <archive> --expected-package-hash <registry-keccak>
+loveengine package install <archive> --target <dir> --expected-package-hash <registry-keccak>
+loveengine package self-check --root <dir> --expected-package-hash <registry-keccak>
+loveengine pilot quickstart --root <dir> [--headless]
 loveengine pilot serve --config <path>
 loveengine pilot status --url <url>
 loveengine pilot chain init --root <dir>
@@ -215,8 +216,8 @@ loveengine pilot snapshot verify <path>
 loveengine pilot snapshot restore <path> --config <path> --chain-root <dir>
 loveengine pilot snapshot prune --output <dir> --older-than-days 30
 loveengine witness vote approve --proposal-plan <path> --rpc-url <url> --address <address>
-loveengine demo lan-pilot --events 12 --observers 10 --output <dir>
-loveengine pilot transcript verify <path>
+loveengine demo lan-pilot --stage core|governance --events 12 --observers 10 --output <dir>
+loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]
 loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir>
 ```
 

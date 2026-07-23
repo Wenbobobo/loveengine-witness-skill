@@ -15,3 +15,6 @@ docs/assets/runbooks/**/*.png -filter -diff -merge -text
 # Preserved contract-team source input. Keep bytes stable and do not fail
 # release whitespace checks on formatting inherited from the upstream handoff.
 docs/reference/contracts/contract-team-v2/contracts/*.sol whitespace=-blank-at-eol,-blank-at-eof
+
+# Preserved meeting transcripts remain byte-for-byte source records.
+docs/reference/source-materials/meeting-transcripts/*.md whitespace=-blank-at-eol,-blank-at-eof

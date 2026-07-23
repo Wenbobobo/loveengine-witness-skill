@@ -107,6 +107,10 @@ async def _run_relay_reviewers(
                 node,
                 "--profile",
                 str(profile_path),
+                "--expected-issuer",
+                bootstrap["publisher"],
+                "--expected-manifest-hash",
+                tasks[0]["manifest_hash"],
                 "--expected-tasks",
                 str(expected_tasks),
                 "--verdicts",
@@ -117,6 +121,8 @@ async def _run_relay_reviewers(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             creationflags=creationflags,
         )
         processes.append((process, result_path))
@@ -161,6 +167,8 @@ def run_live_evidence_demo(
         [str(foundry_binary("forge")), "build"],
         cwd=CONTRACTS,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )

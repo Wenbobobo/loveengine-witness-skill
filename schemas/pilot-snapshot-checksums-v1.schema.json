@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/pilot-snapshot-checksums-v1.schema.json",
+  "title": "PilotSnapshotChecksumsV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "files"],
+  "properties": {
+    "schema_version": {"const": "loveengine.pilot-snapshot-checksums/1"},
+    "files": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"type": "string", "minLength": 1, "maxLength": 512},
+      "additionalProperties": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+    }
+  }
+}

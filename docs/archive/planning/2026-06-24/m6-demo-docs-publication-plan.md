@@ -1,8 +1,14 @@
 # LoveEngine M6.8 Demo Documentation and Publication Plan
 
-Status: active execution checklist
+Status: historical M6 closeout checklist; superseded by 0.6.1 hardening
 Target version: `0.6.0-contract-public-pilot`
 Last updated: 2026-06-24
+Archive note: unchecked items preserve the original planning state.
+
+This file preserves the M6.8 execution checklist. Unchecked boxes are historical
+planning state, not claims about the current repository. The local
+`v0.6.0-contract-public-pilot` baseline was completed; Tailscale, public/testnet
+and production gates were not completed and remain deferred.
 
 ## 1. Objective
 

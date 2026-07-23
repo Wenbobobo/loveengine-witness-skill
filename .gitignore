@@ -9,6 +9,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.uv-cache/
 .venv/
 contracts/out/
 contracts/cache/
@@ -38,8 +39,11 @@ Thumbs.db
 desktop.ini
 .idea/
 .vscode/
+*.code-workspace
 
 # Local outputs
+.agents/
+.tmp/
 tmp/
 temp/
 *.log

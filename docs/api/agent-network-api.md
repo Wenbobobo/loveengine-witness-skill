@@ -1,9 +1,11 @@
 # LoveEngine Agent Network API
 
-状态：`M3 local implemented`
-M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）；M4 V2 扩展见 `live-evidence-api.md`。
+状态：M3 V1 历史兼容；0.6.1 candidate 使用 V2 + NodeTrustPolicyV1
+M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）。
 
-本文定义 SkillRegistry、节点身份、Bootstrap、网络任务、任务回执和中心 Relay Hub 的公开接口。M3 只实现中心 Relay；P2P 和节点直连不在本阶段范围内。
+本文先保留 M3 V1 wire format，再说明当前共用 Relay 行为。V2 的 signed profile、
+bootstrap、task 和 receipt 使用 EIP-712 domain version 2；当前 V2 只执行
+`observe_live_text` 和 `review_dispute`。P2P 和节点直连未实现。
 
 ## 1. SkillRegistry
 
@@ -191,20 +193,28 @@ GET /v1/ws
 - SQLite 保存离线消息、cursor、ack 和重试次数。
 - at-least-once delivery。
 - taskId 和 nonce 保证节点端幂等。
+- Relay 只认证 signed bootstrap directory 中完全匹配的 profile。
+- Receipt 必须来自当前 WebSocket 节点，并对应本连接已经投递且 ACK accepted 的
+  pending task；未分配、重复和错绑回执被拒绝。
+- 连接保持期间新增的任务会继续推送，不要求节点重连。
 - Relay Hub 不替 issuer 或 node 签名。
 - 本地 pilot 的节点通过 Anvil RPC signer 完成签名；私钥不进入 CLI 参数、环境变量、日志或 transcript。
-- `loveengine node connect` 是可单独启动的出站节点进程入口。
+- `loveengine node connect` 是统一的 V1/V2 出站 session 入口。V1/V2 codec 独立，
+  连接、鉴权、ACK、keepalive 和 receipt 确认共用同一 session engine。
+- 当前 live connect 还必须取得独立 `NodeTrustPolicyV1`，绑定 chain ID、
+  Registry、Publisher、skill/version、ZIP/manifest hash 和 allowed issuers。
+  invite 只负责连接，不是信任根。
 
 ## 7. CLI
 
 ```text
-loveengine registry publish
-loveengine registry verify
+loveengine registry publish --input <release> --dry-run
+loveengine registry verify --rpc-url <url> --artifact <zip> --chain-id <id> --registry <address> --publisher <address>
 loveengine node profile sign
 loveengine bootstrap build
 loveengine bootstrap verify
 loveengine relay serve
-loveengine node connect
+loveengine node connect --invite <file> --trust-policy <policy> --package <zip> --profile <profile> --rpc-url <url> --address <node>
 loveengine network demo --nodes 3
 loveengine network transcript verify <path>
 ```

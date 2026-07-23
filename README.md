@@ -2,160 +2,132 @@
 
 [中文说明](README.zh-CN.md)
 
-LoveEngine Witness Skill is an Agent-network-first protocol for verifiable public-interest witnessing. It packages source provenance, EIP-712 identities and tasks, local governance contracts, a relay network, evidence artifacts, and replayable transcripts without exposing private keys to an Agent.
+This repository implements one Skill: loveengine-witness. It is the first
+verifiable vertical slice of the LoveEngine/UAS layer in the wider
+NaturalDAO/Proof of Love vision.
 
-Current stable demo: `0.4.0-live-evidence-pilot`.
-Previous network-only demo: `0.3.1-demo-ready`.
-Current active version: `0.6.0-contract-public-pilot`
-(`loveengine-witness-net/0.6`). Previous LAN pilot: `0.5.0-lan-pilot`.
+The Skill verifies a published package, receives observation tasks through an
+Agent network, preserves public statements as content-addressed evidence,
+coordinates dispute review, and prepares a ProposalGate result. Agents do not
+act, vote, or decide real-world truth for people.
 
-## Skill model
+## Status
 
-LoveEngine uses a thin instruction layer and a thick protocol runtime. The
-Codex-facing `SKILL.md` only defines triggers, verification, command routing,
-and safety boundaries. Versioned manifests, schemas, Python use cases,
-adapters, contracts, and transcripts carry the executable protocol. This keeps
-Agent context small while preserving deterministic, testable behavior.
+The latest Git tag is v0.6.0-contract-public-pilot. The working target
+0.6.1-contract-public-pilot is a candidate, not a published release. The wire
+protocol remains loveengine-witness-net/0.6 so M0-M6 schemas and historical
+transcripts remain verifiable.
 
-## Architecture
+| Area | Status |
+| --- | --- |
+| Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
+| ProposalGate and verifiable core transcript | Implemented locally |
+| WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
+| Company livestream adapter and autonomous discovery | Not implemented |
+| SSH/Tailscale, public/testnet deployment, production identity, TLS and HA | Not completed |
+
+The local tests demonstrate protocol separation, tamper detection and
+repeatability. They do not demonstrate independent real-world organizations,
+statement truth, public deployment, or long-term artifact availability.
+
+## Core Flow
 
 ```mermaid
 flowchart LR
-    Sources[Source materials] --> Manifest[Signed and hashed Skill package]
-    Manifest --> Registry[SkillRegistry]
-    Registry --> Relay[Relay Hub]
-    Chain[UAS contracts and events] --> Relay
-    Relay --> A[Agent A]
-    Relay --> B[Agent B]
-    Relay --> C[Agent C]
-    A --> Receipts[Signed receipts]
-    B --> Receipts
-    C --> Receipts
-    Live[LiveSource port] --> Gateway[Live Gateway]
-    Gateway --> Artifacts[ArtifactStore port]
-    Gateway --> Evidence[EvidenceBundle]
-    Evidence --> Review[Review coordinator]
-    Review --> Gate[ProposalGate]
-    Registry --> Dashboard[Read-only dashboard]
-    Receipts --> Dashboard
-    Evidence --> Dashboard
-    Gate --> Dashboard
+    ZIP["Deterministic ZIP"] --> Registry["SkillRegistry release"]
+    Registry --> Policy["Trusted node policy"]
+    Policy --> Relay["Bootstrap-bound Relay"]
+    Source["Authenticated text input"] --> Evidence["Event chain + artifacts"]
+    Relay --> Agents["Observation Agents"]
+    Agents --> Evidence
+    Evidence --> Review["Critical dispute review"]
+    Review --> Gate["ProposalGate"]
+    Gate -. optional .-> Governance["WitnessDAO / PublicSink lab"]
 ```
 
-Replaceable boundaries are documented in [extension interfaces](docs/api/extension-interfaces.md). The domain layer does not depend on a particular signer, live platform, object store, database, or transport.
+The default path stops at ProposalGate. The governance contracts remain useful
+for experiments, but they are not the Witness Skill's core completion criterion.
+ProposalGate is an off-chain advisory check, not WitnessDAO access control.
 
-## End-to-end flow
+The invite tells a node where to connect. A separate NodeTrustPolicyV1, obtained
+through a trusted side channel, fixes chain ID, Registry, Publisher,
+skill/version, ZIP hash, manifest hash, and allowed issuers. A node does not
+treat values reported by the invite, Relay, or task as trust anchors.
 
-```mermaid
-flowchart TD
-    Verify[Verify manifest and source hashes] --> Deploy[Deploy four UAS contracts and SkillRegistry]
-    Deploy --> Register[Register witnesses with EIP-712 signatures]
-    Register --> Schedule[Schedule broadcast]
-    Schedule --> Observe[Relay observe task to Agents]
-    Observe --> Build[Build immutable evidence bundle]
-    Build --> Review[Three-node dispute review]
-    Review --> Gate{ProposalGate}
-    Gate -->|dismissed disputes| Propose[Create proposal execution plan]
-    Gate -->|upheld or unresolved| Block[Block proposal]
-    Propose --> Vote[Witness vote signatures]
-    Vote --> Execute[Execute approved proposal]
-    Execute --> Query[Query PublicSink]
-    Query --> Transcript[Verify transcript]
-```
+## Local Experiment
 
-## M3 network sequence
-
-```mermaid
-sequenceDiagram
-    participant Chain
-    participant Relay
-    participant A as Agent A
-    participant B as Agent B
-    participant C as Agent C
-    Chain->>Relay: ReleasePublished / BroadcastScheduled
-    Relay->>A: signed NetworkTask
-    Relay->>B: signed NetworkTask
-    Relay->>C: signed NetworkTask
-    A-->>Relay: signed TaskReceipt
-    B-->>Relay: signed TaskReceipt
-    C-->>Relay: signed TaskReceipt
-    Relay-->>Relay: ack, retry, deduplicate
-    Relay-->>Chain: no signing authority
-```
-
-## Repository layout
-
-```text
-contracts/                 Foundry UAS contracts and SkillRegistry
-docs/api/                  Public protocol and extension interfaces
-docs/development/          Onboarding, runbooks and acceptance reports
-docs/reference/            Current source constraints
-docs/archive/              Historical sources and implemented specifications
-docs/specs/                Current roadmap and active specification
-examples/                  Secret-free fixtures and transcripts
-schemas/                   JSON Schema Draft 2020-12 contracts
-skills/loveengine-witness/ Verifiable Skill manifests and onboarding
-src/loveengine_witness/    Python domain, use cases, ports, adapters and CLI
-tests/                     Unit, contract and end-to-end tests
-tools/                     Repository and compatibility validators
-```
-
-## Operator and read-only views
-
-The Pilot Server exposes an authenticated host console and a separate
-read-only evidence view. The token remains only in page memory; the public view
-cannot write or sign. These screenshots are rendered from the repository's
-secret-free local UI fixture.
-
-![LoveEngine host operator console](docs/assets/runbooks/common/operator-en-overview.png)
-
-![LoveEngine read-only evidence console](docs/assets/runbooks/common/viewer-en-overview.png)
-
-## Quick start
-
-Requires Python 3.11+, [uv](https://docs.astral.sh/uv/), and Foundry `1.7.1`.
+Requirements: Python 3.11+, uv, and pinned Foundry 1.7.1.
 
 ```powershell
 uv sync --frozen
-uv run loveengine pilot quickstart --root .\pilot --open-ui
-uv run loveengine pilot status --url http://127.0.0.1:8780
+uv run loveengine manifest verify
+uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\pilot-output
 ```
 
-`--open-ui` opens the operator console when a desktop browser is available.
-Use `--headless` on remote Debian/Tailscale hosts; stdout JSON includes
-`operator_url`, `dashboard_url`, `invite_path`, and `token_file`. Full
-installation, server, chain, snapshot, voting, package, background soak, and
-troubleshooting commands are in the [CLI and operations reference](docs/api/cli-reference.md).
-Run `pilot status` from a second terminal while quickstart is running. Use
-`uv run loveengine demo lan-pilot --output .\pilot-output` for the full
-package-to-PublicSink E2E transcript.
+The core experiment builds and anchors a real ZIP, starts a local Anvil and
+Relay, uses the public node CLI, verifies artifacts, resolves a fixed dispute,
+evaluates ProposalGate, and writes WitnessCoreTranscriptV1. Its output marks
+environment: local_anvil and actors_simulated: true.
 
-## Security invariants
+Run the optional governance extension separately:
 
-- Raw private keys, mnemonics, keystores, and tokens never enter Agent context, fixtures, logs, or transcripts.
-- A relayer submits signatures but cannot sign for a witness or node.
-- Every signed task binds chain ID, verifying contract, issuer, recipient, payload hash, nonce, and deadline.
-- Raw evidence stays off-chain; only content hashes enter proposals or contracts.
-- Agents never auto-sign votes. Each witness approval is a separate explicit
-  `loveengine witness vote approve` command using an external RPC signer.
-- `PublicSink` remains read-only.
+```powershell
+uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 --output .\governance-output
+```
 
-## Documentation entrypoints
+Start the loopback-only interactive server:
 
-- Architecture and scope: [master plan](docs/specs/love-engine-master-plan.md)
-  and [active M6 specification](docs/specs/love-engine-contract-public-pilot-spec.md).
-- Interfaces and commands: [API index](docs/api/README.md) and
-  [CLI reference](docs/api/cli-reference.md).
-- Development and operations:
-  [integration guide](docs/development/integration-guide.md),
-  [participant runbook](docs/development/participant-runbook.zh-CN.md), and
-  [contract2 recommendations](docs/development/contract2-comparison-and-recommendations.md).
-- Technical background:
-  [LoveEngine technical architecture](docs/articles/loveengine-technical-architecture.zh-CN.md).
-- Provenance: [source inventory](docs/kb/source-inventory.md) and
-  [SCC0 provenance](docs/reference/licenses/scc0-provenance.md).
+```powershell
+uv run loveengine pilot quickstart --root .\pilot --headless
+```
+
+Quickstart writes both pilot-invite.json and pilot-trust-policy.json. It is not a
+remote deployment command. A dry run prints the plan without creating runtime
+state:
+
+```powershell
+uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
+```
+
+## Roles
+
+| Role | Authority |
+| --- | --- |
+| Operator | Authenticated session/event writes, close, and explicit evidence finalization |
+| Observation Agent | Release/task/evidence verification and signed receipts; never votes |
+| Voting Witness | Optional governance lab only; explicitly approves through an external RPC signer |
+| Viewer | Read-only session/evidence view; UI is not a trust root |
+| Publisher | Builds packages, prepares an unsigned publish plan, and performs read-only Registry verification |
+
+## Safety Boundaries
+
+- Raw private keys, mnemonics, keystores, and write tokens never enter Agent
+  context, tasks, fixtures, snapshots, logs, or transcripts.
+- Events and artifacts are content-addressed. Finalization rereads the artifact
+  bytes; GET endpoints never finalize or mutate evidence.
+- Relay accepts bootstrap members only and binds each receipt to its
+  authenticated WebSocket node and accepted pending task.
+- Offline integrity is not chain trust. A verifier reports trust_bound: true
+  only when RPC facts also match an externally supplied trust policy.
+- The Windows quickstart does not configure or verify an explicit NTFS ACL for
+  its token file; this is loopback experiment isolation, not a production
+  multi-user host boundary.
+- Raw evidence stays off chain. PublicSink is read-only, and UTO is public
+  accounting rather than a tradable asset.
+
+## Documentation
+
+- [Meeting questions and evidence-backed answers](QA.md)
+- [Core architecture and data flow](docs/architecture/witness-core-and-data-flow.zh-CN.md)
+- [Developer experiments](docs/development/integration-guide.md)
+- [CLI reference](docs/api/cli-reference.md)
+- [Contract API](docs/api/loveengine-contract-api.md)
+- [Engineering master plan](docs/specs/love-engine-master-plan.md)
+- [Active optimization specification](docs/specs/love-engine-witness-core-optimization.md)
+- [Documentation index](docs/README.md)
 
 ## License
 
 LoveEngineSkill is released under Smart Creative Commons Zero (SCC0). See
-[LICENSE](LICENSE) and the exact [license provenance](docs/reference/licenses/scc0-provenance.md).
+[LICENSE](LICENSE) and
+[license provenance](docs/reference/licenses/scc0-provenance.md).

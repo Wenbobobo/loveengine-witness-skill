@@ -39,11 +39,14 @@ def test_active_documentation_has_valid_links_and_no_stale_workspace_paths() -> 
     assert "LoveEngine documentation validation passed" in result.stdout
 
 
-def test_m6_8_release_closeout_documentation_assets_exist() -> None:
-    spec = ROOT / "docs/specs/love-engine-contract-public-pilot-spec.md"
-    assert "M6.8 Release closeout" in spec.read_text(encoding="utf-8")
+def test_current_spec_and_preserved_release_assets_exist() -> None:
+    spec = ROOT / "docs/specs/love-engine-witness-core-optimization.md"
+    assert "Witness Core Optimization" in spec.read_text(encoding="utf-8")
 
-    assert (ROOT / "docs/development/m6-demo-docs-publication-plan.md").is_file()
+    assert (
+        ROOT
+        / "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md"
+    ).is_file()
     assert (ROOT / "docs/articles/loveengine-technical-architecture.zh-CN.md").is_file()
 
     for rel_path in M6_8_RUNBOOKS:

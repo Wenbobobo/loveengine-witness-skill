@@ -77,6 +77,8 @@ def initialize_chain(root: Path, *, port: int) -> dict[str, Any]:
         cwd=CONTRACTS,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     if build.returncode:
@@ -122,8 +124,8 @@ def initialize_chain(root: Path, *, port: int) -> dict[str, Any]:
         contracts = {
             name: {
                 "address": address,
-                "code_hash": Web3.keccak(w3.eth.get_code(address)).hex(),
-                "deployment_transaction": receipt.transactionHash.hex(),
+                "code_hash": Web3.to_hex(Web3.keccak(w3.eth.get_code(address))),
+                "deployment_transaction": Web3.to_hex(receipt.transactionHash),
                 "deployment_block": str(receipt.blockNumber),
             }
             for name, (address, receipt) in deployed.items()
@@ -184,7 +186,7 @@ def status_chain(root: Path, rpc_url: str) -> dict[str, Any]:
     checks: dict[str, bool] = {}
     for name, value in deployment["contracts"].items():
         checks[name] = (
-            Web3.keccak(w3.eth.get_code(value["address"])).hex()
+            Web3.to_hex(Web3.keccak(w3.eth.get_code(value["address"])))
             == value["code_hash"]
         )
     return {

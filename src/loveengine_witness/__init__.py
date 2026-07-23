@@ -1,3 +1,6 @@
-"""LoveEngine Witness protocol and local-loop tooling."""
+"""LoveEngine Witness protocol and local-pilot tooling."""
 
-__version__ = "0.6.0"
+from .release_identity import PROJECT_VERSION
+
+
+__version__ = PROJECT_VERSION

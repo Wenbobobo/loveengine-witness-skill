@@ -103,6 +103,7 @@ def run_pilot_soak(
     started = time.monotonic()
     result = run_pilot_demo(
         output,
+        stage="governance",
         event_count=event_count,
         observer_count=observers,
         event_interval=duration_seconds / event_count,
