@@ -18,7 +18,7 @@ uv run python .\tools\check.py
 
 依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
 [CLI 参考](../api/cli-reference.md)和
-[活动优化 SPEC](../specs/love-engine-witness-core-optimization.md)。历史阶段报告只在
+[活动远程实验 SPEC](../specs/love-engine-pre-enterprise-remote-lab.md)。历史阶段报告只在
 追查兼容性时阅读。
 
 ## 实验 0：package 与 Registry 信任
@@ -53,7 +53,8 @@ uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy
 ```
 
 观察：节点先核对 policy、RPC release、ZIP 和 profile，再建立出站 WebSocket；任务
-ACK 与完成 receipt 分开；连接建立后 Relay 仍可推送任务。
+通过鉴权 `POST /v1/relay/tasks` 提交已经签名的 NetworkTaskV2；ACK 与完成
+receipt 分开；连接建立后 Relay 仍可推送任务。Pilot 不替 Publisher 签名。
 
 证明：任务和 receipt 的签名、成员、recipient、nonce、deadline 以及连接绑定。
 不证明：节点由现实中的独立组织控制，或 Relay 是高可用服务。
@@ -108,9 +109,35 @@ uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 -
 powershell -ExecutionPolicy Bypass -File .\tools\run_core_experiments.ps1
 ```
 
-脚本在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证等级和篡改检查，并
-在 finally 中停止子进程。报告必须写明 environment: local_anvil、
-actors_simulated: true，以及每项实验“证明/不证明”的边界。
+PowerShell 入口只是跨平台 Python runner 的薄包装。Linux/Windows 都可直接运行：
+
+```powershell
+uv run python .\tools\run_core_experiments.py
+```
+
+runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证等级和篡改检查。
+报告必须写明 environment: local_anvil、actors_simulated: true，以及每项实验
+“证明/不证明”的边界。
+
+## 实验 5：共享 Linux remote lab
+
+先配置独立 SSH key 和已经旁路核对的 known_hosts。runner 不接受密码：
+
+```powershell
+uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+```
+
+preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
++15、最多两核和低构建并发运行 core/recovery。Pilot 与 Anvil 不绑定 Tailscale
+地址，报告/transcript 下载后由本机再次离线验证。随后 runner 建立 SSH tunnel，
+用公开 node CLI 连接远端 Quickstart，在连接后提交签名任务并验收一个绑定
+receipt；它只停止自己创建的 Quickstart 进程组。详细门槛见
+[共享主机 runbook](runbooks/remote-lab-flow.zh-CN.md)。
+
+证明：相同 commit 能否在受约束 Linux 主机上复跑核心/恢复测试，以及公开节点
+路径能否经安全 tunnel 完成连接后任务和 receipt。
+不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
 
 ## 变更验收
 
@@ -129,5 +156,6 @@ manifest 和必要 fixture；不要手工编辑 hash。
 
 - 不把 fixture/Operator UI 扩展成公司直播平台。
 - 不实现自动发现或常驻调度 daemon。
-- 不把 quickstart 当作 SSH、Tailscale、公网或测试网部署。
+- 不把 quickstart 或 SSH-tunnel remote lab 当作 Tailscale 直接服务、公网或
+  测试网部署。
 - 不删除 M0-M6 历史 codec/schema/transcript reader 来降低复杂度。

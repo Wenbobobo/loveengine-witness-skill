@@ -118,3 +118,34 @@ def test_v2_task_uses_domain_version_two_and_detects_tampering() -> None:
             now=1770000000,
         )
     assert exc.value.code == "wrong_issuer"
+
+
+def test_v2_malformed_signature_returns_protocol_error() -> None:
+    issuer = Account.create()
+    recipient = Account.create()
+    task = build_task_v2(
+        chain_id="31337",
+        registry=REGISTRY,
+        task_id="malformed-signature",
+        task_type="review_dispute",
+        issuer=issuer.address,
+        recipient=recipient.address,
+        manifest_hash="0x" + "11" * 32,
+        payload={"dispute_id": "d1", "bundle_hash": "0x" + "22" * 32},
+        nonce="3",
+        deadline="1770000100",
+    )
+    task["signature"] = "0x" + "0" * 130
+
+    with pytest.raises(LoveEngineError) as exc:
+        verify_task_v2(
+            task,
+            expected_chain_id="31337",
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=task["manifest_hash"],
+            now=1770000000,
+        )
+
+    assert exc.value.code == "invalid_signature"

@@ -8,7 +8,7 @@ These instructions apply to the LoveEngineSkill repository.
 2. `docs/development/integration-guide.md`
 3. `docs/specs/love-engine-master-plan.md`
 4. `docs/architecture/witness-core-and-data-flow.zh-CN.md`
-5. `docs/specs/love-engine-witness-core-optimization.md`
+5. `docs/specs/love-engine-pre-enterprise-remote-lab.md`
 6. `docs/api/loveengine-contract-api.md`
 7. `docs/api/agent-skill-api.md`
 8. `docs/api/agent-network-api.md`

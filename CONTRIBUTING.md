@@ -14,7 +14,7 @@ Then read:
 - `docs/development/integration-guide.md`
 - `docs/development/contract-team-handoff.md`
 - `docs/specs/love-engine-master-plan.md`
-- `docs/specs/love-engine-witness-core-optimization.md`
+- `docs/specs/love-engine-pre-enterprise-remote-lab.md`
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
 - `docs/api/agent-network-api.md`

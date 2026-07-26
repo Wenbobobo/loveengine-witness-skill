@@ -15,6 +15,126 @@
     "summary": "Runs repository checks, non-integration and integration tests, pinned Foundry, deterministic double-build, secret scan and diff hygiene."
   },
   {
+    "id": "cross-platform-core-experiment-runner",
+    "title": "Cross-platform core experiment runner",
+    "path": "tools/run_core_experiments.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "core experiment",
+      "cross-platform",
+      "shared host"
+    ],
+    "status": "current",
+    "canonical_role": "Canonical core experiment implementation",
+    "summary": "Runs the core E2E, transcript checks and optional recovery tests on Windows or Linux with a shared-host resource profile."
+  },
+  {
+    "id": "remote-host-preflight",
+    "title": "Remote host preflight",
+    "path": "tools/remote_host_preflight.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "remote lab",
+      "capacity",
+      "safety"
+    ],
+    "status": "current",
+    "canonical_role": "Read-only shared-host resource gate",
+    "summary": "Checks Linux capacity, pinned tools and conflicting experiment processes without mutating the remote host."
+  },
+  {
+    "id": "remote-lab-runner",
+    "title": "Remote lab runner",
+    "path": "tools/run_remote_lab.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "SSH",
+      "remote lab",
+      "public key"
+    ],
+    "status": "current",
+    "canonical_role": "Key-only remote experiment orchestrator",
+    "summary": "Pins host keys, rejects password authentication, deploys one clean commit to a unique user directory and retrieves verified experiment evidence."
+  },
+  {
+    "id": "pilot-task-ingress",
+    "title": "Pilot signed task ingress",
+    "path": "src/loveengine_witness/pilot_task_ingress.py",
+    "source_group": "runtime",
+    "layer": "relay",
+    "domain_tags": [
+      "Pilot",
+      "NetworkTaskV2",
+      "authentication"
+    ],
+    "status": "current",
+    "canonical_role": "Authenticated signed-task validation and enqueue boundary",
+    "summary": "Accepts only signed V2 tasks bound to the active Pilot release, bootstrap member, Publisher issuer, manifest and recipient before durable Relay enqueue."
+  },
+  {
+    "id": "pilot-task-operator",
+    "title": "Loopback Pilot task operator",
+    "path": "src/loveengine_witness/pilot_task_operator.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "Pilot",
+      "task signing",
+      "loopback Anvil"
+    ],
+    "status": "current",
+    "canonical_role": "Test-only signed task producer for the remote tunnel lab",
+    "summary": "Builds and submits one signed review task using only the loopback Anvil signer and restricted Pilot token file."
+  },
+  {
+    "id": "pilot-task-enqueue-helper",
+    "title": "Loopback Pilot task enqueue helper",
+    "path": "tools/enqueue_pilot_task.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "remote lab",
+      "task signing",
+      "loopback Anvil"
+    ],
+    "status": "current",
+    "canonical_role": "Remote tunnel smoke task producer",
+    "summary": "Uses the loopback Pilot test signer and restricted token file to submit one signed review task without exporting signer keys or tokens."
+  },
+  {
+    "id": "shared-quickstart-launcher",
+    "title": "Shared-host Quickstart launcher",
+    "path": "tools/start_shared_quickstart.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "remote lab",
+      "resource limits",
+      "process group"
+    ],
+    "status": "current",
+    "canonical_role": "Owned loopback Quickstart process-group launcher",
+    "summary": "Starts one loopback Pilot under a new process group with reduced priority, bounded CPU affinity and low dependency concurrency."
+  },
+  {
+    "id": "remote-lab-runbook",
+    "title": "Shared remote host experiment flow",
+    "path": "docs/development/runbooks/remote-lab-flow.zh-CN.md",
+    "source_group": "docs/development",
+    "layer": "runbook",
+    "domain_tags": [
+      "SSH",
+      "Tailscale",
+      "shared host"
+    ],
+    "status": "current",
+    "canonical_role": "Remote lab operator runbook",
+    "summary": "Defines host-key verification, public-key authentication, read-only preflight, bounded deployment, SSH tunnels and result interpretation."
+  },
+  {
     "id": "repository-secret-scan",
     "title": "Repository secret scan",
     "path": "tools/scan_secrets.py",
@@ -350,8 +470,8 @@
   {
     "id": "witness-core-optimization-spec",
     "title": "LoveEngine Witness Core Optimization SPEC",
-    "path": "docs/specs/love-engine-witness-core-optimization.md",
-    "source_group": "docs/specs",
+    "path": "docs/archive/specs/implemented/love-engine-witness-core-optimization.md",
+    "source_group": "docs/archive/specs/implemented",
     "layer": "specification",
     "domain_tags": [
       "0.6.1",
@@ -359,9 +479,25 @@
       "core transcript",
       "subtraction"
     ],
+    "status": "historical",
+    "canonical_role": "Implemented core hardening specification",
+    "summary": "Defined the completed release-to-ProposalGate core, optional governance stage, verification levels and deferred deployment work."
+  },
+  {
+    "id": "pre-enterprise-remote-lab-spec",
+    "title": "LoveEngine Pre-enterprise Remote Lab SPEC",
+    "path": "docs/specs/love-engine-pre-enterprise-remote-lab.md",
+    "source_group": "docs/specs",
+    "layer": "specification",
+    "domain_tags": [
+      "0.6.1",
+      "remote lab",
+      "resource guard",
+      "SSH"
+    ],
     "status": "current",
     "canonical_role": "Active implementation specification",
-    "summary": "Defines the release-to-ProposalGate core, optional governance stage, verification levels and explicitly deferred deployment work."
+    "summary": "Defines the key-only, loopback-only and resource-gated shared Linux validation required before enterprise integration."
   },
   {
     "id": "witness-core-data-flow",

@@ -63,10 +63,17 @@ ZIP，随后才连接；任务 issuer 必须属于 allowed_issuers。dry-run 可
     POST /v1/live/sessions/{sessionId}/events
     POST /v1/live/sessions/{sessionId}/close
     POST /v1/live/sessions/{sessionId}/evidence/finalize
+    POST /v1/relay/tasks
 
 写请求需要 Authorization: Bearer [token]；浏览器请求还必须匹配 allowed Origin。
 响应带 X-Correlation-ID。token 只来自受限文件和页面内存，不进入 URL、
 localStorage、日志或 transcript。
+
+`POST /v1/relay/tasks` 只接受完整签名的 NetworkTaskV2。Pilot 会在写入
+`relay.sqlite` 前验证 active release、bootstrap 成员、chainId、Registry、
+recipient、Publisher issuer、manifest hash、deadline 和 EIP-712 签名。成功返回
+202；重复 task ID 或相同 recipient/issuer/nonce 返回 409。端点不创建签名，也不
+接受 V1 task。
 
 SSE 通过 Last-Event-ID/after 恢复。Relay 只接受 bootstrap profile，区分接收 ACK
 和最终 receipt；它可在连接建立后继续推送任务。receipt 必须属于当前连接、当前

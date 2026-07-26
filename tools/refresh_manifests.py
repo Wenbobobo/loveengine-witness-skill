@@ -22,7 +22,8 @@ RELEASE_ROOT_REFS = [
     "LICENSE",
     "QA.md",
     "docs/kb/sources.json",
-    "docs/specs/love-engine-witness-core-optimization.md",
+    "docs/specs/love-engine-pre-enterprise-remote-lab.md",
+    "docs/archive/specs/implemented/love-engine-witness-core-optimization.md",
     "docs/architecture/witness-core-and-data-flow.zh-CN.md",
     "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
     "docs/api/lan-pilot-api.md",
@@ -32,6 +33,7 @@ RELEASE_ROOT_REFS = [
     "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
     "docs/development/contract2-comparison-and-recommendations.md",
     "docs/development/participant-runbook.zh-CN.md",
+    "docs/development/runbooks/remote-lab-flow.zh-CN.md",
     "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
     "docs/development/runbooks/operator-flow.zh-CN.md",
     "docs/development/runbooks/observation-node-flow.zh-CN.md",
@@ -64,6 +66,8 @@ RELEASE_ROOT_REFS = [
     "src/loveengine_witness/pilot_auth.py",
     "src/loveengine_witness/pilot_audit.py",
     "src/loveengine_witness/pilot_ui.py",
+    "src/loveengine_witness/pilot_task_ingress.py",
+    "src/loveengine_witness/pilot_task_operator.py",
     "src/loveengine_witness/package.py",
     "src/loveengine_witness/pilot_server.py",
     "src/loveengine_witness/observation.py",
@@ -87,6 +91,11 @@ RELEASE_ROOT_REFS = [
     "tools/scan_secrets.py",
     "tools/run_release_checks.ps1",
     "tools/run_core_experiments.ps1",
+    "tools/run_core_experiments.py",
+    "tools/remote_host_preflight.py",
+    "tools/enqueue_pilot_task.py",
+    "tools/start_shared_quickstart.py",
+    "tools/run_remote_lab.py",
 ]
 
 # Documentation screenshots are tracked through the source inventory, but they
@@ -146,6 +155,7 @@ def refresh_current() -> None:
         "docs/specs/love-engine-live-evidence-pilot-spec.md": "docs/archive/specs/implemented/love-engine-live-evidence-pilot-spec.md",
         "docs/specs/love-engine-lan-pilot-spec.md": "docs/archive/specs/implemented/love-engine-lan-pilot-spec.md",
         "docs/specs/love-engine-contract-public-pilot-spec.md": "docs/archive/specs/implemented/love-engine-contract-public-pilot-spec.md",
+        "docs/specs/love-engine-witness-core-optimization.md": "docs/archive/specs/implemented/love-engine-witness-core-optimization.md",
         "docs/development/m5-release-closeout-plan.md": "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
         "docs/development/m6-demo-docs-publication-plan.md": "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
     }
@@ -201,7 +211,8 @@ def refresh_current() -> None:
             "governance_demo": "loveengine demo lan-pilot --stage governance --events 12 --observers 10",
             "pilot_transcript_verify": "loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]",
             "pilot_soak": "loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10",
-            "core_experiment": "powershell -File tools/run_core_experiments.ps1",
+            "core_experiment": "uv run python tools/run_core_experiments.py",
+            "remote_lab": "uv run python tools/run_remote_lab.py preflight|run",
         }
     )
     value["package_hash"] = package_hash(value)

@@ -1,6 +1,6 @@
 # LoveEngine Witness Core Optimization SPEC
 
-状态：active candidate hardening
+状态：implemented candidate hardening
 目标版本：0.6.1-contract-public-pilot
 协议：loveengine-witness-net/0.6
 更新日期：2026-07-23
@@ -17,7 +17,9 @@
     -> verifiable core transcript
 
 WitnessDAO、投票、CorporateSink、StreamingEngine 和 PublicSink 保留为可选治理
-实验。公司直播 adapter、自动发现、SSH、公网和测试网部署不在本规格范围。
+实验。公司直播 adapter、自动发现、SSH、公网和测试网部署不在本规格范围。本规格
+的本机核心加固已完成；后续远程实验由活动的 Pre-enterprise Remote Lab SPEC
+管理。
 
 ## 信任边界
 

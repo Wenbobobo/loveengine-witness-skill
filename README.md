@@ -23,8 +23,9 @@ transcripts remain verifiable.
 | Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
 | ProposalGate and verifiable core transcript | Implemented locally |
 | WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
+| Shared Linux preflight and key-only remote lab tooling | Implemented; remote acceptance pending |
 | Company livestream adapter and autonomous discovery | Not implemented |
-| SSH/Tailscale, public/testnet deployment, production identity, TLS and HA | Not completed |
+| Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
 
 The local tests demonstrate protocol separation, tamper detection and
 repeatability. They do not demonstrate independent real-world organizations,
@@ -89,6 +90,25 @@ state:
 uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 ```
 
+## Shared Remote Lab
+
+The pre-enterprise remote lab keeps Pilot and Anvil on the remote loopback
+interface. It pins the SSH host key, requires public-key authentication, runs a
+read-only resource gate, deploys one clean commit to a unique directory, limits
+the experiment to two CPUs with lower scheduling priority, and downloads the
+report/transcript for another local offline verification. Run mode also maps
+the remote loopback through an SSH tunnel and proves that the public node CLI
+receives a task queued after connection and returns one bound receipt.
+
+```powershell
+uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+```
+
+The remote runner deliberately has no password option and does not use sudo,
+systemd, public binds, or automatic cleanup. See the
+[shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
+
 ## Roles
 
 | Role | Authority |
@@ -114,6 +134,8 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
   multi-user host boundary.
 - Raw evidence stays off chain. PublicSink is read-only, and UTO is public
   accounting rather than a tradable asset.
+- Remote lab automation requires a pinned host key and dedicated SSH public key;
+  passwords are never accepted by the runner.
 
 ## Documentation
 
@@ -123,7 +145,8 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 - [CLI reference](docs/api/cli-reference.md)
 - [Contract API](docs/api/loveengine-contract-api.md)
 - [Engineering master plan](docs/specs/love-engine-master-plan.md)
-- [Active optimization specification](docs/specs/love-engine-witness-core-optimization.md)
+- [Active remote lab specification](docs/specs/love-engine-pre-enterprise-remote-lab.md)
+- [Shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [Documentation index](docs/README.md)
 
 ## License

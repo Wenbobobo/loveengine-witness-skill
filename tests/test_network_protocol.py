@@ -178,3 +178,34 @@ def test_network_task_binds_registry_recipient_nonce_deadline_and_payload() -> N
             now=1_900_000_000,
         )
     assert exc.value.code == "wrong_manifest_hash"
+
+
+def test_v1_malformed_signature_returns_protocol_error() -> None:
+    issuer = Account.create()
+    recipient = Account.create()
+    task = build_task(
+        chain_id=CHAIN_ID,
+        registry=REGISTRY,
+        task_id="malformed-signature",
+        task_type="propagate_skill",
+        issuer=issuer.address,
+        recipient=recipient.address,
+        manifest_hash="0x" + "2" * 64,
+        payload={"package_hash": "sha256:" + "3" * 64},
+        nonce="9",
+        deadline="2000000000",
+    )
+    task["signature"] = "0x" + "0" * 130
+
+    with pytest.raises(LoveEngineError) as exc:
+        verify_task(
+            task,
+            expected_chain_id=CHAIN_ID,
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=task["manifest_hash"],
+            now=1_900_000_000,
+        )
+
+    assert exc.value.code == "invalid_signature"

@@ -7,6 +7,7 @@ from typing import Any
 
 from eth_account import Account
 from eth_account.messages import encode_typed_data
+from eth_keys.exceptions import BadSignature
 from eth_utils import to_checksum_address
 
 from .errors import LoveEngineError
@@ -30,7 +31,7 @@ def _recover(typed_data: dict[str, Any], signature: str) -> str:
             encode_typed_data(full_message=typed_data),
             signature=signature,
         )
-    except (TypeError, ValueError) as exc:
+    except (BadSignature, TypeError, ValueError) as exc:
         raise LoveEngineError("invalid_signature", "signature recovery failed") from exc
 
 

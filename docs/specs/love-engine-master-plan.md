@@ -3,10 +3,10 @@
 状态：current
 工作目标：0.6.1-contract-public-pilot candidate
 最新 Git tag：v0.6.0-contract-public-pilot
-更新日期：2026-07-23
+更新日期：2026-07-27
 
 本文是唯一活动工程总规划。当前实施规格是
-[Witness Core Optimization SPEC](love-engine-witness-core-optimization.md)。
+[Pre-enterprise Remote Lab SPEC](love-engine-pre-enterprise-remote-lab.md)。
 已完成规格在 ../archive/specs/implemented/，原始资料在 ../reference/ 和
 ../archive/source-materials/，不得原地改写。
 
@@ -30,15 +30,17 @@
   package-to-chain 实验基线。
 - M6 / v0.6.0-contract-public-pilot：最新发布 tag，是本机 Anvil/LAN 合约融合
   基线，不代表 Tailscale、公网或测试网部署。
-- 0.6.1 candidate：修复信任边界、拆分核心/治理实验、建立可解释实验和文档。
-  wire protocol 保持 loveengine-witness-net/0.6。
+- 0.6.1 candidate：信任边界、核心/治理拆分、可解释实验和 CI 已完成本机加固；
+  当前进入共享 Linux 远程实验门。wire protocol 保持
+  loveengine-witness-net/0.6。
 
 当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
 签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
 还能验证本机交易、code hash 和 PublicSink 状态。
 
-当前代码不能证明远程网络已部署、生产身份可信、公众陈述为真、Agent 在社会关系
-上独立、artifact 长期可用，或公司直播已接入。
+当前代码不能证明生产网络已部署、生产身份可信、公众陈述为真、Agent 在社会关系
+上独立、artifact 长期可用，或公司直播已接入。远程实验即使通过，也只增加相同
+commit 在受约束共享 Linux 主机上可复跑的证据。
 
 ## 默认主路径
 
@@ -73,22 +75,26 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 
 完成 0.6.1 本机核心实验后，下一阶段仍需逐项决策和验收：
 
+- 共享远程实验：先执行只读资源门，再以 key-only SSH、loopback 服务、低优先级
+  和唯一目录运行短 core/recovery 实验，并用公开 node CLI 经 tunnel 验收连接后
+  任务/receipt；长 soak 只在独立空闲窗口执行。
 - 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
 - PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
 - UHAH：只在真实需求和独立安全审计成立后评估。
 - 单支付公司真实合作：先明确合规、数据来源、调度和 signer，再接一个受约束
   合作方；本轮不实现。
-- 部署门：SSH/Tailscale、外部 signer、公共测试网、TLS、生产身份、监控、备份
-  和 HA 分别验收，不能由本机 demo 推断。
+- 部署门：共享主机 SSH 实验、Tailscale 直接服务、外部 signer、公共测试网、
+  TLS、生产身份、监控、备份和 HA 分别验收，不能互相推断。
 - 治理协议：多场排期和链上强制 Gate 需要独立合约设计与审计，不在 0.6.1 修改
   ABI。
 
 ## Authority order
 
 1. 本文。
-2. [Witness Core Optimization SPEC](love-engine-witness-core-optimization.md)。
+2. [Pre-enterprise Remote Lab SPEC](love-engine-pre-enterprise-remote-lab.md)。
 3. [核心架构与数据流](../architecture/witness-core-and-data-flow.zh-CN.md)。
 4. ../api/ 下的当前接口文档。
 5. ../development/contract2-comparison-and-recommendations.md。
 6. ../reference/source-materials/current/。
-7. ../archive/specs/implemented/ 和 ../archive/source-materials/。
+7. ../archive/specs/implemented/ 和 ../archive/source-materials/，其中包括已完成的
+   Witness Core Optimization SPEC。

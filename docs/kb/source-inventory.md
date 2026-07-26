@@ -11,7 +11,7 @@
 | README.md / README.zh-CN.md | 中英文仓库入口和真实成熟度 |
 | QA.md | 会议问题的代码事实回答 |
 | docs/specs/love-engine-master-plan.md | 唯一工程总规划 |
-| docs/specs/love-engine-witness-core-optimization.md | 当前 0.6.1 candidate 规格 |
+| docs/specs/love-engine-pre-enterprise-remote-lab.md | 当前 0.6.1 共享 Linux 验收规格 |
 | docs/architecture/witness-core-and-data-flow.zh-CN.md | 核心/治理边界、数据流和存储 |
 | docs/api/ | 当前接口、ABI 和 CLI |
 | docs/development/integration-guide.md | 分层开发实验 |
@@ -54,10 +54,12 @@ docs/archive/source-materials/。
 ## Implementation layers
 
 - Core trust：deterministic ZIP、SkillRegistry、NodeTrustPolicyV1、profile/bootstrap、
-  signed task/receipt 和 Relay。
+  signed task/receipt、鉴权 task ingress 和 Relay。
 - Core evidence：session/event、artifact、ObservationSet、EvidenceBundle、critical
   dispute 和 ProposalGate。
 - Core verification：WitnessCoreTranscriptV1 的 offline/RPC/policy 模式。
+- Remote lab：只读资源门、key-only SSH、loopback 服务、低优先级 core/recovery，
+  以及经 SSH tunnel 使用公开 node CLI 的连接后签名任务与回执验证。
 - Governance lab：WitnessDAO、CorporateSink、StreamingEngine、PublicSink、显式
   vote 和 PilotTranscriptV2。
 - Historical compatibility：M0-M6 schema、codec、fixture 和 transcript reader。
@@ -71,7 +73,7 @@ source hash 和 package hash；只有 M0 package hash 变化时才更新 propaga
 ## Authority order
 
 1. docs/specs/love-engine-master-plan.md
-2. docs/specs/love-engine-witness-core-optimization.md
+2. docs/specs/love-engine-pre-enterprise-remote-lab.md
 3. docs/architecture/witness-core-and-data-flow.zh-CN.md
 4. docs/api/
 5. docs/reference/source-materials/current/

@@ -27,7 +27,7 @@
 
 ## Active development
 
-- `docs/specs/`: the master plan and active Witness core optimization SPEC.
+- `docs/specs/`: the master plan and active pre-enterprise remote lab SPEC.
 - `docs/architecture/`: canonical core/data-flow explanations.
 - `docs/api/`: public protocol and replaceable port contracts.
 - `src/loveengine_witness/`: domain/use cases, release trust, Agent session,
@@ -35,6 +35,8 @@
 - `schemas/`: versioned wire contracts.
 - `contracts/`: four UAS contracts and SkillRegistry.
 - `examples/`: secret-free fixtures and transcripts.
+- `tools/`: repository/release gates, cross-platform core experiments, and the
+  key-only shared-host remote lab.
 
 ## Preserved provenance
 

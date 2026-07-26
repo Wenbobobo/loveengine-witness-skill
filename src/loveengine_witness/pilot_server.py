@@ -30,8 +30,9 @@ from .pilot_config import (
     default_pilot_readiness,
     load_pilot_config,
 )
-from .schema import validate_schema
+from .pilot_task_ingress import enqueue_signed_task
 from .pilot_ui import localized_operator_html
+from .schema import validate_schema
 
 
 CONFIG_KEY = web.AppKey("pilot_config", object)
@@ -222,11 +223,16 @@ def create_pilot_app(
             content_type="text/html",
         )
 
+    async def enqueue_relay_task(request: web.Request) -> web.Response:
+        result = enqueue_signed_task(relay, await request.json())
+        return web.json_response(result, status=202)
+
     app.add_routes(
         [
             web.get("/healthz", health),
             web.get("/readyz", ready),
             web.get("/v1/metrics", metrics_handler),
+            web.post("/v1/relay/tasks", enqueue_relay_task),
             web.get("/operator/", operator),
         ]
     )

@@ -102,7 +102,7 @@ artifact 使用 SHA-256 内容寻址；finalize 会重新读取 bytes 并复算 
 
 ## 7. 三个 Agent 已经证明了什么？（45:38-45:46）
 
-**状态：`[仅本机实验]`**
+**状态：`[本机已验证] [远端待验收]`**
 
 **当前已证明：** 固定实验可以启动三个独立进程/连接，验证成员身份、任务签名、
 事件连续性、artifact 完整性、三份不同地址的回执，以及争议复核的多数结果。
@@ -181,11 +181,13 @@ dispute 是否已 `dismissed`。通过后返回 proposal plan；失败则给出�
 
 **当前已证明：** 开发成员可在 Python 3.11+、uv 和固定 Foundry 1.7.1 环境中
 执行分层实验：包信任、Relay/receipt、证据/finalize、争议/Gate，以及可选的
-治理合约流程。每层都有机器可读结果和自动测试。
+治理合约流程。每层都有机器可读结果和自动测试；远端 runner 还会用公开
+`node connect` 经 SSH tunnel 验证连接后任务和绑定 receipt。
 
 **当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；工作树中的
-`0.6.1-contract-public-pilot` 是 candidate，不是已发布版本。没有完成 SSH、
-Tailscale、公网、公共测试网、TLS、生产身份或 HA 验收。
+`0.6.1-contract-public-pilot` 是 candidate，不是已发布版本。工具实现不等于
+指定主机已经通过 SSH/resource/core/tunnel 验收，也没有完成公网、公共测试网、
+TLS、生产身份或 HA 验收。
 
 **验证入口：** [开发实验指南](docs/development/integration-guide.md)、
 [中文 README](README.zh-CN.md)。
@@ -201,5 +203,25 @@ Tailscale、公网、公共测试网、TLS、生产身份或 HA 验收。
 **当前未证明：** 会议中“之后会部署公共测试网或主机”的表述只是当时计划，不是
 完成事实。远程实验需要明确 host、端口、身份、部署目录和 signer 方案后单独验收。
 
-**验证入口：** [活动优化规格](docs/specs/love-engine-witness-core-optimization.md)、
+**验证入口：** [活动远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
 [工程总规划](docs/specs/love-engine-master-plan.md)。
+
+## 14. 远程主机测试是否等于可以接企业？
+
+**状态：`[已实现] [未实现]`**
+
+**当前已证明：** 仓库提供只读 shared-host preflight、跨平台 core runner 和
+key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净 commit，
+限制为 nice +15 和最多两核，并保持远端 Pilot/Anvil loopback。短实验还覆盖
+持久 Anvil 重启、Quickstart Relay、snapshot 恢复，以及公开 node CLI 经 SSH
+tunnel 收到连接后任务并返回绑定 receipt。
+
+**当前未证明：** 工具存在不等于某台主机已经验收。只有目标主机 preflight、
+远端 core report、下载 transcript 的本机复验都通过后，才能声称共享 Linux
+实验成功；还必须看到 tunnel smoke、receipt 和本次进程组清理结果。即使成功，
+也不证明生产 signer、TLS、HA、公共测试网或企业系统已经接入。
+
+**验证入口：**
+[远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
+[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)、
+`tests/test_remote_lab.py`。

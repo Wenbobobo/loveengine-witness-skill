@@ -12,12 +12,13 @@
 ## Active authority
 
 1. [Engineering master plan](specs/love-engine-master-plan.md)
-2. [Witness Core Optimization SPEC](specs/love-engine-witness-core-optimization.md)
+2. [Pre-enterprise Remote Lab SPEC](specs/love-engine-pre-enterprise-remote-lab.md)
 3. [API documents](api/README.md)
 4. [Role runbooks](development/participant-runbook.zh-CN.md)
 
-0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。公司直播、
-SSH/Tailscale、公网和测试网不属于当前已完成能力。
+0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。共享
+Linux remote lab 是当前活动验收门；公司直播、Tailscale 直接服务、公网和测试网
+仍不属于当前已完成能力。
 
 ## Development and operations
 
@@ -28,6 +29,7 @@ SSH/Tailscale、公网和测试网不属于当前已完成能力。
 - [Voting witness](development/runbooks/voting-witness-flow.zh-CN.md)
 - [Read-only viewer](development/runbooks/public-viewer-flow.zh-CN.md)
 - [Publisher](development/runbooks/publisher-flow.zh-CN.md)
+- [Shared remote lab](development/runbooks/remote-lab-flow.zh-CN.md)
 - [Technical architecture article](articles/loveengine-technical-architecture.zh-CN.md)
 
 ## Historical evidence

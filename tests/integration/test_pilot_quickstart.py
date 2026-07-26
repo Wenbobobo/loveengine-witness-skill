@@ -15,6 +15,7 @@ from loveengine_witness.m4_network import build_task_v2
 from loveengine_witness.m4_typed_data import build_task_v2_typed_data
 from loveengine_witness.pilot_runtime import prepare_local_pilot_runtime
 from loveengine_witness.pilot_server import RELAY_KEY, create_pilot_app
+from loveengine_witness.pilot_task_operator import enqueue_review_task
 
 
 @pytest.mark.integration
@@ -111,13 +112,46 @@ def test_quickstart_runtime_exposes_trust_bound_public_node_path(
             )
             assert "error" not in signed
             task["signature"] = str(signed["result"])
-            assert app[RELAY_KEY].store.enqueue(
-                node,
-                task["task_id"],
-                json.dumps(task, sort_keys=True),
-                task["issuer"],
-                task["nonce"],
-            )
+            async with ClientSession() as session:
+                missing_auth = await session.post(
+                    base_url + "/v1/relay/tasks",
+                    json=task,
+                )
+                assert missing_auth.status == 401
+                wrong_auth = await session.post(
+                    base_url + "/v1/relay/tasks",
+                    json=task,
+                    headers={"Authorization": "Bearer wrong"},
+                )
+                assert wrong_auth.status == 401
+                wrong_origin = await session.post(
+                    base_url + "/v1/relay/tasks",
+                    json=task,
+                    headers={
+                        "Authorization": f"Bearer {runtime.config.write_token}",
+                        "Origin": "https://untrusted.example",
+                    },
+                )
+                assert wrong_origin.status == 403
+                queued_value = await asyncio.to_thread(
+                    enqueue_review_task,
+                    tmp_path,
+                    profile_index=1,
+                    task_id=task["task_id"],
+                    dispute_id=dispute_id,
+                )
+                assert queued_value["queued"] is True
+                assert queued_value["task_id"] == task["task_id"]
+                assert queued_value["recipient"] == node
+                duplicate = await session.post(
+                    base_url + "/v1/relay/tasks",
+                    json=task,
+                    headers={
+                        "Authorization": f"Bearer {runtime.config.write_token}",
+                        "Origin": base_url,
+                    },
+                )
+                assert duplicate.status == 409
 
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
             assert process.returncode == 0, stderr.decode("utf-8", errors="replace")

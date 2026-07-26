@@ -176,7 +176,31 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 accelerated soak、secret scan 和 `git diff --check`。四小时墙钟 soak 需单独运行
 并保存报告。
 
-## 11. Stable command tree
+跨平台核心实验入口为：
+
+```powershell
+uv run python .\tools\run_core_experiments.py
+```
+
+PowerShell wrapper 调用同一 Python runner，不维护第二份流程。
+
+## 11. Shared remote lab tools
+
+remote lab 是 repository tool，不增加 LoveEngine 协议命令。它固定 host key，
+只接受 SSH public key，并在部署前执行只读资源门：
+
+```powershell
+uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts <known-hosts>
+uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts <known-hosts>
+```
+
+run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
+最多两核和低并发。它先运行 core/recovery，再建立本机 SSH tunnel，使用公开
+`loveengine node connect` 连接远端 Quickstart，并通过鉴权任务入口证明连接后任务
+和绑定 receipt。工具没有 password、sudo、systemd、public bind 或远端文件自动
+清理选项。资源门失败使用退出码 4。
+
+## 12. Stable command tree
 
 ```text
 version  manifest  node  fixture  evidence  transcript

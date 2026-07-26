@@ -171,6 +171,17 @@ GET /v1/releases/{publisher}/{skillId}/{version}
 GET /v1/artifacts/{packageHash}
 ```
 
+Pilot Server 另提供受 write token 和 Origin 保护的任务入口：
+
+```text
+POST /v1/relay/tasks
+```
+
+该入口只接受已经签名的 NetworkTaskV2，并在持久化前检查 active release、
+BootstrapBundleV2 成员、chainId、Registry、recipient、Publisher issuer、
+manifest hash、deadline 和签名。它不替 issuer 签名。独立 `relay serve` 不提供
+该 Operator 写入口。
+
 WebSocket：
 
 ```text

@@ -20,8 +20,9 @@ loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验�
 | package/Registry 信任、签名任务/回执、证据和争议复核 | 已在本机实现 |
 | ProposalGate 和可验证核心 transcript | 已在本机实现 |
 | WitnessDAO、显式投票和 PublicSink | 可选治理实验 |
+| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；远程验收待完成 |
 | 公司直播 adapter 和自动发现 | 未实现 |
-| SSH/Tailscale、公网/测试网、生产身份、TLS 和 HA | 未完成 |
+| Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
 
 本机测试证明协议分权、篡改检测和可重复性；它不证明现实中的组织彼此独立、发言
 内容为真、已经公开部署或 artifact 能长期可用。
@@ -81,6 +82,22 @@ Quickstart 同时生成 pilot-invite.json 和 pilot-trust-policy.json；它不�
 uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 ```
 
+## 共享远程实验
+
+企业衔接前的 remote lab 让 Pilot 和 Anvil 继续只监听远端 loopback。它固定 SSH
+host key，只接受 public-key 认证，先执行只读资源门，再把一个干净 commit 部署到
+唯一目录；实验最多使用两个 CPU、降低调度优先级，最后下载报告和 transcript，
+在本机再次离线验证。run 模式还会建立本机 SSH tunnel，使用公开 node CLI 连接
+远端 loopback Quickstart，证明节点在连接后收到新任务并返回一个绑定 receipt。
+
+```powershell
+uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+```
+
+远程 runner 故意不提供 password 参数，也不使用 sudo、systemd、公开端口绑定或
+自动清理。完整步骤见[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
+
 ## 角色
 
 | 角色 | 权限 |
@@ -104,6 +121,7 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 - Windows 本机 token 文件尚未显式配置或验收 NTFS ACL，只能视为 loopback 实验
   隔离，不是生产多用户主机的权限边界。
 - 原始证据不上链；PublicSink 只读；UTO 是公共记账，不是可交易资产。
+- remote lab 必须固定 host key 并使用专用 SSH public key；runner 不接受密码。
 
 ## 文档入口
 
@@ -113,7 +131,8 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 - [CLI 参考](docs/api/cli-reference.md)
 - [合约 API](docs/api/loveengine-contract-api.md)
 - [工程总规划](docs/specs/love-engine-master-plan.md)
-- [活动优化规格](docs/specs/love-engine-witness-core-optimization.md)
+- [活动远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)
+- [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [完整文档索引](docs/README.md)
 
 ## License

@@ -10,14 +10,14 @@ Read order:
 1. `skills/loveengine-witness/skill-manifest.json` (current)
 2. `skills/loveengine-witness/skill-manifest.m0.json` (M0 compatibility)
 3. `docs/specs/love-engine-master-plan.md`
-4. `docs/specs/love-engine-witness-core-optimization.md`
+4. `docs/specs/love-engine-pre-enterprise-remote-lab.md`
 5. `docs/api/extension-interfaces.md`
 6. `docs/reference/source-materials/current/UAS接口文档.md`
 7. `docs/reference/source-materials/current/UAS 见证方案 2.0.md`
 8. `docs/kb/source-inventory.md`
 
 Source rule: `docs/specs/love-engine-master-plan.md` is the engineering source
-of truth and `docs/specs/love-engine-witness-core-optimization.md` is the active
+of truth and `docs/specs/love-engine-pre-enterprise-remote-lab.md` is the active
 implementation spec. Implemented specs and preserved source materials remain
 under `docs/archive/` and `docs/reference/`; do not rewrite them in place.
 
@@ -59,4 +59,4 @@ Governance parameters:
 
 M0 compatibility manifest spec hash:
 
-`sha256:6a582314dae3b4fcbef77c18fbba102c49a0d1606cbcafe7a8bface1737182ea`
+`sha256:3705e649499ea870155c3be74edadcf2c023fdc99f1a4eefd4ed19d1c66d094c`

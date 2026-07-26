@@ -151,7 +151,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "docs/development/participant-runbook.zh-CN.md",
         "docs/architecture/witness-core-and-data-flow.zh-CN.md",
         "docs/specs/love-engine-master-plan.md",
-        "docs/specs/love-engine-witness-core-optimization.md",
+        "docs/specs/love-engine-pre-enterprise-remote-lab.md",
     ]
     seen: set[str] = set()
     for relative_value in [*fixed, *source_refs]:

@@ -18,8 +18,9 @@ WitnessDAO、投票和 PublicSink 属于可选治理实验。
 | SkillRegistry | 锚定 Publisher release 的 ZIP/manifest hash 与状态 | 保存完整 ZIP 或证据原文 |
 | 治理实验 | 演示显式投票和 UTO 公共记账 | Witness Skill 的默认完成条件 |
 
-公司直播 adapter、自动发现、长期 scheduler、SSH、公网、测试网、生产身份、TLS、
-HA 和多副本证据存储当前都未实现。
+公司直播 adapter、自动发现、长期 scheduler、公网、测试网、生产身份、TLS、HA
+和多副本证据存储当前都未实现。共享 Linux SSH 实验工具已经实现，但它只运行
+loopback Anvil/Pilot 和短期 core/recovery 验证，不是远程生产服务。
 
 ## 组件与角色
 
@@ -57,6 +58,7 @@ flowchart LR
 sequenceDiagram
     participant P as Publisher
     participant R as SkillRegistry
+    participant O as Operator
     participant N as Observation Agent
     participant H as Relay
     P->>P: build deterministic ZIP
@@ -66,6 +68,9 @@ sequenceDiagram
     N->>R: read active release
     N->>N: verify policy, ZIP, manifest and signed profile
     N->>H: outbound WebSocket connect as bootstrap member
+    P-->>O: provide signed NetworkTaskV2
+    O->>H: authenticated POST signed task
+    H->>H: verify release, member, issuer, recipient and signature
     H->>N: signed observe/review task
     N->>N: verify issuer, recipient, nonce and deadline
     N-->>H: acceptance ACK
@@ -165,12 +170,17 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 ## 传输、重试与失败模式
 
 - Agent 只建立出站 WebSocket；Relay 可以在连接建立后继续推送新任务。
+- Pilot 的鉴权 task ingress 只接受已经签名的 NetworkTaskV2；write token 只授权
+  入队，不赋予 Pilot 代替 Publisher 签名的能力。
 - Relay 使用 at-least-once 语义。重复 task/event 必须幂等；同 ID 不同内容拒绝。
 - 接收 ACK 延迟和任务完成延迟分别记录；长观察任务期间继续处理 heartbeat。
 - observation cursor 持久化，SSE 重连携带 Last-Event-ID 或 after。
 - receipt 必须属于当前鉴权连接和该节点已接受的 pending task；伪造、错绑或重复
   receipt 均拒绝。
 - 当前 node connect 是有界会话，不是常驻 scheduler 或生产级 daemon。
+- 共享远程实验固定 host key、只接受 SSH key，并通过 tunnel 保持 Pilot/Anvil
+  的 loopback 边界；本机公开 node CLI 经 tunnel 完成连接后任务和 receipt 验证，
+  但不开放 Tailscale 或公网监听。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
 

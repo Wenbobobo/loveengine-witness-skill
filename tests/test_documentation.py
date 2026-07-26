@@ -40,8 +40,13 @@ def test_active_documentation_has_valid_links_and_no_stale_workspace_paths() -> 
 
 
 def test_current_spec_and_preserved_release_assets_exist() -> None:
-    spec = ROOT / "docs/specs/love-engine-witness-core-optimization.md"
-    assert "Witness Core Optimization" in spec.read_text(encoding="utf-8")
+    spec = ROOT / "docs/specs/love-engine-pre-enterprise-remote-lab.md"
+    assert "Pre-enterprise Remote Lab" in spec.read_text(encoding="utf-8")
+    implemented = (
+        ROOT
+        / "docs/archive/specs/implemented/love-engine-witness-core-optimization.md"
+    )
+    assert "Witness Core Optimization" in implemented.read_text(encoding="utf-8")
 
     assert (
         ROOT
