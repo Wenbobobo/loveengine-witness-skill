@@ -1,6 +1,6 @@
 # LoveEngine Pre-enterprise Remote Lab SPEC
 
-状态：active candidate hardening
+状态：short remote acceptance verified; long soak deferred
 目标版本：0.6.1-contract-public-pilot
 协议：loveengine-witness-net/0.6
 更新日期：2026-07-27
@@ -97,6 +97,23 @@ CPU、内存、磁盘、ACK 和恢复报告。
 - 没有监听非 loopback 端口，没有 sudo/systemd 和系统级安装；
 - 没有密码、token、私钥或 Anvil key 进入仓库、报告、日志和 transcript；
 - 本机全量发布门和 GitHub Actions 继续通过。
+
+## 实测记录
+
+2026-07-27，source commit `63909b9` 在共享 ARM64 Linux 主机上通过短验收：
+
+- preflight、core 前资源门、tunnel 前资源门和实验后 preflight 均为
+  `safe_to_run:true`，没有相关残留进程；
+- core 为 passed，3 个 observation receipt、3 个 review receipt、Gate ready，
+  restart/snapshot 恢复测试通过；
+- 下载 transcript 在本机返回 `offline_integrity`、`trust_bound:false`；
+- 公开 node CLI 在连接后收到签名任务，返回 1 个绑定 receipt，Relay 记录 1 个
+  ACK；
+- Quickstart 清理的 stop/absence 校验都返回 0，远端服务始终只绑定 loopback。
+
+主机最初因缺少固定 Foundry 1.7.1 被门禁阻断。操作者另行校验官方 immutable
+release 的 ARM64 归档、SHA-256 和 GitHub attestation，以原子方式放入用户专用
+目录后重新运行门禁；runner 没有自动安装系统软件或降低阈值。
 
 ## 明确延期
 

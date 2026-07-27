@@ -31,15 +31,15 @@
 - M6 / v0.6.0-contract-public-pilot：最新发布 tag，是本机 Anvil/LAN 合约融合
   基线，不代表 Tailscale、公网或测试网部署。
 - 0.6.1 candidate：信任边界、核心/治理拆分、可解释实验和 CI 已完成本机加固；
-  当前进入共享 Linux 远程实验门。wire protocol 保持
-  loveengine-witness-net/0.6。
+  source commit `63909b9` 已通过共享 ARM64 Linux 短实验门，长 soak 仍延期。
+  wire protocol 保持 loveengine-witness-net/0.6。
 
 当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
 签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
 还能验证本机交易、code hash 和 PublicSink 状态。
 
 当前代码不能证明生产网络已部署、生产身份可信、公众陈述为真、Agent 在社会关系
-上独立、artifact 长期可用，或公司直播已接入。远程实验即使通过，也只增加相同
+上独立、artifact 长期可用，或公司直播已接入。已通过的远程短实验只增加相同
 commit 在受约束共享 Linux 主机上可复跑的证据。
 
 ## 默认主路径
@@ -73,11 +73,10 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 
 ## 后续路线
 
-完成 0.6.1 本机核心实验后，下一阶段仍需逐项决策和验收：
+完成 0.6.1 本机核心和共享 Linux 短实验后，下一阶段仍需逐项决策和验收：
 
-- 共享远程实验：先执行只读资源门，再以 key-only SSH、loopback 服务、低优先级
-  和唯一目录运行短 core/recovery 实验，并用公开 node CLI 经 tunnel 验收连接后
-  任务/receipt；长 soak 只在独立空闲窗口执行。
+- 共享远程实验：短 core/recovery 和公开 node CLI tunnel 已通过；30 分钟与
+  4 小时 soak 只在独立空闲窗口执行。
 - 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
 - PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
 - UHAH：只在真实需求和独立安全审计成立后评估。

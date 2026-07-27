@@ -57,6 +57,14 @@ try {
 
     Invoke-CheckedNative "M2-M6 integration tests" { uv run pytest -m integration -q }
 
+    Invoke-CheckedNative "accelerated soak" {
+        uv run loveengine pilot soak `
+            --duration-seconds 1 `
+            --events 12 `
+            --observers 10 `
+            --output (Join-Path $buildCheckRoot "accelerated-soak")
+    }
+
     $first = Invoke-CheckedNative "first deterministic build" {
         uv run loveengine package build --output (Join-Path $buildCheckRoot "first")
     } | ConvertFrom-Json

@@ -19,8 +19,9 @@ WitnessDAO、投票和 PublicSink 属于可选治理实验。
 | 治理实验 | 演示显式投票和 UTO 公共记账 | Witness Skill 的默认完成条件 |
 
 公司直播 adapter、自动发现、长期 scheduler、公网、测试网、生产身份、TLS、HA
-和多副本证据存储当前都未实现。共享 Linux SSH 实验工具已经实现，但它只运行
-loopback Anvil/Pilot 和短期 core/recovery 验证，不是远程生产服务。
+和多副本证据存储当前都未实现。共享 Linux SSH 短实验已在 ARM64 主机上通过，
+但它只运行 loopback Anvil/Pilot、core/recovery 和 tunnel 节点验证，不是远程
+生产服务。
 
 ## 组件与角色
 
@@ -180,7 +181,8 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 - 当前 node connect 是有界会话，不是常驻 scheduler 或生产级 daemon。
 - 共享远程实验固定 host key、只接受 SSH key，并通过 tunnel 保持 Pilot/Anvil
   的 loopback 边界；本机公开 node CLI 经 tunnel 完成连接后任务和 receipt 验证，
-  但不开放 Tailscale 或公网监听。
+  但不开放 Tailscale 或公网监听。source commit `63909b9` 的短实验已验证该路径，
+  长 soak 和生产网络仍未验证。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
 

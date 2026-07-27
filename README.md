@@ -23,13 +23,15 @@ transcripts remain verifiable.
 | Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
 | ProposalGate and verifiable core transcript | Implemented locally |
 | WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
-| Shared Linux preflight and key-only remote lab tooling | Implemented; remote acceptance pending |
+| Shared Linux preflight and key-only remote lab tooling | Implemented; short ARM64 Linux acceptance passed |
 | Company livestream adapter and autonomous discovery | Not implemented |
 | Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
 
-The local tests demonstrate protocol separation, tamper detection and
-repeatability. They do not demonstrate independent real-world organizations,
-statement truth, public deployment, or long-term artifact availability.
+The local tests and the 2026-07-27 shared ARM64 Linux short acceptance of source
+commit `63909b9` demonstrate protocol separation, tamper detection,
+cross-platform repeatability, and the public-node SSH tunnel path. They do not
+demonstrate independent real-world organizations, statement truth, public
+deployment, or long-term artifact availability.
 
 ## Core Flow
 
@@ -108,6 +110,13 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 The remote runner deliberately has no password option and does not use sudo,
 systemd, public binds, or automatic cleanup. See the
 [shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
+
+The completed short acceptance produced three observation receipts, three
+review receipts, Gate ready, and passing recovery checks. The downloaded
+transcript verified as `offline_integrity` with `trust_bound:false`; the public
+node CLI received one post-connection signed task, Relay stored one bound
+receipt, and the post-run read-only gate found no related process left behind.
+The 30-minute and four-hour soak gates remain deferred.
 
 ## Roles
 

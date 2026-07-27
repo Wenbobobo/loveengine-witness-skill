@@ -20,12 +20,13 @@ loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验�
 | package/Registry 信任、签名任务/回执、证据和争议复核 | 已在本机实现 |
 | ProposalGate 和可验证核心 transcript | 已在本机实现 |
 | WitnessDAO、显式投票和 PublicSink | 可选治理实验 |
-| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；远程验收待完成 |
+| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；ARM64 Linux 短验收已通过 |
 | 公司直播 adapter 和自动发现 | 未实现 |
 | Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
 
-本机测试证明协议分权、篡改检测和可重复性；它不证明现实中的组织彼此独立、发言
-内容为真、已经公开部署或 artifact 能长期可用。
+本机测试和 2026-07-27 的共享 ARM64 Linux 短验收（source commit `63909b9`）
+证明协议分权、篡改检测、跨平台复跑和 SSH tunnel 公共节点路径；它们不证明现实
+中的组织彼此独立、发言内容为真、已经公开部署或 artifact 能长期可用。
 
 ## 核心流程
 
@@ -97,6 +98,11 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 
 远程 runner 故意不提供 password 参数，也不使用 sudo、systemd、公开端口绑定或
 自动清理。完整步骤见[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
+
+已完成的短验收得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过；
+下载 transcript 为 `offline_integrity` / `trust_bound:false`。公开 node CLI 在
+连接后收到一个签名任务，Relay 保存一个绑定回执，实验后的只读门禁未发现相关
+残留进程。30 分钟和 4 小时 soak 仍未执行。
 
 ## 角色
 

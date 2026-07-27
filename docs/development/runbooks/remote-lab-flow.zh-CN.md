@@ -37,6 +37,12 @@ uv run python .\tools\run_remote_lab.py preflight `
 
 资源门返回退出码 4 时停止。共享主机不得通过降低门槛或手动修改报告绕过。
 
+如果唯一阻塞是用户目录缺少固定 Foundry，runner 仍必须停止。主机操作者可以在
+独立步骤中下载官方 immutable v1.7.1 对应架构归档，同时验证发布摘要和 GitHub
+attestation，先在阶段目录复验 `forge/anvil --version`，再原子切换到
+`~/.codex/tools/foundry-v1.7.1/`。共享主机上不要现场编译；完成后重新执行完整
+preflight。该工具链准备不属于 runner 的自动行为。
+
 ## 3. 部署和短核心实验
 
 本地 worktree 必须干净，且当前 commit 已经过本机回归：
@@ -93,3 +99,7 @@ Pilot 配置改成 `0.0.0.0`。
 公网可用性、生产密钥安全或企业系统已经接入。
 
 30 分钟/4 小时 soak 只在单独确认的空闲窗口执行，短实验不会自动启动它们。
+
+2026-07-27 的 source commit `63909b9` 已满足上述短实验字段；机器报告保留在
+本机忽略目录和远端唯一部署目录。实验后再次运行 preflight，确认没有相关残留
+进程。长 soak 仍未执行。

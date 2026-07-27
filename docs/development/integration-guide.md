@@ -139,6 +139,12 @@ receipt；它只停止自己创建的 Quickstart 进程组。详细门槛见
 路径能否经安全 tunnel 完成连接后任务和 receipt。
 不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
 
+2026-07-27 的 source commit `63909b9` 已通过该短实验：3 个 observation
+receipt、3 个 review receipt、Gate ready、恢复测试通过；下载 transcript 为
+`offline_integrity` / `trust_bound:false`，tunnel 节点得到 1 个绑定 receipt，
+Relay 记录 1 个 ACK，实验后 preflight 未发现相关残留进程。30 分钟和 4 小时
+soak 仍延期。
+
 ## 变更验收
 
 ```powershell
