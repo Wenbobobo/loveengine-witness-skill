@@ -154,6 +154,10 @@ def _scp_options(args: argparse.Namespace) -> list[str]:
     return options
 
 
+def _no_forwarding_options() -> list[str]:
+    return ["-o", "ClearAllForwardings=yes"]
+
+
 def _remote_bash(script: str) -> str:
     return "bash -lc " + shlex.quote(script)
 
@@ -339,8 +343,7 @@ class RemoteLab:
             [
                 self.ssh,
                 *self.ssh_options,
-                "-o",
-                "DisableForwarding=yes",
+                *_no_forwarding_options(),
                 self.target,
                 command,
             ],
@@ -510,8 +513,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             [
                 self.ssh,
                 *self.ssh_options,
-                "-o",
-                "DisableForwarding=yes",
+                *_no_forwarding_options(),
                 self.target,
                 stop_command,
             ],
@@ -526,8 +528,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             [
                 self.ssh,
                 *self.ssh_options,
-                "-o",
-                "DisableForwarding=yes",
+                *_no_forwarding_options(),
                 self.target,
                 absence_command,
             ],

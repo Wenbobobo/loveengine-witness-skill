@@ -19,6 +19,7 @@ from remote_host_preflight import (  # noqa: E402
 from run_remote_lab import (  # noqa: E402
     _owned_group_absence_command,
     _owned_group_stop_command,
+    _no_forwarding_options,
     _ssh_options,
     _validate_remote_artifact,
     _validate_remote_limits,
@@ -123,7 +124,7 @@ def test_remote_preflight_detects_python_launched_loveengine(
 ) -> None:
     ok, _, relevant, error = _parse_process_snapshot(
         (
-            "4321 python3 1.5 0.2 "
+            "4321 1.5 0.2 "
             "python3 -m loveengine_witness.cli pilot serve --config fixture.json\n"
         )
     )
@@ -143,8 +144,8 @@ def test_remote_preflight_detects_python_launched_loveengine(
 def test_remote_preflight_ignores_only_the_current_lab_process() -> None:
     ok, _, relevant, error = _parse_process_snapshot(
         (
-            "4321 python3 1.5 0.2 python3 tools/run_core_experiments.py\n"
-            "4322 python3 1.0 0.1 python3 tools/run_core_experiments.py\n"
+            "4321 1.5 0.2 python3 tools/run_core_experiments.py\n"
+            "4322 1.0 0.1 python3 tools/run_core_experiments.py\n"
         ),
         ignored_pids={4321},
     )
@@ -159,6 +160,44 @@ def test_remote_preflight_ignores_only_the_current_lab_process() -> None:
             "memory_percent": 0.1,
         }
     ]
+
+
+def test_remote_preflight_accepts_a_process_with_empty_arguments() -> None:
+    ok, top, relevant, error = _parse_process_snapshot(
+        "4321 0.0 0.0\n"
+    )
+
+    assert ok is True
+    assert error is None
+    assert top == [
+        {
+            "pid": 4321,
+            "command": "",
+            "cpu_percent": 0.0,
+            "memory_percent": 0.0,
+        }
+    ]
+    assert relevant == []
+
+
+def test_remote_preflight_accepts_only_the_procps_dash_placeholder() -> None:
+    ok, top, relevant, error = _parse_process_snapshot(
+        "4321 - 0.0 [kworker]\n"
+    )
+
+    assert ok is True
+    assert error is None
+    assert top[0]["cpu_percent"] == 0.0
+    assert relevant == []
+
+    for value in ("nan", "-1", "unknown"):
+        ok, _, _, error = _parse_process_snapshot(
+            f"4321 {value} 0.0 [kworker]\n"
+        )
+        assert ok is False
+        assert error == (
+            "unparsed process rows: columns=0, pid=0, cpu=1, memory=0"
+        )
 
 
 @pytest.mark.parametrize(
@@ -248,6 +287,10 @@ def test_remote_ssh_is_key_only_and_has_no_password_option(tmp_path: Path) -> No
     assert "ForwardAgent=no" in options
     assert options[options.index("-F") + 1] in {"NUL", "/dev/null"}
     assert "password" not in build_parser().format_help().lower()
+    assert _no_forwarding_options() == [
+        "-o",
+        "ClearAllForwardings=yes",
+    ]
 
 
 @pytest.mark.parametrize(

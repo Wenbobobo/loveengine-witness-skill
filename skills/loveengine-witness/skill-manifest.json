@@ -327,8 +327,8 @@
     "src/loveengine_witness/trust_policy.py": "sha256:66b57914f1914a211f146cac79a0567bd8a513db0a5d2d0dca6202aae5ea5564",
     "tools/run_core_experiments.ps1": "sha256:cba5823a70f1ec4df1ef5023c65d95c8ec983e81fbf883a6e44f91682dd34adc",
     "tools/run_core_experiments.py": "sha256:0897597d9f02adee1c73c173dc4a12703563290c7df567bf359573e353ad6f7d",
-    "tools/remote_host_preflight.py": "sha256:dbe149b0c2abcecffe2cba67ce061b993d17c72a7b95428cc6baf7ea315c2546",
-    "tools/run_remote_lab.py": "sha256:2aebb871a279bdffec92f4e004b8209e2264c5533abb33ae30b58a829b7952ab",
+    "tools/remote_host_preflight.py": "sha256:fa5d9981919c63e0adbc99176ad818ec90f752f0cfd367a5772daca553f32cee",
+    "tools/run_remote_lab.py": "sha256:0064ccad2343e199df914bdf9f4a30224175bc85af29cb179c1dce1bc0ebbc91",
     "docs/development/runbooks/remote-lab-flow.zh-CN.md": "sha256:0290ecdb89cba5071bc24cf229ef5c209501751f230d62d35fb72eef2baa2931",
     "docs/specs/love-engine-pre-enterprise-remote-lab.md": "sha256:8c579f766a9e9b28b99b95b7ac23c9f47f3c3f14e41bf7f41b47d197f0b63dd6",
     "src/loveengine_witness/pilot_task_ingress.py": "sha256:b15a599008fea8b56db22ada4bbd775672135251c433f0cc5b648eb6c74da99a",
@@ -431,7 +431,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:651f1ae9f86227c81da4504b433dd8a6108b7029a6f430b4bc075bf04a38b8da",
+  "package_hash": "sha256:f9d2aefb67f8956609bfc815d30abdfcbed25af413381b1461aa2ba578850ef0",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

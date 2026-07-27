@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import platform
 import re
@@ -112,7 +113,7 @@ def _process_snapshot(
         return False, [], [], "process inspection requires Linux ps"
     try:
         result = subprocess.run(
-            ["ps", "-eo", "pid=,comm=,%cpu=,%mem=,args=", "--sort=-%cpu"],
+            ["ps", "-eo", "pid=,%cpu=,%mem=,args=", "--sort=-%cpu"],
             capture_output=True,
             check=True,
             text=True,
@@ -134,34 +135,71 @@ def _parse_process_snapshot(
     ignored_pids: set[int] | None = None,
 ) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]], str | None]:
     ignored = ignored_pids or set()
+
+    def process_percent(raw: str) -> float:
+        if raw == "-":
+            return 0.0
+        value = float(raw)
+        if not math.isfinite(value) or value < 0:
+            raise ValueError
+        return value
+
     top: list[dict[str, Any]] = []
     relevant: list[dict[str, Any]] = []
-    parse_errors = 0
+    column_errors = 0
+    pid_errors = 0
+    cpu_errors = 0
+    memory_errors = 0
     for raw in output.splitlines():
-        parts = raw.split(None, 4)
-        if len(parts) != 5:
+        parts = raw.split(None, 3)
+        if len(parts) not in {3, 4}:
             if raw.strip():
-                parse_errors += 1
+                column_errors += 1
             continue
         try:
-            item = {
-                "pid": int(parts[0]),
-                "command": parts[1],
-                "cpu_percent": float(parts[2]),
-                "memory_percent": float(parts[3]),
-            }
+            pid = int(parts[0])
         except ValueError:
-            parse_errors += 1
+            pid_errors += 1
             continue
+        try:
+            cpu_percent = process_percent(parts[1])
+        except ValueError:
+            cpu_errors += 1
+            continue
+        try:
+            memory_percent = process_percent(parts[2])
+        except ValueError:
+            memory_errors += 1
+            continue
+        arguments = parts[3] if len(parts) == 4 else ""
+        first_argument = arguments.split(None, 1)[0] if arguments else ""
+        command = (
+            first_argument.rsplit("/", 1)[-1]
+            if first_argument.startswith("/")
+            else first_argument
+        )
+        item = {
+            "pid": pid,
+            "command": command,
+            "cpu_percent": cpu_percent,
+            "memory_percent": memory_percent,
+        }
         if int(item["pid"]) in ignored:
             continue
         if len(top) < 8:
             top.append(item)
-        searchable = f"{item['command']} {parts[4]}".lower()
+        searchable = arguments.lower()
         if any(name in searchable for name in RELEVANT_PROCESSES):
             relevant.append(item)
-    if parse_errors:
-        return False, top, relevant, f"unparsed process rows: {parse_errors}"
+    if column_errors or pid_errors or cpu_errors or memory_errors:
+        return (
+            False,
+            top,
+            relevant,
+            "unparsed process rows: "
+            f"columns={column_errors}, pid={pid_errors}, "
+            f"cpu={cpu_errors}, memory={memory_errors}",
+        )
     return True, top, relevant, None
 
 
