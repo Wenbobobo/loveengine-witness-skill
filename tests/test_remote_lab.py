@@ -17,6 +17,7 @@ from remote_host_preflight import (  # noqa: E402
     evaluate_capacity,
 )
 from run_remote_lab import (  # noqa: E402
+    TUNNEL_NODE_COUNT,
     _owned_group_absence_command,
     _owned_group_stop_command,
     _no_forwarding_options,
@@ -25,6 +26,7 @@ from run_remote_lab import (  # noqa: E402
     _validate_remote_limits,
     _validate_remote_root,
     _validate_target,
+    _validated_review_receipt,
     _wait_http_json_or_none,
     build_parser,
 )
@@ -397,6 +399,39 @@ def test_http_wait_timeout_is_transient_only_while_tunnel_is_live(
             "http://127.0.0.1:1/v1/metrics",
             timeout=0.1,
             process=Process(1),  # type: ignore[arg-type]
+        )
+
+
+def test_tunnel_review_receipt_must_bind_each_of_three_nodes() -> None:
+    assert TUNNEL_NODE_COUNT == 3
+    result = {
+        "rejected": 0,
+        "receipts": [
+            {
+                "task_id": "task-2",
+                "status": "completed",
+                "result": {
+                    "dispute_id": "dispute-2",
+                    "evidence_verified": True,
+                },
+            }
+        ],
+    }
+
+    assert (
+        _validated_review_receipt(
+            result,
+            task_id="task-2",
+            dispute_id="dispute-2",
+        )["status"]
+        == "completed"
+    )
+    result["receipts"][0]["result"]["evidence_verified"] = False
+    with pytest.raises(RuntimeError, match="evidence-verified"):
+        _validated_review_receipt(
+            result,
+            task_id="task-2",
+            dispute_id="dispute-2",
         )
 
 

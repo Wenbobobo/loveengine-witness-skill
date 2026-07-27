@@ -94,8 +94,9 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 host key，只接受 public-key 认证，先执行只读资源门，再把一个干净 commit 部署到
 唯一目录；实验最多使用两个 CPU、降低调度优先级，最后下载报告和 transcript，
 在本机再次离线验证。run 模式还会建立本机 SSH tunnel，使用公开 node CLI 连接
-远端 loopback Quickstart，证明节点在连接后收到新任务并返回一个绑定 receipt。
-该任务引用真实 finalized evidence，节点会经 tunnel 取回并验证后才签回执。
+远端 loopback Quickstart。runner 先启动 3 个独立鉴权进程，三者全部连接后才
+分别提交任务；每个节点取回并复算各自的 finalized evidence，再返回与
+node/task/dispute 分别绑定的 receipt。
 
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -110,7 +111,10 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 已完成的短验收得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过；
 下载 transcript 为 `offline_integrity` / `trust_bound:false`。公开 node CLI 在
 连接后收到一个签名任务，Relay 保存一个绑定回执，实验后的只读门禁未发现相关
-残留进程。30 分钟和 4 小时 soak 仍未执行。
+残留进程。这是旧的单节点 tunnel baseline；增强后的 runner 要求在同一次短时
+跨主机实验中得到 3 个公开节点连接、3 个 evidence-verified 回执、3 个 Relay
+ACK 和 3 个 receipt confirmation。三个 profile/进程仍是模拟 actor，不代表
+现实社会独立性。30 分钟和 4 小时 soak 仍未执行。
 
 ## 角色
 

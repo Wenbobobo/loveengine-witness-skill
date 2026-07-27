@@ -202,8 +202,10 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
 最多两核和低并发。它先运行 core/recovery，再建立本机 SSH tunnel，使用公开
 `loveengine node connect` 连接远端 Quickstart，并通过鉴权任务入口证明连接后任务
-和绑定 receipt。tunnel review task 指向刚创建的 finalized evidence；节点实际
-取回 bundle、event 和 artifact 后才签名。成功或失败都会写
+和绑定 receipt。runner 先同时连接 3 个公开 node 进程，再分别提交 3 个 tunnel
+review task。每个任务指向刚创建的 finalized evidence；节点实际取回 bundle、
+event 和 artifact 后才签名。报告必须包含 3 个 evidence-verified receipt、
+3 个 ACK 和 3 个 receipt confirmation。成功或失败都会写
 `remote-lab-report.json`；最终 postflight 单独记录进程检查和残留状态。工具没有
 password、sudo、systemd、public bind 或远端文件自动清理选项。资源门失败使用
 退出码 4。

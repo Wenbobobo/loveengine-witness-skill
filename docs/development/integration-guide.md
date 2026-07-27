@@ -143,10 +143,11 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
 +15、最多两核和低构建并发运行 core/recovery。Pilot 与 Anvil 不绑定 Tailscale
 地址，报告/transcript 下载后由本机再次离线验证。随后 runner 建立 SSH tunnel，
-用公开 node CLI 连接远端 Quickstart，在连接后提交签名任务并验收一个绑定
-receipt。该 review task 指向辅助程序刚创建并 finalize 的真实 evidence，节点会
-通过 tunnel 读取并复算；报告要求 `evidence_verified:true`，Relay 还必须记录
-`receipt_confirmed:1`。它只停止自己创建的进程组；成功或失败都写 report，
+启动 3 个公开 node CLI 进程连接远端 Quickstart，等三者全部连接后才分别提交
+签名任务并验收 3 个绑定 receipt。每个 review task 指向辅助程序刚创建并
+finalize 的真实 evidence，节点会通过 tunnel 读取并复算；报告要求三份
+`evidence_verified:true`，Relay 还必须精确记录 `acked:3` 和
+`receipt_confirmed:3`。它只停止自己创建的进程组；成功或失败都写 report，
 postflight 另验无相关残留。详细门槛见
 [共享主机 runbook](runbooks/remote-lab-flow.zh-CN.md)。
 
@@ -160,7 +161,8 @@ receipt、3 个 review receipt、Gate ready、恢复测试通过；下载 transc
 Relay 记录 1 个 ACK，清理检查未发现相关残留进程。机器报告 SHA-256 为
 `0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
 这是改进前报告；增强后的 runner 以每次新报告中的精确 source_commit、
-`evidence_verified`、`relay_receipt_confirmed` 和 postflight 字段逐次验收。
+三节点/三回执、`evidence_verified`、`relay_receipt_confirmed` 和 postflight
+字段逐次验收。
 30 分钟和 4 小时 soak 仍延期。
 
 ## 变更验收
