@@ -9,6 +9,7 @@ import pytest
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 
+import run_remote_lab  # noqa: E402
 from remote_host_preflight import (  # noqa: E402
     CapacityThresholds,
     evaluate_capacity,
@@ -20,6 +21,7 @@ from run_remote_lab import (  # noqa: E402
     _validate_remote_artifact,
     _validate_remote_root,
     _validate_target,
+    _wait_http_json_or_none,
     build_parser,
 )
 from start_shared_quickstart import _parse_linux_process_start_ticks  # noqa: E402
@@ -202,3 +204,33 @@ def test_linux_process_start_ticks_parser_handles_spaced_command_name() -> None:
     stat = prefix + " " + " ".join(fields_after_command)
 
     assert _parse_linux_process_start_ticks(stat) == 987654
+
+
+def test_http_wait_timeout_is_transient_only_while_tunnel_is_live(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Process:
+        def __init__(self, returncode: int | None) -> None:
+            self.returncode = returncode
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+    def timeout(*args: object, **kwargs: object) -> dict:
+        raise RuntimeError("timed out")
+
+    monkeypatch.setattr(run_remote_lab, "_wait_http_json", timeout)
+    assert (
+        _wait_http_json_or_none(
+            "http://127.0.0.1:1/v1/metrics",
+            timeout=0.1,
+            process=Process(None),  # type: ignore[arg-type]
+        )
+        is None
+    )
+    with pytest.raises(RuntimeError, match="timed out"):
+        _wait_http_json_or_none(
+            "http://127.0.0.1:1/v1/metrics",
+            timeout=0.1,
+            process=Process(1),  # type: ignore[arg-type]
+        )

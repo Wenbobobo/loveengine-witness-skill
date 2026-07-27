@@ -324,7 +324,7 @@
     "tools/run_core_experiments.ps1": "sha256:cba5823a70f1ec4df1ef5023c65d95c8ec983e81fbf883a6e44f91682dd34adc",
     "tools/run_core_experiments.py": "sha256:dd62de53d1ebd21ebcb709715adb9c9e400c21fd4b6391249d1b215b6095168a",
     "tools/remote_host_preflight.py": "sha256:69c84c93ccd5419310a691d16fe0742085a6df208bdfe89435b5f8c61f0a0c3e",
-    "tools/run_remote_lab.py": "sha256:ab016a413be0335c66886e35d3be08e371e3dfaca20955728a8f1cdf718bc89e",
+    "tools/run_remote_lab.py": "sha256:ceb0af547d892a065311393f4cac723cf9dbb7a71937a470f8e31f2d472170b3",
     "docs/development/runbooks/remote-lab-flow.zh-CN.md": "sha256:4485613aa21742467f30c5800be9effd6f77f375ed85e26b35a23d3b786dc3d4",
     "docs/specs/love-engine-pre-enterprise-remote-lab.md": "sha256:178ef3bf358fab254c9be718ac9519ab129b600d3336ddf22c80601e2acb5553",
     "src/loveengine_witness/pilot_task_ingress.py": "sha256:7f2bc7f71dcadd8a0e772827b90f7bfb49159cbf5b32ad6a72c612b6489bb427",
@@ -423,7 +423,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:9a7f5edef296458083cf1faee2e2e71d85944c45d3acca7e5b26fd9b621718a0",
+  "package_hash": "sha256:2a418aed7b17d71aa606a082b1347529c7d52ad1a6867a740dcd739d6a9933ca",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

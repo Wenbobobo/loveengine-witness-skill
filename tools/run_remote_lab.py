@@ -144,6 +144,20 @@ def _wait_http_json(
     raise RuntimeError(f"timed out waiting for {url}: {last_error}")
 
 
+def _wait_http_json_or_none(
+    url: str,
+    *,
+    timeout: float,
+    process: subprocess.Popen[str] | None = None,
+) -> dict[str, Any] | None:
+    try:
+        return _wait_http_json(url, timeout=timeout, process=process)
+    except RuntimeError:
+        if process is not None and process.poll() is not None:
+            raise
+        return None
+
+
 def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
     if (
         not REMOTE_FILE_PATTERN.fullmatch(value)
@@ -601,11 +615,13 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     raise RuntimeError(
                         f"tunneled node exited before connecting: {detail.strip()}"
                     )
-                metrics = _wait_http_json(
+                metrics = _wait_http_json_or_none(
                     base_url + "/v1/metrics",
                     timeout=2,
                     process=tunnel_process,
                 )
+                if metrics is None:
+                    continue
                 if int(metrics["connections"]["agents"]) >= 1:
                     break
                 time.sleep(0.25)
@@ -638,11 +654,13 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 raise RuntimeError("tunneled node did not return the bound receipt")
             metrics_deadline = time.monotonic() + 15
             while time.monotonic() < metrics_deadline:
-                metrics = _wait_http_json(
+                metrics = _wait_http_json_or_none(
                     base_url + "/v1/metrics",
                     timeout=2,
                     process=tunnel_process,
                 )
+                if metrics is None:
+                    continue
                 if int(metrics["relay"]["acked"]) == 1:
                     break
                 time.sleep(0.25)
