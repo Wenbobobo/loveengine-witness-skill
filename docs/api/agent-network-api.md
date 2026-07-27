@@ -1,9 +1,11 @@
 # LoveEngine Agent Network API
 
-状态：`M3 local implemented`
-M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）；M4 V2 扩展见 `live-evidence-api.md`。
+状态：M3 V1 历史兼容；0.6.1 candidate 使用 V2 + NodeTrustPolicyV1
+M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）。
 
-本文定义 SkillRegistry、节点身份、Bootstrap、网络任务、任务回执和中心 Relay Hub 的公开接口。M3 只实现中心 Relay；P2P 和节点直连不在本阶段范围内。
+本文先保留 M3 V1 wire format，再说明当前共用 Relay 行为。V2 的 signed profile、
+bootstrap、task 和 receipt 使用 EIP-712 domain version 2；当前 V2 只执行
+`observe_live_text` 和 `review_dispute`。P2P 和节点直连未实现。
 
 ## 1. SkillRegistry
 
@@ -169,6 +171,30 @@ GET /v1/releases/{publisher}/{skillId}/{version}
 GET /v1/artifacts/{packageHash}
 ```
 
+Pilot Server 另提供受 write token 和 Origin 保护的任务入口：
+
+```text
+POST /v1/relay/tasks
+```
+
+该入口只接受已经签名的 NetworkTaskV2，并在持久化前检查 active release、
+BootstrapBundleV2 成员、chainId、Registry、recipient、Publisher issuer、
+manifest hash、deadline、签名和完整可执行 payload schema。字节完全相同的
+签名 task 重试返回幂等成功；相同 taskId 或 issuer+nonce 对应不同内容时冲突。
+它不替 issuer 签名。独立 `relay serve` 不提供该 Operator 写入口。
+
+当前可执行 payload：
+
+- `observe_live_text` 必须使用
+  `loveengine.observe-live-text-payload/1`，绑定 session、SSE、session API、
+  artifact origin 和 durable cursor；
+- `review_dispute` 必须使用
+  `loveengine.review-dispute-payload/1`，绑定 dispute、finalized bundle、
+  session、evidence/events/artifact URL、revision、event count 和 head hash。
+
+历史 V2 transcript 中只含 sessionId 或 disputeId/bundleHash 的最小 payload
+仍可做签名与一致性验证，但公开入口不再把它们视为可执行任务。
+
 WebSocket：
 
 ```text
@@ -181,6 +207,8 @@ GET /v1/ws
 - `authenticate`
 - `task`
 - `receipt`
+- `receipt_state`
+- `receipt_ack`
 - `ack`
 - `heartbeat`
 - `error`
@@ -188,23 +216,43 @@ GET /v1/ws
 投递语义：
 
 - Agent 主动建立出站连接。
-- SQLite 保存离线消息、cursor、ack 和重试次数。
+- Relay SQLite 保存离线消息、ACK、receipt 与重试次数；节点自己的 SQLite
+  journal 保存 taskId、issuer+nonce、完整签名 task、签名 receipt 和确认状态。
 - at-least-once delivery。
-- taskId 和 nonce 保证节点端幂等。
+- taskId 和 issuer+nonce 双重约束节点端幂等。
+- Relay 只认证 signed bootstrap directory 中完全匹配的 profile。
+- Receipt 必须来自当前 WebSocket 节点，并对应本连接已经投递且 ACK accepted 的
+  pending task；未分配、重复和错绑回执被拒绝。
+- 连接保持期间新增的任务会继续推送，不要求节点重连。
+- 节点在发送前持久化 signed receipt。若 Relay 已保存 receipt 但确认 ACK 丢失，
+  下次认证后 Relay 发送 `receipt_state`；节点只在它与本地 journal 完全一致时
+  回 `receipt_ack`，Relay 再返回 `ack/status=receipt_confirmed`，节点不再次执行
+  任务。认证 ACK 的 `receipt_state_count` 声明本次恢复批次数量，节点拒绝非法
+  或过大的计数。
 - Relay Hub 不替 issuer 或 node 签名。
 - 本地 pilot 的节点通过 Anvil RPC signer 完成签名；私钥不进入 CLI 参数、环境变量、日志或 transcript。
-- `loveengine node connect` 是可单独启动的出站节点进程入口。
+- `loveengine node connect` 是统一的 V1/V2 出站 session 入口。V1/V2 codec 独立，
+  连接、鉴权、ACK、keepalive 和 receipt 确认共用同一 session engine。
+- live node 默认最多重连 3 次、每次 idle timeout 60 秒。每次重连都重新执行
+  Relay challenge/profile 校验；首次连接后每次重连还重新查询 Registry release
+  并与 trust policy 比较。达到上限后返回结构化错误，不作为常驻 daemon 无限重试。
+- observation 单次执行上限是 10,000 个新事件、64 MiB artifact 总量；review
+  上限是 1,000 个事件、32 MiB artifact 总量。两者的 JSON/SSE 响应上限为
+  1 MiB，单个 artifact 上限为 8 MiB，HTTP redirect 被拒绝。
+- 当前 live connect 还必须取得独立 `NodeTrustPolicyV1`，绑定 chain ID、
+  Registry、Publisher、skill/version、ZIP/manifest hash 和 allowed issuers。
+  invite 只负责连接，不是信任根。
 
 ## 7. CLI
 
 ```text
-loveengine registry publish
-loveengine registry verify
+loveengine registry publish --input <release> --dry-run
+loveengine registry verify --rpc-url <url> --artifact <zip> --chain-id <id> --registry <address> --publisher <address>
 loveengine node profile sign
 loveengine bootstrap build
 loveengine bootstrap verify
 loveengine relay serve
-loveengine node connect
+loveengine node connect --invite <file> --trust-policy <policy> --package <zip> --profile <profile> --rpc-url <url> --address <node> --reconnect-attempts 3 --idle-timeout-seconds 60
 loveengine network demo --nodes 3
 loveengine network transcript verify <path>
 ```

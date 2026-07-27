@@ -1,71 +1,36 @@
-# 投票见证者批准流程
+# 投票见证者流程（可选治理实验）
 
-适用角色：投票见证者 / Voting Witness
-适用版本：`0.6.0-contract-public-pilot`
+适用目标：0.6.1-contract-public-pilot candidate governance stage
 
-投票见证者拥有链上 witness 地址。只有 ProposalGate 放行后，见证者才手动批准
-一次投票。Agent 不自动投票，Relayer 不能替见证者签名。
+Voting Witness 与 Observation Agent 是不同角色。只有本人明确选择参加治理实验时，
+才通过外部 RPC signer 批准 vote；Agent、Relay 和主持人都不能替你签名。
 
-## 1. 获取 proposal plan
+## 审阅正确的 plan
 
-主持人或提案协调者会提供 `proposal-plan.json`。先查看关键字段：
+witness vote approve 读取 OnchainProposalPlanV1。它只有：
 
-```powershell
-uv run loveengine proposal gate --bundle .\evidence-bundle.json --output .\proposal-plan.json
-```
+- schema_version、chain_id、witness_dao；
+- proposal_id、payload_hash；
+- support、reason_hash、deadline。
 
-或直接打开已经生成的 plan，核对：
+EvidenceBundle、Gate 结果、StreamingEngine 和 PublicSink 地址不在该 schema 内，
+必须从核心 transcript、部署记录和链上读取后另行交叉核对。不要把链下
+ProposalPlan 与 OnchainProposalPlanV1 混为一份文件。
 
-- `proposal_id`
-- `payload_hash`
-- `evidence_bundle_hash`
-- `deadline`
-- `witness_address`
-- `streaming_engine`
-- `public_sink`
-
-## 2. 核对链事实
+## 查询并显式批准
 
 ```powershell
-uv run loveengine pilot chain status `
-  --root .\pilot-chain `
-  --rpc-url http://127.0.0.1:8545
+uv run loveengine pilot chain status --root .\pilot-chain --rpc-url http://127.0.0.1:8545
+uv run loveengine witness vote approve --proposal-plan .\onchain-proposal-plan.json --rpc-url http://127.0.0.1:8545 --address <witness-address> --output .\vote-approval.json
 ```
 
-检查 chainId、合约地址和 code hash 与主持人公告一致。不要在 chain not ready
-时签名。
+CLI 重新查询 chain ID、active proposal、payload hash、witness 注册和 nonce，然后
+请求 eth_signTypedData_v4。它不接受私钥参数。确认钱包中显示的 proposalId、
+payloadHash、support、reasonHash、nonce 和 deadline 与审阅结果一致。
 
-## 3. 显式批准投票
+vote-approval.json 可交给 permissionless relayer。relayer 只能提交有效签名，不能
+修改绑定字段。UI 目前不显示 vote 或 PublicSink 状态；应使用链上事件和
+PilotTranscriptV2 复核，而不是截图。
 
-```powershell
-uv run loveengine witness vote approve `
-  --proposal-plan .\proposal-plan.json `
-  --rpc-url http://127.0.0.1:8545 `
-  --address <witness-address> `
-  --output .\vote-approval.json
-```
-
-私钥应保留在外部 RPC signer、钱包或你亲自控制的 signer 中。不要把私钥、
-助记词或 keystore 交给 Agent。
-
-## 4. 交付 vote approval
-
-把 `vote-approval.json` 交给 relayer 或提案协调者。relayer 只能提交你的签名，
-不能修改：
-
-- `proposalId`
-- `payloadHash`
-- `reasonHash`
-- `nonce`
-- `deadline`
-- `support`
-
-错误 proposalId、payloadHash、nonce、deadline 或 signer 都会失败。
-
-## 5. 在只读面板确认执行
-
-提案执行后，只读面板应能显示 PublicSink 最终状态。
-
-![只读面板中的证据与执行状态](../../assets/runbooks/viewer/viewer-03-gate-status-zh.png)
-
-如果状态不一致，以链上事件、proposal plan 和 transcript 为准，不以截图为准。
+限制：ProposalGate 是链下 advisory check，WitnessDAO 不强制验证它；当前流程依靠
+见证者在签名前人工确认 Gate/evidence 引用。

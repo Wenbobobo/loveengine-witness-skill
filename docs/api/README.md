@@ -1,38 +1,24 @@
 # API documents
 
-这里放给辅助开发团队和 Agent adapter 使用的接口文档。它们是整理后的开发入口，不替代仓库根目录的原始资料。
+当前接口按“核心”和“可选治理实验”阅读，不按 M1-M6 历史阶段推断能力。
 
-## 文档列表
-
-| 文件 | 用途 |
+| 文档 | 当前用途 |
 | --- | --- |
-| `docs/api/loveengine-contract-api.md` | 四合约接口、EIP-712 约束、事件和集成顺序 |
-| `docs/api/agent-skill-api.md` | Skill manifest、Agent 节点声明、传播任务、证据包、transcript |
-| `docs/api/agent-network-api.md` | SkillRegistry、签名节点身份、bootstrap、网络任务、回执和 Relay Hub |
-| `docs/api/live-evidence-api.md` | LiveGateway、事件哈希链、EvidenceBundleV2、争议复核、ProposalGate 和只读面板 |
-| `docs/api/lan-pilot-api.md` | PilotConfig、invite、鉴权、观察协议、持久链、显式投票、snapshot 和统一 transcript |
-| `docs/api/cli-reference.md` | 完整 CLI、运行、后台 soak、验证矩阵和故障排查 |
+| [Agent Skill API](agent-skill-api.md) | manifest、package、evidence 和历史兼容格式 |
+| [Agent Network API](agent-network-api.md) | Registry、profile/bootstrap、task/receipt、Relay |
+| [Live evidence API](live-evidence-api.md) | event、artifact、finalize、dispute 和 Gate |
+| [Local Pilot API](lan-pilot-api.md) | invite/policy、服务、stage、snapshot 和 transcript |
+| [Contract API](loveengine-contract-api.md) | 核心 SkillRegistry 与四个治理实验合约的真实 ABI |
+| [Extension interfaces](extension-interfaces.md) | transport、signer、source、storage adapter 边界 |
+| [CLI reference](cli-reference.md) | 当前命令、信任模式和运行约束 |
 
-## 状态标记
+状态口径：
 
-接口文档使用这些状态：
+- latest tag：v0.6.0-contract-public-pilot；
+- current candidate：0.6.1-contract-public-pilot；
+- local implemented：有代码和自动测试，但不代表远程/生产部署；
+- governance experiment：不是 Witness Skill 默认核心；
+- historical：只为旧 schema/fixture/transcript 兼容保留。
 
-| 状态 | 含义 |
-| --- | --- |
-| M0 implemented | 已在当前 M0 文件或脚本中存在 |
-| M0 fixture | 只有 fixture，没有真实协议实现 |
-| M1 implemented | schema / CLI 已实现并有自动测试 |
-| M2 local implemented | 本地链、合约、relayer 或 transcript 已实现 |
-| M3 local implemented | 本地 Anvil、Relay Hub 和三节点进程试点已实现 |
-| M4 local implemented | 本地直播证据、三节点复核和只读面板已实现 |
-| M5 implemented | 可安装包、LAN 服务、真实观察、恢复和统一链上 E2E |
-| M6 active | 合约融合、参与者上手、Plugin 分发、Tailscale/Debian 和公网/测试网预备 |
-| Open | 仍需决策 |
-
-## 关键约束
-
-- Agent 不接触私钥。
-- relayer 可以提交交易，但不能替见证者签名。
-- `VoteSignature` 必须绑定 `proposalId`、nonce、deadline 和 payload hash。
-- `PublicSink` 是只读公共查询入口。
-- 直播证据和凭证只上链 hash，不把原文大文件塞进合约。
+不可破坏约束：Agent 不接触私钥；invite 不是信任根；Observation Agent 不签 vote；
+raw evidence 不上链；PublicSink 只读；离线完整性不能返回 trust_bound: true。

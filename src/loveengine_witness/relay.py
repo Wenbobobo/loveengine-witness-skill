@@ -31,6 +31,7 @@ class RelayStore:
                 attempts INTEGER NOT NULL DEFAULT 0,
                 accepted INTEGER NOT NULL DEFAULT 0,
                 acked INTEGER NOT NULL DEFAULT 0,
+                receipt_confirmed INTEGER NOT NULL DEFAULT 0,
                 receipt TEXT,
                 PRIMARY KEY (recipient, task_id),
                 UNIQUE (recipient, issuer, nonce)
@@ -44,6 +45,13 @@ class RelayStore:
         if "accepted" not in columns:
             self.connection.execute(
                 "ALTER TABLE messages ADD COLUMN accepted INTEGER NOT NULL DEFAULT 0"
+            )
+        if "receipt_confirmed" not in columns:
+            self.connection.execute(
+                """
+                ALTER TABLE messages
+                ADD COLUMN receipt_confirmed INTEGER NOT NULL DEFAULT 0
+                """
             )
         self.connection.commit()
 
@@ -74,7 +82,11 @@ class RelayStore:
         except sqlite3.IntegrityError:
             return False
 
-    def pending(self, recipient: str) -> list[RelayMessage]:
+    def pending(
+        self,
+        recipient: str,
+        exclude_task_ids: set[str] | None = None,
+    ) -> list[RelayMessage]:
         rows = self.connection.execute(
             """
             SELECT task_id, payload, attempts
@@ -86,6 +98,8 @@ class RelayStore:
         ).fetchall()
         result = []
         for task_id, payload, attempts in rows:
+            if exclude_task_ids and task_id in exclude_task_ids:
+                continue
             attempts += 1
             self.connection.execute(
                 """
@@ -98,15 +112,17 @@ class RelayStore:
         self.connection.commit()
         return result
 
-    def ack(self, recipient: str, task_id: str, receipt: str) -> None:
-        self.connection.execute(
+    def ack(self, recipient: str, task_id: str, receipt: str) -> bool:
+        cursor = self.connection.execute(
             """
             UPDATE messages SET acked = 1, receipt = ?
             WHERE recipient = ? AND task_id = ?
+              AND accepted = 1 AND acked = 0 AND receipt IS NULL
             """,
             (receipt, recipient, task_id),
         )
         self.connection.commit()
+        return cursor.rowcount == 1
 
     def accept(self, recipient: str, task_id: str) -> bool:
         cursor = self.connection.execute(
@@ -129,17 +145,63 @@ class RelayStore:
         ).fetchone()
         return None if row is None else row[0]
 
+    def stored_receipts(self, recipient: str) -> list[str]:
+        rows = self.connection.execute(
+            """
+            SELECT receipt FROM messages
+            WHERE recipient = ? AND receipt IS NOT NULL
+              AND receipt_confirmed = 0
+            ORDER BY rowid
+            """,
+            (recipient,),
+        ).fetchall()
+        return [str(row[0]) for row in rows]
+
+    def confirm_receipt(self, recipient: str, task_id: str) -> bool:
+        cursor = self.connection.execute(
+            """
+            UPDATE messages SET receipt_confirmed = 1
+            WHERE recipient = ? AND task_id = ?
+              AND receipt IS NOT NULL AND receipt_confirmed = 0
+            """,
+            (recipient, task_id),
+        )
+        self.connection.commit()
+        return cursor.rowcount == 1
+
+    def task_state(self, recipient: str, task_id: str) -> dict[str, object] | None:
+        row = self.connection.execute(
+            """
+            SELECT issuer, nonce, payload, accepted, acked, receipt
+            FROM messages
+            WHERE recipient = ? AND task_id = ?
+            """,
+            (recipient, task_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "issuer": row[0],
+            "nonce": row[1],
+            "payload": str(row[2]),
+            "accepted": bool(row[3]),
+            "acked": bool(row[4]),
+            "receipt": row[5],
+        }
+
     def metrics(self) -> dict[str, int]:
-        queued, delivered, accepted, acked = self.connection.execute(
+        queued, delivered, accepted, acked, confirmed = self.connection.execute(
             """
             SELECT COUNT(*), COALESCE(SUM(attempts), 0),
-                   COALESCE(SUM(accepted), 0), COALESCE(SUM(acked), 0)
+                   COALESCE(SUM(accepted), 0), COALESCE(SUM(acked), 0),
+                   COALESCE(SUM(receipt_confirmed), 0)
             FROM messages
             """
         ).fetchone()
         return {
             "accepted": int(accepted),
             "acked": int(acked),
+            "receipt_confirmed": int(confirmed),
             "delivered": int(delivered),
             "queued": int(queued),
         }

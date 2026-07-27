@@ -7,6 +7,7 @@ import json
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from eth_utils import to_checksum_address
@@ -19,6 +20,57 @@ from .live_protocol import verify_live_event
 from .m4_network import verify_receipt_v2
 from .schema import validate_schema
 from .secrets import reject_secret_fields
+
+
+MAX_SSE_RESPONSE_BYTES = 1024 * 1024
+MAX_JSON_RESPONSE_BYTES = 1024 * 1024
+MAX_ARTIFACT_BYTES = 8 * 1024 * 1024
+MAX_OBSERVATION_EVENTS = 10_000
+MAX_OBSERVATION_ARTIFACT_BYTES = 64 * 1024 * 1024
+
+
+def _normalized_http_origin(value: str) -> tuple[str, str, int]:
+    try:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.fragment
+        ):
+            raise ValueError
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except (TypeError, ValueError) as exc:
+        raise LoveEngineError("invalid_observation_url", str(value)) from exc
+    return parsed.scheme, parsed.hostname.lower(), port
+
+
+def validate_observation_urls(
+    payload: dict[str, Any],
+    *,
+    allowed_origin: str,
+) -> None:
+    validate_schema(payload, "observe-live-text-payload-v1.schema.json")
+    expected = _normalized_http_origin(allowed_origin)
+    for field in ("stream_url", "session_url", "artifact_base_url"):
+        if _normalized_http_origin(payload[field]) != expected:
+            raise LoveEngineError(
+                "observation_origin_mismatch",
+                f"{field} must match the invite server origin",
+            )
+
+
+async def _read_limited(
+    response: Any,
+    *,
+    limit: int,
+    error_code: str,
+) -> bytes:
+    body = await response.content.read(limit + 1)
+    if len(body) > limit:
+        raise LoveEngineError(error_code, f"response exceeds {limit} bytes")
+    return body
 
 
 def observation_timeout_seconds(payload: dict[str, Any]) -> float:
@@ -108,10 +160,12 @@ async def observe_live_session(
     *,
     poll_interval: float = 0.05,
     timeout_seconds: float | None = None,
+    allowed_origin: str,
 ) -> dict[str, Any]:
     """Observe a live SSE feed, verify every artifact, and resume from disk."""
 
     reject_secret_fields(payload)
+    validate_observation_urls(payload, allowed_origin=allowed_origin)
     configured_timeout = observation_timeout_seconds(payload)
     session_id = payload["session_id"]
     start = int(payload["start_cursor"])
@@ -124,6 +178,8 @@ async def observe_live_session(
     event_count = stored["event_count"] if stored else start
     observed_from = cursor
     artifact_count = 0
+    artifact_bytes = 0
+    processed_events = 0
     deadline = asyncio.get_running_loop().time() + (
         configured_timeout if timeout_seconds is None else timeout_seconds
     )
@@ -137,13 +193,25 @@ async def observe_live_session(
                     payload["stream_url"],
                     params={"after": str(cursor)},
                     headers={"Last-Event-ID": str(cursor)},
+                    allow_redirects=False,
                 ) as response:
                     if response.status != 200:
                         raise LoveEngineError(
                             "live_stream_unavailable", str(response.status), 4
                         )
-                    events = _sse_events(await response.text())
+                    stream_body = await _read_limited(
+                        response,
+                        limit=MAX_SSE_RESPONSE_BYTES,
+                        error_code="live_stream_too_large",
+                    )
+                    events = _sse_events(stream_body.decode("utf-8"))
                 for event in events:
+                    processed_events += 1
+                    if processed_events > MAX_OBSERVATION_EVENTS:
+                        raise LoveEngineError(
+                            "observation_event_limit_exceeded",
+                            str(MAX_OBSERVATION_EVENTS),
+                        )
                     validate_schema(event, "live-event-v1.schema.json")
                     if event["session_id"] != session_id:
                         raise LoveEngineError("wrong_session", event["session_id"])
@@ -156,13 +224,35 @@ async def observe_live_session(
                     async with session.get(
                         payload["artifact_base_url"].rstrip("/")
                         + "/"
-                        + event["artifact_hash"]
+                        + event["artifact_hash"],
+                        allow_redirects=False,
                     ) as artifact_response:
                         if artifact_response.status != 200:
                             raise LoveEngineError(
                                 "artifact_missing", event["artifact_hash"]
                             )
-                        artifact = await artifact_response.read()
+                        remaining_artifact_bytes = (
+                            MAX_OBSERVATION_ARTIFACT_BYTES - artifact_bytes
+                        )
+                        if remaining_artifact_bytes <= 0:
+                            raise LoveEngineError(
+                                "observation_artifact_budget_exceeded",
+                                str(MAX_OBSERVATION_ARTIFACT_BYTES),
+                            )
+                        artifact = await _read_limited(
+                            artifact_response,
+                            limit=min(
+                                MAX_ARTIFACT_BYTES,
+                                remaining_artifact_bytes,
+                            ),
+                            error_code=(
+                                "artifact_too_large"
+                                if remaining_artifact_bytes
+                                >= MAX_ARTIFACT_BYTES
+                                else "observation_artifact_budget_exceeded"
+                            ),
+                        )
+                    artifact_bytes += len(artifact)
                     if (
                         sha256_prefixed(artifact) != event["artifact_hash"]
                         or artifact != event["content"].encode("utf-8")
@@ -176,15 +266,45 @@ async def observe_live_session(
                     head = event["event_hash"]
                     cursors.save(consumer, session_id, cursor, head, event_count)
 
-                async with session.get(payload["session_url"]) as response:
-                    state = await response.json()
+                async with session.get(
+                    payload["session_url"], allow_redirects=False
+                ) as response:
+                    state = json.loads(
+                        (
+                            await _read_limited(
+                                response,
+                                limit=MAX_JSON_RESPONSE_BYTES,
+                                error_code="session_response_too_large",
+                            )
+                        ).decode("utf-8")
+                    )
+                validate_schema(state, "live-session-v1.schema.json")
                 if state["status"] == "closed":
                     if int(state["next_sequence"]) - 1 != cursor:
                         raise LoveEngineError("sequence_gap", state["next_sequence"])
                     if state["head_event_hash"].lower() != head.lower():
                         raise LoveEngineError("hash_chain_broken", session_id)
-                    async with session.get(payload["session_url"] + "/evidence") as response:
-                        bundle = await response.json()
+                    async with session.get(
+                        payload["session_url"] + "/evidence",
+                        allow_redirects=False,
+                    ) as response:
+                        if response.status in {400, 404, 409}:
+                            await asyncio.sleep(poll_interval)
+                            continue
+                        if response.status != 200:
+                            raise LoveEngineError(
+                                "evidence_unavailable", str(response.status), 4
+                            )
+                        bundle = json.loads(
+                            (
+                                await _read_limited(
+                                    response,
+                                    limit=MAX_JSON_RESPONSE_BYTES,
+                                    error_code="evidence_response_too_large",
+                                )
+                                ).decode("utf-8")
+                            )
+                    validate_schema(bundle, "evidence-bundle-v2.schema.json")
                     if bundle["bundle_hash"] != evidence_bundle_hash(bundle):
                         raise LoveEngineError("bundle_hash_mismatch", session_id)
                     if (
@@ -208,7 +328,7 @@ async def observe_live_session(
                     validate_schema(result, "live-observation-receipt-v1.schema.json")
                     return result
                 await asyncio.sleep(poll_interval)
-    except (ClientError, TimeoutError, OSError) as exc:
+    except (ClientError, TimeoutError, OSError, UnicodeError, ValueError) as exc:
         raise LoveEngineError("live_stream_unavailable", str(exc), 4) from exc
 
 

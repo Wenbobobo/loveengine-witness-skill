@@ -10,6 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .cli_pilot import add_pilot_parser, handle_pilot
+from .cli_trust import (
+    add_node_connect_parser,
+    add_package_parser,
+    add_registry_parser,
+    handle_node_connect,
+    handle_package,
+    handle_registry,
+)
 from .errors import LoveEngineError
 from .evidence import build_evidence_bundle
 from .dispute import aggregate_reviews, build_dispute, build_proposal_plan
@@ -26,49 +35,17 @@ from .live_store import LocalArtifactStore, LiveMetadataStore
 from .live_transcript import verify_live_transcript
 from .m4_network import build_task_v2
 from .network_demo import run_network_demo
-from .network_node import connect_node
 from .network_protocol import (
     build_bootstrap,
     verify_bootstrap,
-    verify_node_profile,
 )
 from .network_transcript import verify_network_transcript
 from .network_typed_data import build_node_profile_typed_data
 from .node_profile import build_node_profile
-from .package import (
-    build_package,
-    install_package,
-    package_self_check,
-    verify_package,
-)
-from .pilot_server import (
-    load_pilot_config,
-    pilot_status,
-    quickstart_pilot,
-    serve_pilot,
-)
 from .pilot_demo import run_pilot_demo
-from .pilot_transcript import verify_pilot_transcript
-from .pilot_snapshot import (
-    create_system_snapshot,
-    prune_snapshots,
-    restore_system_snapshot,
-    verify_system_snapshot,
-)
-from .pilot_soak import run_pilot_soak
-from .pilot_soak_process import background_soak_status, start_background_soak
-from .pilot_chain import (
-    initialize_chain,
-    restore_chain,
-    snapshot_chain,
-    start_chain,
-    status_chain,
-)
-from .registry import publish_plan, verify_release
 from .relayer import plan_batch
 from .relay import RelayStore
 from .relay_server import serve_forever
-from .schema import validate_schema
 from .transcript import verify_transcript
 from .typed_data import build_register_typed_data, build_vote_typed_data
 from .witness_vote import approve_vote
@@ -153,19 +130,12 @@ def build_parser() -> argparse.ArgumentParser:
     lan_pilot.add_argument("--observers", type=int, default=10)
     lan_pilot.add_argument("--event-interval", type=float, default=0.01)
     lan_pilot.add_argument("--no-faults", action="store_true")
+    lan_pilot.add_argument(
+        "--stage", choices=("core", "governance"), default="core"
+    )
     lan_pilot.add_argument("--output", type=Path, required=True)
 
-    registry = commands.add_parser("registry")
-    registry_commands = registry.add_subparsers(dest="registry_command")
-    registry_publish = registry_commands.add_parser("publish")
-    registry_publish.add_argument("--input", type=Path, required=True)
-    registry_publish.add_argument("--dry-run", action="store_true")
-    registry_verify = registry_commands.add_parser("verify")
-    registry_verify.add_argument("--release", type=Path, required=True)
-    registry_verify.add_argument("--artifact", type=Path, required=True)
-    registry_verify.add_argument("--chain-id", required=True)
-    registry_verify.add_argument("--registry", required=True)
-    registry_verify.add_argument("--publisher", required=True)
+    add_registry_parser(commands)
 
     bootstrap = commands.add_parser("bootstrap")
     bootstrap_commands = bootstrap.add_subparsers(dest="bootstrap_command")
@@ -185,15 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     relay_serve.add_argument("--host", default="127.0.0.1")
     relay_serve.add_argument("--port", type=int, default=8765)
 
-    node_connect = node_commands.add_parser("connect")
-    node_connect.add_argument("--url")
-    node_connect.add_argument("--invite", type=Path)
-    node_connect.add_argument("--profile", type=Path, required=True)
-    node_connect.add_argument("--rpc-url")
-    node_connect.add_argument("--address")
-    node_connect.add_argument("--expected-tasks", type=int, default=0)
-    node_connect.add_argument("--output", type=Path)
-    node_connect.add_argument("--dry-run", action="store_true")
+    add_node_connect_parser(node_commands)
 
     network = commands.add_parser("network")
     network_commands = network.add_subparsers(dest="network_command")
@@ -258,81 +220,8 @@ def build_parser() -> argparse.ArgumentParser:
     proposal_gate.add_argument("--input", type=Path, required=True)
     proposal_gate.add_argument("--output", type=Path)
 
-    package = commands.add_parser("package")
-    package_commands = package.add_subparsers(dest="package_command")
-    package_build = package_commands.add_parser("build")
-    package_build.add_argument("--output", type=Path, required=True)
-    package_verify = package_commands.add_parser("verify")
-    package_verify.add_argument("archive", type=Path)
-    package_install = package_commands.add_parser("install")
-    package_install.add_argument("archive", type=Path)
-    package_install.add_argument("--target", type=Path, required=True)
-    package_check = package_commands.add_parser("self-check")
-    package_check.add_argument("--root", type=Path, required=True)
-
-    pilot = commands.add_parser("pilot")
-    pilot_commands = pilot.add_subparsers(dest="pilot_command")
-    pilot_quickstart = pilot_commands.add_parser("quickstart")
-    pilot_quickstart.add_argument("--root", type=Path, required=True)
-    pilot_quickstart.add_argument("--host", default="127.0.0.1")
-    pilot_quickstart.add_argument("--port", type=int, default=8780)
-    pilot_quickstart.add_argument("--base-url", default="http://127.0.0.1:8780")
-    pilot_quickstart.add_argument("--open-ui", action="store_true")
-    pilot_quickstart.add_argument("--headless", action="store_true")
-    pilot_quickstart.add_argument("--dry-run", action="store_true")
-    pilot_serve = pilot_commands.add_parser("serve")
-    pilot_serve.add_argument("--config", type=Path, required=True)
-    pilot_status_command = pilot_commands.add_parser("status")
-    pilot_status_command.add_argument("--url", required=True)
-    pilot_chain = pilot_commands.add_parser("chain")
-    pilot_chain_commands = pilot_chain.add_subparsers(dest="pilot_chain_command")
-    chain_init = pilot_chain_commands.add_parser("init")
-    chain_init.add_argument("--root", type=Path, required=True)
-    chain_init.add_argument("--port", type=int, default=8545)
-    chain_start = pilot_chain_commands.add_parser("start")
-    chain_start.add_argument("--root", type=Path, required=True)
-    chain_start.add_argument("--port", type=int, default=8545)
-    chain_status = pilot_chain_commands.add_parser("status")
-    chain_status.add_argument("--root", type=Path, required=True)
-    chain_status.add_argument("--rpc-url", default="http://127.0.0.1:8545")
-    chain_snapshot = pilot_chain_commands.add_parser("snapshot")
-    chain_snapshot.add_argument("--root", type=Path, required=True)
-    chain_snapshot.add_argument("--rpc-url", default="http://127.0.0.1:8545")
-    chain_restore = pilot_chain_commands.add_parser("restore")
-    chain_restore.add_argument("--root", type=Path, required=True)
-    chain_restore.add_argument("--rpc-url", default="http://127.0.0.1:8545")
-    chain_restore.add_argument("--snapshot", type=Path, required=True)
-    pilot_transcript = pilot_commands.add_parser("transcript")
-    pilot_transcript_commands = pilot_transcript.add_subparsers(
-        dest="pilot_transcript_command"
-    )
-    pilot_transcript_verify = pilot_transcript_commands.add_parser("verify")
-    pilot_transcript_verify.add_argument("path", type=Path)
-    pilot_snapshot = pilot_commands.add_parser("snapshot")
-    pilot_snapshot_commands = pilot_snapshot.add_subparsers(
-        dest="pilot_snapshot_command"
-    )
-    snapshot_create = pilot_snapshot_commands.add_parser("create")
-    snapshot_create.add_argument("--config", type=Path, required=True)
-    snapshot_create.add_argument("--chain-root", type=Path, required=True)
-    snapshot_create.add_argument("--output", type=Path, required=True)
-    snapshot_verify = pilot_snapshot_commands.add_parser("verify")
-    snapshot_verify.add_argument("path", type=Path)
-    snapshot_restore = pilot_snapshot_commands.add_parser("restore")
-    snapshot_restore.add_argument("path", type=Path)
-    snapshot_restore.add_argument("--config", type=Path, required=True)
-    snapshot_restore.add_argument("--chain-root", type=Path, required=True)
-    snapshot_prune = pilot_snapshot_commands.add_parser("prune")
-    snapshot_prune.add_argument("--output", type=Path, required=True)
-    snapshot_prune.add_argument("--older-than-days", type=int, default=30)
-    pilot_soak = pilot_commands.add_parser("soak")
-    pilot_soak.add_argument("--duration-seconds", type=float, default=14400)
-    pilot_soak.add_argument("--events", type=int, default=240)
-    pilot_soak.add_argument("--observers", type=int, default=10)
-    pilot_soak.add_argument("--output", type=Path, required=True)
-    pilot_soak.add_argument("--background", action="store_true")
-    pilot_soak_status = pilot_commands.add_parser("soak-status")
-    pilot_soak_status.add_argument("state", type=Path)
+    add_package_parser(commands)
+    add_pilot_parser(commands)
 
     witness = commands.add_parser("witness")
     witness_commands = witness.add_subparsers(dest="witness_command")
@@ -381,57 +270,7 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
             "signer_required": True,
         }
     if args.command == "node" and args.node_command == "connect":
-        signed_profile = read_json(args.profile)
-        invite = read_json(args.invite) if args.invite else None
-        if invite is not None:
-            validate_schema(invite, "pilot-invite-v1.schema.json")
-        url = args.url or (invite["relay_url"] if invite else None)
-        if not url:
-            raise LoveEngineError(
-                "invalid_arguments",
-                "node connect requires --url or --invite",
-                2,
-            )
-        if invite is not None:
-            if signed_profile["chain_id"] != invite["chain_id"]:
-                raise LoveEngineError(
-                    "wrong_chain_id",
-                    "profile chainId does not match invite",
-                )
-            if signed_profile["registry"].lower() != invite["registry"].lower():
-                raise LoveEngineError(
-                    "wrong_registry",
-                    "profile Registry does not match invite",
-                )
-        node_address = verify_node_profile(signed_profile)
-        if not args.dry_run:
-            if not args.rpc_url or not args.address:
-                raise LoveEngineError(
-                    "local_signer_required",
-                    "live connect requires --rpc-url and --address",
-                    4,
-            )
-            return connect_node(
-                url=url,
-                rpc_url=args.rpc_url,
-                address=args.address,
-                profile_path=args.profile,
-                expected_tasks=args.expected_tasks,
-                output=args.output,
-            )
-        return {
-            "connected": False,
-            "dry_run": True,
-            "node": node_address,
-            "url": url,
-            "invite": {
-                "dashboard_url": invite["dashboard_url"],
-                "server_url": invite["server_url"],
-                "package_hash": invite["package_hash"],
-            }
-            if invite
-            else None,
-        }
+        return handle_node_connect(args)
     if args.command == "fixture" and args.fixture_command == "generate":
         paths = generate_witness_fixtures(args.witnesses, args.output)
         return {"generated": len(paths), "output": str(args.output)}
@@ -483,23 +322,10 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
             observer_count=args.observers,
             event_interval=args.event_interval,
             simulate_faults=not args.no_faults,
+            stage=args.stage,
         )
-    if args.command == "registry" and args.registry_command == "publish":
-        if not args.dry_run:
-            raise LoveEngineError(
-                "local_signer_required",
-                "registry publish requires a local signer adapter",
-                4,
-            )
-        return publish_plan(read_json(args.input))
-    if args.command == "registry" and args.registry_command == "verify":
-        return verify_release(
-            read_json(args.release),
-            args.artifact,
-            expected_chain_id=args.chain_id,
-            expected_registry=args.registry,
-            expected_publisher=args.publisher,
-        )
+    if args.command == "registry":
+        return handle_registry(args)
     if args.command == "bootstrap" and args.bootstrap_command == "build":
         value = read_json(args.input)
         bootstrap = build_bootstrap(
@@ -646,137 +472,10 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.output:
             write_json(args.output, result)
         return result
-    if args.command == "package" and args.package_command == "build":
-        result = build_package(Path(__file__).resolve().parents[2], args.output)
-        return {
-            "archive": str(result.archive.resolve()),
-            "archive_sha256": result.sha256,
-            "archive_keccak256": result.keccak256,
-            "file_count": result.file_count,
-            "checksums": str(result.checksums.resolve()),
-            "sbom": str(result.sbom.resolve()),
-        }
-    if args.command == "package" and args.package_command == "verify":
-        return verify_package(args.archive)
-    if args.command == "package" and args.package_command == "install":
-        return install_package(args.archive, args.target)
-    if args.command == "package" and args.package_command == "self-check":
-        return package_self_check(args.root)
-    if args.command == "pilot" and args.pilot_command == "quickstart":
-        return quickstart_pilot(
-            root=args.root,
-            base_url=args.base_url,
-            host=args.host,
-            port=args.port,
-            open_ui=args.open_ui,
-            headless=args.headless,
-            dry_run=args.dry_run,
-        )
-    if args.command == "pilot" and args.pilot_command == "serve":
-        serve_pilot(load_pilot_config(args.config))
-        return {"stopped": True}
-    if args.command == "pilot" and args.pilot_command == "status":
-        return asyncio.run(pilot_status(args.url))
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "chain"
-        and args.pilot_chain_command == "init"
-    ):
-        return initialize_chain(args.root, port=args.port)
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "chain"
-        and args.pilot_chain_command == "start"
-    ):
-        process = start_chain(args.root, port=args.port)
-        return {
-            "started": True,
-            "pid": process.pid,
-            "rpc_url": f"http://127.0.0.1:{args.port}",
-        }
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "chain"
-        and args.pilot_chain_command == "status"
-    ):
-        return status_chain(args.root, args.rpc_url)
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "chain"
-        and args.pilot_chain_command == "snapshot"
-    ):
-        return snapshot_chain(args.root, args.rpc_url)
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "chain"
-        and args.pilot_chain_command == "restore"
-    ):
-        return restore_chain(args.root, args.rpc_url, args.snapshot)
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "transcript"
-        and args.pilot_transcript_command == "verify"
-    ):
-        return verify_pilot_transcript(read_json(args.path))
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "snapshot"
-        and args.pilot_snapshot_command == "create"
-    ):
-        config = load_pilot_config(args.config)
-        return create_system_snapshot(
-            run_id=config.run_id,
-            database=config.database,
-            relay_database=config.relay_database,
-            artifact_root=config.artifact_root,
-            audit_log=config.audit_log,
-            chain_root=args.chain_root,
-            output=args.output,
-        )
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "snapshot"
-        and args.pilot_snapshot_command == "verify"
-    ):
-        return verify_system_snapshot(args.path)
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "snapshot"
-        and args.pilot_snapshot_command == "restore"
-    ):
-        config = load_pilot_config(args.config)
-        return restore_system_snapshot(
-            args.path,
-            database=config.database,
-            relay_database=config.relay_database,
-            artifact_root=config.artifact_root,
-            audit_log=config.audit_log,
-            chain_root=args.chain_root,
-        )
-    if (
-        args.command == "pilot"
-        and args.pilot_command == "snapshot"
-        and args.pilot_snapshot_command == "prune"
-    ):
-        return prune_snapshots(
-            args.output, older_than_days=args.older_than_days
-        )
-    if args.command == "pilot" and args.pilot_command == "soak":
-        if args.background:
-            return start_background_soak(
-                args.output,
-                duration_seconds=args.duration_seconds,
-                event_count=args.events,
-                observers=args.observers,
-            )
-        return run_pilot_soak(
-            args.output,
-            duration_seconds=args.duration_seconds,
-            event_count=args.events,
-            observers=args.observers,
-        )
-    if args.command == "pilot" and args.pilot_command == "soak-status":
-        return background_soak_status(args.state)
+    if args.command == "package":
+        return handle_package(args)
+    if args.command == "pilot":
+        return handle_pilot(args)
     if (
         args.command == "witness"
         and args.witness_command == "vote"

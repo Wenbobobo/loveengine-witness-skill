@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from aiohttp import web
 from web3 import HTTPProvider, Web3
 
 from .canonical import canonical_json_bytes
@@ -24,6 +25,7 @@ from .errors import LoveEngineError
 from .hashes import keccak256_hex
 from .jsonio import read_json, write_json
 from .live_evidence import finalize_evidence_bundle
+from .live_gateway import create_live_app
 from .live_protocol import build_live_event, build_live_session
 from .live_source import FixtureLiveSource
 from .live_store import LocalArtifactStore, LiveMetadataStore
@@ -68,6 +70,7 @@ async def _run_relay_reviewers(
     profiles: list[dict[str, Any]],
     bootstrap: dict[str, Any],
     verdicts: dict[str, dict[str, str]],
+    evidence_port: int,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
     result_dir = output / "reviews"
     profile_dir = output / "profiles"
@@ -83,7 +86,21 @@ async def _run_relay_reviewers(
         )
     hub = RelayHub(store, bootstrap, {}, {})
     port = free_port()
-    await hub.start("127.0.0.1", port)
+    evidence_runner = web.AppRunner(
+        create_live_app(output / "live.sqlite", output / "artifacts")
+    )
+    await evidence_runner.setup()
+    evidence_site = web.TCPSite(
+        evidence_runner,
+        "127.0.0.1",
+        evidence_port,
+    )
+    await evidence_site.start()
+    try:
+        await hub.start("127.0.0.1", port)
+    except Exception:
+        await evidence_runner.cleanup()
+        raise
     processes: list[tuple[subprocess.Popen[str], Path]] = []
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     for index, profile in enumerate(profiles, start=1):
@@ -94,31 +111,51 @@ async def _run_relay_reviewers(
         write_json(profile_path, profile)
         write_json(verdict_path, verdicts[node])
         expected_tasks = sum(task["recipient"] == node for task in tasks)
-        process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "loveengine_witness.live_review_node",
-                "--url",
-                f"http://127.0.0.1:{port}/v1/ws",
-                "--rpc-url",
-                rpc_url,
-                "--address",
-                node,
-                "--profile",
-                str(profile_path),
-                "--expected-tasks",
-                str(expected_tasks),
-                "--verdicts",
-                str(verdict_path),
-                "--output",
-                str(result_path),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            creationflags=creationflags,
-        )
+        try:
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "loveengine_witness.live_review_node",
+                    "--url",
+                    f"http://127.0.0.1:{port}/v1/ws",
+                    "--rpc-url",
+                    rpc_url,
+                    "--address",
+                    node,
+                    "--profile",
+                    str(profile_path),
+                    "--expected-issuer",
+                    bootstrap["publisher"],
+                    "--expected-manifest-hash",
+                    tasks[0]["manifest_hash"],
+                    "--expected-tasks",
+                    str(expected_tasks),
+                    "--evidence-origin",
+                    f"http://127.0.0.1:{evidence_port}",
+                    "--verdicts",
+                    str(verdict_path),
+                    "--output",
+                    str(result_path),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=creationflags,
+            )
+        except Exception:
+            for started, _ in processes:
+                started.terminate()
+                try:
+                    started.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    started.kill()
+                    started.wait(timeout=5)
+            await hub.stop()
+            await evidence_runner.cleanup()
+            raise
         processes.append((process, result_path))
     try:
         failures = []
@@ -146,7 +183,16 @@ async def _run_relay_reviewers(
         metrics = hub.metrics()
         return list(hub.receipts), len(processes), metrics
     finally:
+        for process, _ in processes:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
         await hub.stop()
+        await evidence_runner.cleanup()
 
 
 def run_live_evidence_demo(
@@ -161,6 +207,8 @@ def run_live_evidence_demo(
         [str(foundry_binary("forge")), "build"],
         cwd=CONTRACTS,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -308,6 +356,8 @@ def run_live_evidence_demo(
             ),
         ]
         tasks: list[dict[str, Any]] = []
+        evidence_port = free_port()
+        evidence_origin = f"http://127.0.0.1:{evidence_port}"
 
         def tasks_for(dispute: dict[str, Any], recipients: list[str]) -> list[dict[str, Any]]:
             built = []
@@ -321,8 +371,24 @@ def run_live_evidence_demo(
                     recipient=node,
                     manifest_hash=Web3.to_hex(manifest_hash),
                     payload={
+                        "schema_version": "loveengine.review-dispute-payload/1",
                         "dispute_id": dispute["dispute_id"],
                         "bundle_hash": dispute["bundle_hash"],
+                        "session_id": session_id,
+                        "evidence_url": (
+                            evidence_origin
+                            + f"/v1/live/sessions/{session_id}/evidence"
+                        ),
+                        "events_url": (
+                            evidence_origin
+                            + f"/v1/live/sessions/{session_id}/events"
+                        ),
+                        "artifact_base_url": (
+                            evidence_origin + "/v1/live/artifacts"
+                        ),
+                        "revision": bundle["revision"],
+                        "event_count": bundle["event_count"],
+                        "head_event_hash": bundle["head_event_hash"],
                     },
                     nonce=str(len(tasks) + len(built) + 1),
                     deadline="4102444700",
@@ -356,6 +422,7 @@ def run_live_evidence_demo(
                 profiles=profiles,
                 bootstrap=bootstrap,
                 verdicts=verdicts,
+                evidence_port=evidence_port,
             )
         )
         for receipt in receipts:

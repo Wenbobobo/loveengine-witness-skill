@@ -6,7 +6,7 @@ from typing import Any
 
 from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
-from .hashes import keccak256_hex
+from .hashes import keccak256_hex, sha256_prefixed
 from .live_protocol import ZERO_HASH, verify_live_event
 from .live_store import ArtifactStore, LiveMetadataStore
 
@@ -37,8 +37,17 @@ def finalize_evidence_bundle(
             raise LoveEngineError("sequence_gap", str(expected))
         if event["previous_event_hash"] != previous or not verify_live_event(event):
             raise LoveEngineError("hash_chain_broken", event["event_id"])
-        if not artifacts.exists(event["artifact_hash"]):
-            raise LoveEngineError("artifact_missing", event["artifact_hash"])
+        artifact = artifacts.get(event["artifact_hash"])
+        if sha256_prefixed(artifact) != event["artifact_hash"]:
+            raise LoveEngineError(
+                "artifact_hash_mismatch", event["artifact_hash"]
+            )
+        if event["artifact_hash"] != sha256_prefixed(
+            event["content"].encode("utf-8")
+        ):
+            raise LoveEngineError(
+                "artifact_content_mismatch", event["event_id"]
+            )
         counts[event["category"]] += 1
         references.append(
             {

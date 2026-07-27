@@ -81,6 +81,20 @@ def test_gateway_accepts_json_ndjson_and_exposes_read_only_dashboard(
             assert response.status == 202
             assert (await response.json())["accepted"] == 2
 
+            forged = await client.post(
+                "/v1/live/sessions/gateway-1/events",
+                json={
+                    "event_id": "forged",
+                    "occurred_at": "1770000003",
+                    "category": "source",
+                    "source_type": "http_push",
+                    "content": "forged",
+                    "artifact_hash": "sha256:" + "0" * 64,
+                },
+            )
+            assert forged.status == 400
+            assert (await forged.json())["error"]["code"] == "artifact_hash_mismatch"
+
             duplicate = await client.post(
                 "/v1/live/sessions/gateway-1/events",
                 json={
@@ -101,6 +115,14 @@ def test_gateway_accepts_json_ndjson_and_exposes_read_only_dashboard(
 
             close = await client.post("/v1/live/sessions/gateway-1/close")
             assert close.status == 200
+            evidence = await client.get("/v1/live/sessions/gateway-1/evidence")
+            assert evidence.status == 400
+            assert (await evidence.json())["error"]["code"] == "bundle_not_found"
+            finalized = await client.post(
+                "/v1/live/sessions/gateway-1/evidence/finalize",
+                json={"revision": "1", "finalized_at": "1770000010"},
+            )
+            assert finalized.status == 200
             evidence = await client.get("/v1/live/sessions/gateway-1/evidence")
             assert evidence.status == 200
             assert (await evidence.json())["event_count"] == "2"

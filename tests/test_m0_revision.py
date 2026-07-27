@@ -63,14 +63,14 @@ def test_current_manifest_is_contract_public_pilot() -> None:
     manifest = load(MANIFEST)
 
     assert manifest["schema_version"] == "loveengine.skill-manifest/0.3"
-    assert manifest["version"] == "0.6.0-contract-public-pilot"
+    assert manifest["version"] == "0.6.1-contract-public-pilot"
     assert manifest["registry_binding"]["chain_id"] == "31337"
     assert manifest["network"]["task_types"] == [
-        "propagate_skill",
-        "observe_broadcast",
         "observe_live_text",
         "review_dispute",
     ]
+    assert load(PROPAGATION)["task_type"] == "propagate_skill"
+    assert (ROOT / "schemas" / "network-task-v1.schema.json").is_file()
     assert manifest["eip712"]["domain_version"] == "2"
     assert manifest["security"]["private_keys_in_agent_context"] is False
     assert "docs/assets/operator-console.png" not in manifest["source_refs"]

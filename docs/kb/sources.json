@@ -1,5 +1,410 @@
 [
   {
+    "id": "release-check-runner",
+    "title": "Release check runner",
+    "path": "tools/run_release_checks.ps1",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "release gate",
+      "Foundry",
+      "pytest"
+    ],
+    "status": "current",
+    "canonical_role": "Complete local release gate",
+    "summary": "Runs repository checks, non-integration and integration tests, pinned Foundry, deterministic double-build, secret scan and diff hygiene."
+  },
+  {
+    "id": "cross-platform-core-experiment-runner",
+    "title": "Cross-platform core experiment runner",
+    "path": "tools/run_core_experiments.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "core experiment",
+      "cross-platform",
+      "shared host"
+    ],
+    "status": "current",
+    "canonical_role": "Canonical core experiment implementation",
+    "summary": "Runs the core E2E, transcript checks and optional recovery tests on Windows or Linux with a shared-host resource profile."
+  },
+  {
+    "id": "remote-host-preflight",
+    "title": "Remote host preflight",
+    "path": "tools/remote_host_preflight.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "remote lab",
+      "capacity",
+      "safety"
+    ],
+    "status": "current",
+    "canonical_role": "Read-only shared-host resource gate",
+    "summary": "Checks Linux capacity, pinned tools and conflicting experiment processes without mutating the remote host."
+  },
+  {
+    "id": "remote-lab-runner",
+    "title": "Remote lab runner",
+    "path": "tools/run_remote_lab.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "SSH",
+      "remote lab",
+      "public key"
+    ],
+    "status": "current",
+    "canonical_role": "Key-only remote experiment orchestrator",
+    "summary": "Pins host keys, rejects password authentication, deploys one clean commit to a unique user directory and retrieves verified experiment evidence."
+  },
+  {
+    "id": "pilot-task-ingress",
+    "title": "Pilot signed task ingress",
+    "path": "src/loveengine_witness/pilot_task_ingress.py",
+    "source_group": "runtime",
+    "layer": "relay",
+    "domain_tags": [
+      "Pilot",
+      "NetworkTaskV2",
+      "authentication"
+    ],
+    "status": "current",
+    "canonical_role": "Authenticated signed-task validation and enqueue boundary",
+    "summary": "Accepts only signed V2 tasks bound to the active Pilot release, bootstrap member, Publisher issuer, manifest and recipient before durable Relay enqueue."
+  },
+  {
+    "id": "pilot-task-operator",
+    "title": "Loopback Pilot task operator",
+    "path": "src/loveengine_witness/pilot_task_operator.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "Pilot",
+      "task signing",
+      "loopback Anvil"
+    ],
+    "status": "current",
+    "canonical_role": "Test-only signed task producer for the remote tunnel lab",
+    "summary": "Creates finalized test evidence, builds a signed evidence-bound review task and submits it using only the loopback Anvil signer and restricted Pilot token file."
+  },
+  {
+    "id": "review-evidence-runtime",
+    "title": "Dispute evidence review runtime",
+    "path": "src/loveengine_witness/review_evidence.py",
+    "source_group": "runtime",
+    "layer": "evidence",
+    "domain_tags": [
+      "review",
+      "artifact",
+      "SSRF"
+    ],
+    "status": "current",
+    "canonical_role": "Independent review evidence verifier",
+    "summary": "Restricts review URLs to the invite origin and recomputes finalized bundle, event-chain, artifact and cross-reference integrity before a verdict receipt is signed."
+  },
+  {
+    "id": "review-dispute-payload-schema",
+    "title": "ReviewDisputePayloadV1 schema",
+    "path": "schemas/review-dispute-payload-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "network",
+    "domain_tags": [
+      "review",
+      "task payload",
+      "evidence"
+    ],
+    "status": "current",
+    "canonical_role": "Executable dispute-review task payload contract",
+    "summary": "Binds a signed review task to retrievable finalized evidence, events, artifacts, revision, event count and head hash."
+  },
+  {
+    "id": "pilot-task-enqueue-helper",
+    "title": "Loopback Pilot task enqueue helper",
+    "path": "tools/enqueue_pilot_task.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "remote lab",
+      "task signing",
+      "loopback Anvil"
+    ],
+    "status": "current",
+    "canonical_role": "Remote tunnel smoke task producer",
+    "summary": "Uses the loopback Pilot test signer and restricted token file to submit one signed review task without exporting signer keys or tokens."
+  },
+  {
+    "id": "shared-quickstart-launcher",
+    "title": "Shared-host Quickstart launcher",
+    "path": "tools/start_shared_quickstart.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "remote lab",
+      "resource limits",
+      "process group"
+    ],
+    "status": "current",
+    "canonical_role": "Owned loopback Quickstart process-group launcher",
+    "summary": "Starts one loopback Pilot under a new process group with reduced priority, bounded CPU affinity and low dependency concurrency."
+  },
+  {
+    "id": "shared-core-launcher",
+    "title": "Shared-host core launcher",
+    "path": "tools/start_shared_core.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "remote lab",
+      "resource limits",
+      "process group"
+    ],
+    "status": "current",
+    "canonical_role": "Owned shared-host core process-group launcher",
+    "summary": "Starts the canonical core experiment under a separately identifiable process group with fixed CPU, priority and timeout constraints."
+  },
+  {
+    "id": "remote-lab-runbook",
+    "title": "Shared remote host experiment flow",
+    "path": "docs/development/runbooks/remote-lab-flow.zh-CN.md",
+    "source_group": "docs/development",
+    "layer": "runbook",
+    "domain_tags": [
+      "SSH",
+      "Tailscale",
+      "shared host"
+    ],
+    "status": "current",
+    "canonical_role": "Remote lab operator runbook",
+    "summary": "Defines host-key verification, public-key authentication, read-only preflight, bounded deployment, SSH tunnels and result interpretation."
+  },
+  {
+    "id": "repository-secret-scan",
+    "title": "Repository secret scan",
+    "path": "tools/scan_secrets.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "secrets",
+      "release gate",
+      "security"
+    ],
+    "status": "current",
+    "canonical_role": "Repository secret material release gate",
+    "summary": "Rejects sensitive file names, private key material and common credential token patterns without treating protocol hashes as keys."
+  },
+  {
+    "id": "protocol-secret-boundary",
+    "title": "Protocol secret-field boundary",
+    "path": "src/loveengine_witness/secrets.py",
+    "source_group": "runtime",
+    "layer": "security",
+    "domain_tags": [
+      "secrets",
+      "task",
+      "transcript"
+    ],
+    "status": "current",
+    "canonical_role": "Recursive protocol secret-field rejection",
+    "summary": "Rejects private-key, mnemonic, keystore and Pilot bearer-token field names before protocol objects enter storage, logs or transcripts."
+  },
+  {
+    "id": "pilot-config-runtime",
+    "title": "Pilot configuration runtime",
+    "path": "src/loveengine_witness/pilot_config.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "configuration",
+      "readiness",
+      "invite"
+    ],
+    "status": "current",
+    "canonical_role": "Pilot configuration and readiness boundary",
+    "summary": "Loads bounded Pilot configuration, builds secret-free invites and checks local readiness."
+  },
+  {
+    "id": "pilot-auth-runtime",
+    "title": "Pilot HTTP authentication",
+    "path": "src/loveengine_witness/pilot_auth.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "HTTP",
+      "authentication",
+      "origin"
+    ],
+    "status": "current",
+    "canonical_role": "Pilot HTTP write boundary",
+    "summary": "Enforces bearer-token and origin checks for every state-changing Pilot HTTP request."
+  },
+  {
+    "id": "pilot-audit-runtime",
+    "title": "Pilot audit runtime",
+    "path": "src/loveengine_witness/pilot_audit.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "audit",
+      "hash chain",
+      "logging"
+    ],
+    "status": "current",
+    "canonical_role": "Append-only Pilot audit boundary",
+    "summary": "Writes and verifies hash-linked audit records without logging authorization secrets."
+  },
+  {
+    "id": "pilot-ui-runtime",
+    "title": "Pilot operator UI",
+    "path": "src/loveengine_witness/pilot_ui.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "UI",
+      "operator",
+      "localization"
+    ],
+    "status": "current",
+    "canonical_role": "Static Pilot operator interface",
+    "summary": "Owns the local operator HTML and language-specific rendering outside the Pilot HTTP server composition layer."
+  },
+  {
+    "id": "pilot-phases-runtime",
+    "title": "Pilot execution phases",
+    "path": "src/loveengine_witness/pilot_phases.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "observation",
+      "evidence",
+      "governance"
+    ],
+    "status": "current",
+    "canonical_role": "Phased LAN Pilot execution",
+    "summary": "Separates environment, observation, evidence, governance and acceptance stages while preserving the public node CLI path."
+  },
+  {
+    "id": "cli-trust-subsystem",
+    "title": "Trusted CLI subsystem",
+    "path": "src/loveengine_witness/cli_trust.py",
+    "source_group": "runtime",
+    "layer": "cli",
+    "domain_tags": [
+      "CLI",
+      "Registry",
+      "package"
+    ],
+    "status": "current",
+    "canonical_role": "Package, Registry and node trust CLI boundary",
+    "summary": "Owns parser and handler logic for release-bound package, Registry and node connection commands."
+  },
+  {
+    "id": "cli-pilot-subsystem",
+    "title": "Pilot CLI subsystem",
+    "path": "src/loveengine_witness/cli_pilot.py",
+    "source_group": "runtime",
+    "layer": "cli",
+    "domain_tags": [
+      "CLI",
+      "pilot",
+      "recovery"
+    ],
+    "status": "current",
+    "canonical_role": "Pilot lifecycle CLI boundary",
+    "summary": "Owns parser and handler logic for quickstart, chain, transcript, snapshot and soak commands."
+  },
+  {
+    "id": "release-identity-runtime",
+    "title": "Release identity constants",
+    "path": "src/loveengine_witness/release_identity.py",
+    "source_group": "runtime",
+    "layer": "release",
+    "domain_tags": [
+      "version",
+      "protocol",
+      "release"
+    ],
+    "status": "current",
+    "canonical_role": "Central release and protocol identity",
+    "summary": "Defines the current project, Skill release and wire protocol versions used by runtime and release tooling."
+  },
+  {
+    "id": "agent-session-runtime",
+    "title": "Agent session engine",
+    "path": "src/loveengine_witness/agent_session.py",
+    "source_group": "runtime",
+    "layer": "network",
+    "domain_tags": [
+      "WebSocket",
+      "Agent",
+      "receipt"
+    ],
+    "status": "current",
+    "canonical_role": "Unified outbound Agent session engine",
+    "summary": "Runs authenticated V1 and V2 outbound node sessions with a durable task journal, bounded reconnect, receipt confirmation and separate codecs."
+  },
+  {
+    "id": "pilot-runtime",
+    "title": "Pilot runtime",
+    "path": "src/loveengine_witness/pilot_runtime.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "Anvil",
+      "Relay",
+      "quickstart"
+    ],
+    "status": "current",
+    "canonical_role": "Shared local pilot environment preparation",
+    "summary": "Builds the package, starts persistent Anvil, anchors the release and prepares signed bootstrap material for local pilot flows."
+  },
+  {
+    "id": "pilot-transcript-v2-schema",
+    "title": "PilotTranscriptV2 schema",
+    "path": "schemas/pilot-transcript-v2.schema.json",
+    "source_group": "schemas",
+    "layer": "verification",
+    "domain_tags": [
+      "transcript",
+      "offline",
+      "chain"
+    ],
+    "status": "current",
+    "canonical_role": "Trust-bound pilot transcript contract",
+    "summary": "Binds release anchors, membership, signed tasks and receipts, evidence, governance, transactions and final chain state."
+  },
+  {
+    "id": "pilot-snapshot-schema",
+    "title": "Pilot snapshot schema",
+    "path": "schemas/pilot-snapshot-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "recovery",
+    "domain_tags": [
+      "snapshot",
+      "restore",
+      "recovery"
+    ],
+    "status": "current",
+    "canonical_role": "Pilot recovery snapshot contract",
+    "summary": "Defines bounded snapshot identity and recovery metadata."
+  },
+  {
+    "id": "pilot-snapshot-checksums-schema",
+    "title": "Pilot snapshot checksums schema",
+    "path": "schemas/pilot-snapshot-checksums-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "recovery",
+    "domain_tags": [
+      "snapshot",
+      "checksums",
+      "integrity"
+    ],
+    "status": "current",
+    "canonical_role": "Pilot snapshot integrity contract",
+    "summary": "Requires complete checksum coverage before a snapshot can replace live state."
+  },
+  {
     "id": "repo-readme",
     "title": "LoveEngine Witness Skill README",
     "path": "README.md",
@@ -13,7 +418,22 @@
     ],
     "status": "current",
     "canonical_role": "Repository entrypoint",
-    "summary": "Project status, quick start, repository layout, read order, development target, interface docs, and verification."
+    "summary": "One-Skill boundary, release/candidate status, core experiment entrypoint, roles, safety boundaries and documentation map."
+  },
+  {
+    "id": "meeting-qa",
+    "title": "LoveEngine Witness meeting Q&A",
+    "path": "QA.md",
+    "source_group": "repository",
+    "layer": "onboarding",
+    "domain_tags": [
+      "Q&A",
+      "meeting",
+      "evidence"
+    ],
+    "status": "current",
+    "canonical_role": "Evidence-backed project questions and answers",
+    "summary": "Answers questions in the available 33:42-51:06 meeting excerpt with implemented, local-only, governance-lab and unimplemented boundaries."
   },
   {
     "id": "repo-agents",
@@ -82,13 +502,13 @@
     "layer": "development",
     "domain_tags": [
       "integration",
-      "M1",
-      "M2",
-      "Agent adapter"
+      "experiments",
+      "core",
+      "governance"
     ],
     "status": "current",
-    "canonical_role": "Auxiliary developer integration guide",
-    "summary": "Local checks, read order, task split, interface boundaries, and PR acceptance."
+    "canonical_role": "Developer experiment guide",
+    "summary": "Five layered local experiments from package trust through the optional governance contracts, including what each experiment does and does not prove."
   },
   {
     "id": "love-engine-master-plan",
@@ -105,7 +525,55 @@
     ],
     "status": "current",
     "canonical_role": "Canonical engineering plan",
-    "summary": "Current progress, engineering boundaries, milestone baseline, risks, and authority order."
+    "summary": "Separates the core evidence loop from the optional governance lab and records current, deferred and historical work."
+  },
+  {
+    "id": "witness-core-optimization-spec",
+    "title": "LoveEngine Witness Core Optimization SPEC",
+    "path": "docs/archive/specs/implemented/love-engine-witness-core-optimization.md",
+    "source_group": "docs/archive/specs/implemented",
+    "layer": "specification",
+    "domain_tags": [
+      "0.6.1",
+      "trust policy",
+      "core transcript",
+      "subtraction"
+    ],
+    "status": "historical",
+    "canonical_role": "Implemented core hardening specification",
+    "summary": "Defined the completed release-to-ProposalGate core, optional governance stage, verification levels and deferred deployment work."
+  },
+  {
+    "id": "pre-enterprise-remote-lab-spec",
+    "title": "LoveEngine Pre-enterprise Remote Lab SPEC",
+    "path": "docs/specs/love-engine-pre-enterprise-remote-lab.md",
+    "source_group": "docs/specs",
+    "layer": "specification",
+    "domain_tags": [
+      "0.6.1",
+      "remote lab",
+      "resource guard",
+      "SSH"
+    ],
+    "status": "current",
+    "canonical_role": "Active implementation specification",
+    "summary": "Defines the key-only, loopback-only and resource-gated shared Linux validation required before enterprise integration."
+  },
+  {
+    "id": "witness-core-data-flow",
+    "title": "LoveEngine Witness core and data flow zh-CN",
+    "path": "docs/architecture/witness-core-and-data-flow.zh-CN.md",
+    "source_group": "docs/architecture",
+    "layer": "architecture",
+    "domain_tags": [
+      "data flow",
+      "storage",
+      "trust",
+      "contracts"
+    ],
+    "status": "current",
+    "canonical_role": "Canonical core architecture explanation",
+    "summary": "Explains roles, trust inputs, transport, persistence, hashes, contract permissions, transcripts and known limitations."
   },
   {
     "id": "love-engine-local-witness-loop-spec",
@@ -257,7 +725,22 @@
     ],
     "status": "current",
     "canonical_role": "Local source inventory",
-    "summary": "Inventory for source materials, developer docs, M0 implementation, and version priority."
+    "summary": "Separates current engineering authority, preserved sources, historical documents and implementation layers."
+  },
+  {
+    "id": "meeting-transcript-2026-06-25",
+    "title": "道易程社区共识大会自动逐字稿",
+    "path": "docs/reference/source-materials/meeting-transcripts/2026-06-25-daoyicheng-consensus-full.md",
+    "source_group": "source",
+    "layer": "source-material",
+    "domain_tags": [
+      "meeting",
+      "questions",
+      "LoveEngine"
+    ],
+    "status": "reference",
+    "canonical_role": "Preserved meeting transcript input",
+    "summary": "Unmodified automatic transcript file; the available body contains 63 speaker segments covering 33:42 through 51:06."
   },
   {
     "id": "uas-api-doc",
@@ -770,8 +1253,8 @@
       "demo",
       "operations"
     ],
-    "status": "current",
-    "canonical_role": "External demonstration procedure",
+    "status": "historical",
+    "canonical_role": "Historical M3 demonstration procedure",
     "summary": "Preparation, command sequence, narrative order, and safety boundaries for the M3 demo."
   },
   {
@@ -878,7 +1361,7 @@
     ],
     "status": "current",
     "canonical_role": "Auditable local M4 trial",
-    "summary": "Deploys five contracts, ingests twelve events and runs signed reviews in independent processes."
+    "summary": "Deploys five contracts, ingests twelve events and runs evidence-fetching signed reviews in independent processes."
   },
   {
     "id": "live-session-fixture",
@@ -937,8 +1420,8 @@
       "distribution",
       "E2E"
     ],
-    "status": "current",
-    "canonical_role": "Next-stage SPEC supervision baseline",
+    "status": "historical",
+    "canonical_role": "Historical M4 supervision baseline",
     "summary": "Explains the protocol-package Skill model, current workflow, six known gaps, and the required direction for packaging, distribution, live-source and local/public-testnet E2E."
   },
   {
@@ -956,8 +1439,8 @@
       "recovery"
     ],
     "status": "current",
-    "canonical_role": "LAN/Tailscale public interface contract",
-    "summary": "Defines PilotConfig, PilotInvite, authenticated writes, observation, persistent chain, explicit voting, snapshots and PilotTranscript."
+    "canonical_role": "Local Pilot interface contract",
+    "summary": "Defines invite versus trust policy, authenticated writes, observation, core/governance stages, snapshots and transcript verification levels."
   },
   {
     "id": "m5-acceptance-report",
@@ -971,14 +1454,14 @@
       "soak",
       "release"
     ],
-    "status": "implemented",
+    "status": "historical",
     "canonical_role": "M5 verification evidence",
     "summary": "Separates automated accelerated acceptance from the required real four-hour release run."
   },
   {
     "id": "m5-release-closeout-plan",
     "title": "M5 release closeout execution plan",
-    "path": "docs/development/m5-release-closeout-plan.md",
+    "path": "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
     "source_group": "developer-docs",
     "layer": "execution-plan",
     "domain_tags": [
@@ -988,7 +1471,7 @@
       "UI",
       "release"
     ],
-    "status": "implemented",
+    "status": "historical",
     "canonical_role": "M5 closeout plan archive",
     "summary": "Defines the testable milestones for CLI diagnosis, background soak, observable UI, SCC0 documentation, long-run evidence, PR delivery and Git cleanup."
   },
@@ -1179,8 +1662,8 @@
   },
   {
     "id": "contract-public-pilot-spec",
-    "title": "LoveEngine M6 Contract and Public Pilot SPEC",
-    "path": "docs/specs/love-engine-contract-public-pilot-spec.md",
+    "title": "LoveEngine 0.6.1 Contract Public Pilot Hardening SPEC",
+    "path": "docs/archive/specs/implemented/love-engine-contract-public-pilot-spec.md",
     "source_group": "developer-docs",
     "layer": "specification",
     "domain_tags": [
@@ -1190,9 +1673,9 @@
       "tailscale",
       "public-pilot"
     ],
-    "status": "current",
-    "canonical_role": "Active implementation specification",
-    "summary": "Contract-team v2 fusion, participant onboarding, plugin distribution, Tailscale/Debian trial, public-domain configuration and optional testnet gate."
+    "status": "historical",
+    "canonical_role": "Archived hardening specification",
+    "summary": "Preserves the completed 0.6.1 trust-hardening checklist and deferred external deployment gates."
   },
   {
     "id": "contract2-comparison-recommendations",
@@ -1369,7 +1852,7 @@
   {
     "id": "m6-demo-docs-publication-plan",
     "title": "M6 demo docs publication plan",
-    "path": "docs/development/m6-demo-docs-publication-plan.md",
+    "path": "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
     "source_group": "developer-docs",
     "layer": "release-plan",
     "domain_tags": [
@@ -1378,8 +1861,8 @@
       "screenshots",
       "publication"
     ],
-    "status": "current",
-    "canonical_role": "M6.8 closeout checklist",
+    "status": "historical",
+    "canonical_role": "Historical M6.8 closeout checklist",
     "summary": "Tracks branch closeout, screenshot runbooks, technical article, validation and PR publication work."
   },
   {

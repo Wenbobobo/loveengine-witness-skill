@@ -1,108 +1,58 @@
 # 主持人操作流程
 
-适用角色：主持人 / Operator
-适用版本：`0.6.0-contract-public-pilot`
+适用目标：0.6.1-contract-public-pilot candidate（本机 loopback）
 
-主持人负责启动 Pilot Server、创建文字直播 session、发布文字、关闭
-session，并查看证据连续性和 ProposalGate 状态。主持人不持有投票私钥。
+主持人负责鉴权写入、关闭 session 和显式 evidence finalize；不持有观察节点或投票
+见证者私钥。Operator 页面不是直播平台，也不执行 ProposalGate 或链上交易。
 
-## 1. 启动本地试点
+## 启动
 
 ```powershell
-uv sync --frozen
-uv run loveengine pilot quickstart --root .\pilot --open-ui
+uv run loveengine pilot quickstart --root .\pilot
 ```
 
-`quickstart` 是长运行命令。保持该终端打开。另开一个终端检查状态：
+无浏览器环境增加 --headless。保持终端运行，在另一终端检查：
 
 ```powershell
 uv run loveengine pilot status --url http://127.0.0.1:8780
 ```
 
-无图形界面时使用：
+输出中的 operator_url 是写控制台，dashboard_url 是只读页面，invite_path 和
+trust_policy_path 交给观察节点。token_file 只留在主持人机器，不复制到聊天、
+命令参数、fixture、日志或 transcript。
 
-```powershell
-uv run loveengine pilot quickstart --root .\pilot --headless
-```
+## 创建并写入 session
 
-命令输出 JSON，其中：
-
-- `operator_url` 是主持人页面；
-- `dashboard_url` 是只读页面；
-- `invite_path` 发给观察节点；
-- `token_file` 是本机受限 token 文件。
-
-不要把 token 复制到聊天、README、fixture、日志或 transcript。
-
-## 2. 打开主持人页面
-
-中文页面：
-
-```text
-http://127.0.0.1:8780/operator/?lang=zh-CN
-```
+打开 http://127.0.0.1:8780/operator/?lang=zh-CN，把 token file 内容输入页面；
+token 只保存在页面内存，不进入 URL/localStorage。
 
 ![打开主持人操作台](../../assets/runbooks/operator/operator-01-open-console-zh.png)
 
-页面顶部显示服务、链、Agent 连接数、Relay 队列、已提交事件和流延迟。
-如果 `service` 或 `chain` 不是绿色，先不要发布事件。
+创建 session 后逐条发布文字。服务把元数据写入 pilot.sqlite，把 exact text bytes
+写入 content-addressed artifact store，并更新事件 hash chain。
 
-## 3. 输入 token 并创建 session
+![创建 session](../../assets/runbooks/operator/operator-02-create-session-zh.png)
 
-从 `token_file` 读取 token，粘贴到页面的“主持人 token”输入框。token 只保存在
-当前页面内存，不进入 URL 或 localStorage。
+![发布文字](../../assets/runbooks/operator/operator-03-publish-event-zh.png)
 
-检查 `直播 Session ID`，然后点击“创建 session”。
+完全相同 event ID/内容可幂等重试；同 ID 不同内容、sequence gap 或错误 previous
+hash 会拒绝。
 
-![创建 session 区域](../../assets/runbooks/operator/operator-02-create-session-zh.png)
+## 关闭与 finalize
 
-如果返回 `write_auth_required`，说明 token 错误或没有输入。重新读取
-`token_file`，不要把 token 写进命令行参数。
+页面“关闭 session”只禁止后续事件写入，不会 finalize。随后通过鉴权 API 调用：
 
-## 4. 发布文字事件
+    POST /v1/live/sessions/{session_id}/evidence/finalize
 
-在“直播文字”中输入下一条可观察文字，点击“发布文字”。M6 文字事件会写入
-本地 SQLite、artifact store 和事件 hash chain。
+finalize 重新读取全部 artifact bytes 并复算 hash。GET evidence 只读取已存在 bundle。
 
-![发布文字并查看事件流](../../assets/runbooks/operator/operator-03-publish-event-zh.png)
+![关闭 session](../../assets/runbooks/operator/operator-04-close-session-zh.png)
 
-正常结果：
+页面中的 ProposalGate 文案是 manual hold 提示，不是 Gate 执行结果。核心实验 runner
+在 ObservationSet、EvidenceBundle 和 dispute reviews 完成后调用 Gate。主持人不签
+观察 receipt，也不签 vote。
 
-- `已提交事件` 增加；
-- `序号` 增加；
-- `头事件 hash` 改变；
-- 右侧事件流出现新内容。
+## 停止
 
-重复完全相同事件会幂等处理；同 ID 不同内容会被拒绝。
-
-## 5. 关闭 session 并检查 Gate
-
-确认文字发布完成后点击“关闭 session”。关闭后不能再写入该 session，只能生成
-新的 revision 或新的 session。
-
-![关闭 session 与 Gate 状态](../../assets/runbooks/operator/operator-04-close-session-zh.png)
-
-ProposalGate 只有在以下条件同时满足时才放行：
-
-1. session 已关闭；
-2. EvidenceBundle 已 finalize；
-3. 所有 critical dispute 都是 `dismissed`；
-4. bundle hash 与 proposal plan 匹配。
-
-Gate 放行后主持人仍不签投票，只生成 proposal plan 给投票见证者核对。
-
-## 6. 用只读面板交叉检查
-
-打开：
-
-```text
-http://127.0.0.1:8780/demo/?lang=zh-CN
-```
-
-只读面板中的 session、事件数量和 head hash 应与主持人页面一致。只读面板没有
-写入按钮，不需要 token。
-
-## 7. 停止
-
-开发机上按 `Ctrl+C` 停止 `quickstart`。正式试点应使用 systemd 或后续
-Tailscale/Debian runbook 管理进程。
+按 Ctrl+C 停止 quickstart。本流程只验证本机 adapter；远程进程托管、Tailscale、
+公网和生产运维是独立验收门。

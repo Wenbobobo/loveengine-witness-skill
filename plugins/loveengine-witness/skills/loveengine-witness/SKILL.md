@@ -1,6 +1,6 @@
 ---
 name: loveengine-witness
-description: Verify, install, operate, observe, and audit LoveEngine Witness pilots from Codex. Use for manifests, deterministic packages, invite files, live-text sessions, Agent observation tasks, dispute reviews, explicit witness voting, transcripts, or pilot recovery.
+description: Verify, install, operate, observe, and audit the LoveEngine Witness core and optional governance experiments from Codex. Use for manifests, deterministic packages, trust policies, invite files, live-text sessions, Agent observation tasks, dispute reviews, transcripts, explicit witness voting, or pilot recovery.
 ---
 
 # LoveEngine Witness
@@ -13,7 +13,10 @@ thin instruction layer over the versioned protocol runtime.
 1. Identify the user's role: Operator, Observation Node, Voting Witness, Public
    Viewer, or Publisher.
 2. Verify the manifest or package before joining:
-   `loveengine manifest verify` or `loveengine package verify <archive>`.
+   `loveengine manifest verify` or
+   `loveengine package verify <archive> --expected-package-hash <registry-keccak>`.
+   Without a trusted Registry hash, select `--integrity-only` explicitly and do
+   not describe the result as trust-bound.
 3. For a local pilot, prefer:
    `loveengine pilot quickstart --root <dir> --headless`.
 4. For a participant node, use an invite file plus a signed profile and never

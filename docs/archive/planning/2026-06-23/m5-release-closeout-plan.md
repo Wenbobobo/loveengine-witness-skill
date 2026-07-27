@@ -1,8 +1,7 @@
 # M5 release closeout execution plan
 
-状态：active  
-日期：2026-06-23  
-状态：implemented archive
+状态：historical closeout checklist；已由 0.6.1 核心优化规格取代
+日期：2026-06-23
 适用版本：`0.5.0-lan-pilot`
 权威规格归档：`docs/archive/specs/implemented/love-engine-lan-pilot-spec.md`
 

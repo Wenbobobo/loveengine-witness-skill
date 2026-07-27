@@ -5,8 +5,8 @@
   "status": "draft",
   "spec_version": "2026-06-21",
   "spec_ref": "docs/specs/love-engine-master-plan.md",
-  "spec_hash": "sha256:327a40c56763cf901a6be48b40e7d403b0598b8f17892275aa97647b66af8ee3",
-  "package_hash": "sha256:f89e3a3ac7275126bad5727bbbe92c78b301de82632b1aa3d22664603eb66a56",
+  "spec_hash": "sha256:d3cca708404b35ea1b6bafb996d2bccb3df2cd91cfb2693c1d6d3c5498054e67",
+  "package_hash": "sha256:73b0c3421da8eacd1ee2d95988245c427bcdb9edf05589491a62b8ee3da0bc0d",
   "source_refs": [
     "docs/specs/love-engine-master-plan.md",
     "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md",
@@ -15,11 +15,11 @@
     "docs/kb/source-inventory.md"
   ],
   "source_hashes": {
-    "docs/specs/love-engine-master-plan.md": "sha256:327a40c56763cf901a6be48b40e7d403b0598b8f17892275aa97647b66af8ee3",
+    "docs/specs/love-engine-master-plan.md": "sha256:d3cca708404b35ea1b6bafb996d2bccb3df2cd91cfb2693c1d6d3c5498054e67",
     "docs/archive/specs/implemented/love-engine-local-witness-loop-spec.md": "sha256:8516603ae3a74799be464fc73de13449995ca337f117ae1c3465fec67d7c1675",
     "docs/reference/source-materials/current/UAS接口文档.md": "sha256:3d9ef36b31e574deb5e9320ea94303193cae34e716fa691af2f9742317d201cf",
     "docs/reference/source-materials/current/UAS 见证方案 2.0.md": "sha256:256ede6f49b22984bac3581df8ae48c044479909ed3e2095b9b3c2e04c4f2e95",
-    "docs/kb/source-inventory.md": "sha256:d3e84975abc98a850909c985cdd374035ab237c90099ab913e7a17cddf3f5898"
+    "docs/kb/source-inventory.md": "sha256:d4ae9f798e72b620a1d60d12921f455cd7211cec483c2af542c416b20b4bb750"
   },
   "network": {
     "compatible_protocol": "loveengine-witness-net/0.1",

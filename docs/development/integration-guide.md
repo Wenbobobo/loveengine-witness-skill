@@ -1,139 +1,185 @@
-# Integration guide
+# Developer experiment guide
 
-本文给参与 LoveEngine Witness Skill M6 合约融合、公网预备和后续升级的开发者和 Agent 使用。
+适用目标：0.6.1-contract-public-pilot candidate
+最新发布 tag：v0.6.0-contract-public-pilot
 
-## 1. 初始化
+本指南按当前能力而不是 M1-M6 历史组织实验。默认验证路径在 ProposalGate 结束；
+治理合约是最后一个可选实验。
+
+## 环境与阅读顺序
+
+需要 Python 3.11+、uv，以及用于合约实验的 Foundry 1.7.1。
 
 ```powershell
-cd <loveengine-witness-skill>
-uv sync
+uv sync --frozen
+uv run loveengine version
 uv run python .\tools\check.py
 ```
 
-不要依赖父目录 DAism 中的重复脚本或文档。
+依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
+[CLI 参考](../api/cli-reference.md)和
+[活动远程实验 SPEC](../specs/love-engine-pre-enterprise-remote-lab.md)。历史阶段报告只在
+追查兼容性时阅读。
 
-## 2. 阅读顺序
-
-1. `README.md`
-2. `docs/specs/love-engine-master-plan.md`
-3. `docs/development/m4-skill-supervision-and-next-stage-gaps.md`
-4. `docs/specs/love-engine-contract-public-pilot-spec.md`
-5. `docs/archive/specs/implemented/love-engine-agent-network-pilot-spec.md`
-6. `docs/api/README.md`
-7. `skills/loveengine-witness/skill-manifest.json`
-
-查原始约束时再读：
-
-- `docs/reference/source-materials/current/UAS接口文档.md`
-- `docs/reference/source-materials/current/UAS 见证方案 2.0.md`
-
-## 3. 开发顺序
-
-M1：
-
-1. 先写 schema 或行为测试并确认失败。
-2. 实现最小 domain/use-case。
-3. 实现 CLI adapter。
-4. 运行 pytest 和 M0 compatibility。
-
-M2：
-
-1. 安装并固定 Foundry。
-2. 先写失败的 Foundry 测试。
-3. 按 StreamingEngine、PublicSink、CorporateSink、WitnessDAO 顺序实现。
-4. 接 EIP-712、signer、relayer 和 demo。
-5. 生成 transcript 并进行敏感信息扫描。
-
-M3：
-
-1. 先为 SkillRegistry 状态迁移、签名篡改和 Relay 重投递编写失败测试。
-2. 实现 Registry 与 `0.3.x` manifest。
-3. 实现节点 profile、bootstrap、task 和 receipt 的 EIP-712 校验。
-4. 实现只使用出站连接的 RelayTransport 和 SQLite 队列。
-5. 接入 Registry 与 `BroadcastScheduled` 事件，最后运行三节点 Anvil E2E。
-
-M3 验收：
+## 实验 0：package 与 Registry 信任
 
 ```powershell
-uv run pytest .\tests\integration\test_network_demo.py
-uv run loveengine network demo --nodes 3 --output .\examples\transcripts
-uv run loveengine network transcript verify .\examples\transcripts\network-pilot.fixture.json
+uv run loveengine package build --output .\dist
+uv run loveengine package verify <archive.zip> --integrity-only
+uv run loveengine registry verify --rpc-url http://127.0.0.1:8545 --artifact <archive.zip> --chain-id 31337 --registry <registry-address> --publisher <publisher-address> --skill-id loveengine-witness --version 0.6.1-contract-public-pilot
 ```
 
-M4：
+观察：
 
-1. 先写 LiveEvent、ArtifactStore、EvidenceBundleV2 和 dispute 的失败测试。
-2. domain/use-case 只依赖端口，不依赖 aiohttp 或 SQLite。
-3. LiveGateway、SQLite、文件系统和 dashboard 作为 adapters 接入。
-4. 最后运行三节点 live-evidence E2E 和 transcript 验证。
+- integrity-only 只验证 ZIP 内部 checksums、manifest、release metadata 和秘密文件
+  规则，必须返回 trust_bound: false。
+- Registry 验证比较 actual ZIP Keccak、canonical manifest Keccak 和 active
+  release。
 
-M4 验收：
+证明：拿到的 bytes 与某个链上 release 一致。
+不证明：这个 Publisher 是否是你认可的发布者；认可关系来自独立 trust policy。
+
+## 实验 1：Relay、任务与回执
+
+先运行 quickstart，再在独立终端使用它生成的 invite、trust policy、ZIP 和 signed
+profile 连接：
 
 ```powershell
-uv run pytest .\tests\integration\test_live_evidence_demo.py
-uv run loveengine demo live-evidence --nodes 3 --input .\examples\live\live-session.fixture.ndjson --output .\examples\transcripts
-uv run loveengine live transcript verify .\examples\transcripts\live-review.fixture.json
+uv run loveengine pilot quickstart --root .\pilot --headless
 ```
 
-M5：
-
-1. 先验证 `SKILL.md` frontmatter 与确定性 ZIP。
-2. Pilot Server 写接口必须先有缺失/错误 token 的失败测试。
-3. `observe_live_text` 必须在独立 Agent 进程中验证 SSE、event hash chain 和 artifact。
-4. 持久链先测试 state dump/load 和 code hash，再接 proposal。
-5. 投票只能由五个显式 `witness vote approve` 命令产生。
-6. 最后执行带服务重启、Anvil 重启和三个 Agent 断线的统一 E2E。
-
-M5 快速验收：
-
 ```powershell
-uv run pytest .\tests\integration\test_pilot_chain.py
-uv run pytest .\tests\integration\test_pilot_demo.py
-uv run pytest .\tests\integration\test_pilot_soak.py
-uv run loveengine demo lan-pilot --events 12 --observers 10 --output .\pilot-output
-uv run loveengine pilot transcript verify .\pilot-output\pilot.fixture.json
+uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package .\pilot\release\loveengine-witness-0.6.1-contract-public-pilot.zip --profile .\pilot\profiles\node-1.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node-1.cursor.sqlite --expected-tasks 1
 ```
 
-正式发布前必须单独执行四小时 soak：
+观察：节点先核对 policy、RPC release、ZIP 和 profile，再建立出站 WebSocket；任务
+通过鉴权 `POST /v1/relay/tasks` 提交已经签名的 NetworkTaskV2；ACK 与完成
+receipt 分开；连接建立后 Relay 仍可推送任务。Pilot 不替 Publisher 签名。
+重复提交同一份 signed task 是幂等的；同 taskId 或 issuer+nonce 对应不同内容会
+冲突。节点先把 signed receipt 写入 cursor DB，再发送；默认最多重连 3 次，每次
+idle timeout 60 秒，ACK 丢失时恢复同一回执而不重做任务。
+
+证明：任务和 receipt 的签名、成员、recipient、nonce、deadline 以及连接绑定。
+不证明：节点由现实中的独立组织控制，或 Relay 是高可用服务。
+
+## 实验 2：event、artifact 与 finalize
+
+使用 Operator 页面或鉴权 HTTP 写入创建 session、连续发布文字并关闭。关闭不会
+自动 finalize，必须显式调用：
+
+    POST /v1/live/sessions/{session_id}/evidence/finalize
+
+随后只读：
+
+    GET /v1/live/sessions/{session_id}/evidence
+
+观察 pilot.sqlite 中的事件元数据和 artifacts/sha256 下的原文，篡改任意 artifact
+后再次验证必须失败。
+
+证明：保存的 bytes、SHA-256、canonical event Keccak 和事件顺序一致。
+不证明：文字内容是真实事实，也不证明单机 artifact 永远可用。
+
+## 实验 3：争议与 ProposalGate
 
 ```powershell
-uv run loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output .\pilot-soak
+uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\core-output
 ```
 
-M6：
+实验派发三个不同节点的 review_dispute 任务。每个 review payload 绑定 finalized
+bundle、events 和 artifact URL，节点先重新取回并复算事件链、artifact bytes 与
+bundle 引用，再签 verdict receipt。随后聚合多数结果，并在 finalized bundle 和
+critical dispute 均满足条件时运行 Gate。输出 WitnessCoreTranscriptV1。
 
-1. 合约团队交付稿只保存在 `docs/reference/contracts/contract-team-v2/`，不要原地改写。
-2. 先写合约失败测试，再融合 contract2 的业务结构和 NatSpec。
-3. 保留 `VoteSignature` 的 proposalId、payloadHash、reasonHash、nonce 和 deadline。
-4. README/运行手册必须按角色说明参与流程。
-5. Plugin 只是分发入口；SkillRegistry package hash 仍是信任根。
+离线验证检查 hash、签名、成员、quorum 和引用；RPC + trust policy 才能把 release
+anchor 绑定为 trust_bound: true。
 
-M6 快速验收：
+证明：核心流程从 release 到 Gate 的记录可复核。
+不证明：Gate 是链上权限、review verdict 为现实真相，或三个本机 actor 社会独立。
+
+## 实验 4：可选治理合约
 
 ```powershell
-uv run pytest .\tests\test_cli.py .\tests\test_cli_commands.py .\tests\test_pilot_server.py
-cd contracts
-forge test
-cd ..
+uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 --output .\governance-output
+```
+
+该实验在核心结果后注册 witness、创建 proposal、请求五个显式 EIP-712 approval、
+提交交易并读取 PublicSink，输出 PilotTranscriptV2。
+
+证明：一次干净 Anvil 部署中的合约签名、quorum、交易、code 和最终状态。
+不证明：ProposalGate 被合约强制执行、多场公司排期安全，或公共测试网已经部署。
+
+## 一键本机报告
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\run_core_experiments.ps1
+```
+
+PowerShell 入口只是跨平台 Python runner 的薄包装。Linux/Windows 都可直接运行：
+
+```powershell
+uv run python .\tools\run_core_experiments.py
+```
+
+runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证等级和篡改检查。
+报告必须写明 environment: local_anvil、actors_simulated: true，以及每项实验
+“证明/不证明”的边界。
+
+默认 soak 也停在 core；治理 soak 必须显式指定：
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 1 --events 12 --observers 10 --output .\core-soak
+uv run loveengine pilot soak --stage governance --duration-seconds 1 --events 12 --observers 10 --output .\governance-soak
+```
+
+## 实验 5：共享 Linux remote lab
+
+先配置独立 SSH key 和已经旁路核对的 known_hosts。runner 不接受密码：
+
+```powershell
+uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
+```
+
+preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
++15、最多两核和低构建并发运行 core/recovery。Pilot 与 Anvil 不绑定 Tailscale
+地址，报告/transcript 下载后由本机再次离线验证。随后 runner 建立 SSH tunnel，
+用公开 node CLI 连接远端 Quickstart，在连接后提交签名任务并验收一个绑定
+receipt。该 review task 指向辅助程序刚创建并 finalize 的真实 evidence，节点会
+通过 tunnel 读取并复算；报告要求 `evidence_verified:true`，Relay 还必须记录
+`receipt_confirmed:1`。它只停止自己创建的进程组；成功或失败都写 report，
+postflight 另验无相关残留。详细门槛见
+[共享主机 runbook](runbooks/remote-lab-flow.zh-CN.md)。
+
+证明：相同 commit 能否在受约束 Linux 主机上复跑核心/恢复测试，以及公开节点
+路径能否经安全 tunnel 完成连接后任务和 receipt。
+不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
+
+2026-07-27 的 candidate baseline `2fd3a29` 已通过旧版短实验：3 个 observation
+receipt、3 个 review receipt、Gate ready、恢复测试通过；下载 transcript 为
+`offline_integrity` / `trust_bound:false`，tunnel 节点得到 1 个绑定 receipt，
+Relay 记录 1 个 ACK，清理检查未发现相关残留进程。机器报告 SHA-256 为
+`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
+这是改进前报告；增强后的 runner 以每次新报告中的精确 source_commit、
+`evidence_verified`、`relay_receipt_confirmed` 和 postflight 字段逐次验收。
+30 分钟和 4 小时 soak 仍延期。
+
+## 变更验收
+
+```powershell
 uv run python .\tools\check.py
+uv run pytest -m "not integration"
+uv run pytest .\tests\integration
+powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 ```
 
-## 4. 接口规则
+release gate 还包括 Foundry、确定性双构建、core accelerated soak、secret scan 和
+git diff check。文档、schema 或 source inventory 变化后必须统一刷新 current/M0
+manifest 和必要 fixture；不要手工编辑 hash。
 
-- 新增或修改公开字段时同步更新 `schemas/` 和 `docs/api/`。
-- EVM 大整数在 JSON 中使用十进制字符串。
-- raw private key、mnemonic、keystore 和 token 不能进入 Agent context、fixture、日志或 transcript。
-- relayer 只能提交签名，不得替 witness 签名。
-- 任何治理默认值必须标注为 fixture、部署参数或治理参数。
+## 当前不做
 
-## 5. PR 验收
-
-PR 必须列出：
-
-- 修改层：docs、skill、schemas、Python、contracts、relayer 或 adapter。
-- 公开接口变化。
-- manifest/hash 影响。
-- 验证命令和结果。
-- 未完成内容。
-
-使用 `.github/pull_request_template.md` 自查。
+- 不把 fixture/Operator UI 扩展成公司直播平台。
+- 不实现自动发现或常驻调度 daemon。
+- 不把 quickstart 或 SSH-tunnel remote lab 当作 Tailscale 直接服务、公网或
+  测试网部署。
+- 不删除 M0-M6 历史 codec/schema/transcript reader 来降低复杂度。

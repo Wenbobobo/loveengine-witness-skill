@@ -85,8 +85,9 @@ def sign_typed_data(
 def tx_summary(receipt: Any, action: str) -> dict[str, Any]:
     return {
         "action": action,
-        "transaction_hash": receipt.transactionHash.hex(),
+        "transaction_hash": Web3.to_hex(receipt.transactionHash),
         "block_number": str(receipt.blockNumber),
+        "block_hash": Web3.to_hex(receipt.blockHash),
         "status": str(receipt.status),
     }
 
@@ -129,6 +130,8 @@ def run_local_loop(output: Path) -> dict[str, Any]:
         [str(forge), "build"],
         cwd=CONTRACTS,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
