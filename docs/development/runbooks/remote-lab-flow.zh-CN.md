@@ -62,10 +62,11 @@ uv run python .\tools\run_remote_lab.py run `
 4. 以 nice +15、最多两核和低构建并发执行 core/recovery 测试；
 5. 下载 report 和 transcript，并在本机重新离线验证；
 6. 再次执行资源门，启动一个受限的 loopback Quickstart；
-7. 建立本机 SSH tunnel，使用公开 `loveengine node connect`；
-8. 创建并 finalize 一份 tunnel 可访问的 evidence；
-9. 节点连接后提交绑定 bundle/events/artifacts 的签名 V2 review task，节点实际
-   复算证据并返回一个绑定 receipt；
+7. 建立本机 SSH tunnel，启动 3 个公开 `loveengine node connect` 进程；
+8. 等 3 个节点全部连接后，为每个节点分别创建并 finalize 一份 tunnel 可访问的
+   evidence；
+9. 分别提交绑定 bundle/events/artifacts 的签名 V2 review task；每个节点实际
+   复算自己的证据并返回与 node/task/dispute 绑定的 receipt；
 10. 终止且只终止本次创建的 Quickstart 进程组，再执行只读 postflight。
 
 它不会清理远端目录。确认报告已回收且没有其他进程使用该目录后，再由主机操作者
@@ -94,9 +95,10 @@ Pilot 配置改成 `0.0.0.0`。
 - 3 个 observation receipt 和 3 个 review receipt；
 - recovery tests true；
 - 下载 transcript 为 offline_integrity 且 trust_bound false；
-- `tunnel_smoke.status: passed`、`receipt_count: 1`、
-  `evidence_verified: true`、`relay_acked: 1`、
-  `relay_receipt_confirmed: 1`；
+- `tunnel_smoke.status: passed`、`node_count: 3`、`receipt_count: 3`；
+- 三份 receipt 均为 `evidence_verified: true`，且分别绑定自己的
+  node/task/dispute；
+- `relay_acked: 3`、`relay_receipt_confirmed: 3`；
 - `owned_process_cleanup: true`，远端实验文件仍保留。
 - `postflight_cleanup_verified: true`。若失败，报告还必须包含 `phase` 和稳定的
   error type；不要只看终端最后一行。
@@ -110,5 +112,5 @@ Pilot 配置改成 `0.0.0.0`。
 SHA-256 为
 `0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
 当前 runner 又增加了 evidence 实际复算、receipt ACK-loss 恢复、精确 dependency
-commit 和失败/postflight 报告；增强路径始终以最新报告中的精确
+commit、三公开节点短时跨主机门和失败/postflight 报告；增强路径始终以最新报告中的精确
 `source_commit` 和完整验收字段为准。长 soak 仍未执行。

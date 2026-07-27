@@ -26,6 +26,7 @@ HOST_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 USER_PATTERN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 REMOTE_ROOT_PATTERN = re.compile(r"^[A-Za-z0-9._/-]+$")
 REMOTE_FILE_PATTERN = re.compile(r"^/[A-Za-z0-9._/-]+$")
+TUNNEL_NODE_COUNT = 3
 
 
 def _utc_now() -> str:
@@ -209,6 +210,34 @@ def _wait_http_json_or_none(
         if process is not None and process.poll() is not None:
             raise
         return None
+
+
+def _validated_review_receipt(
+    node_result: dict[str, Any],
+    *,
+    task_id: str,
+    dispute_id: str,
+) -> dict[str, Any]:
+    receipts = node_result.get("receipts")
+    receipt = (
+        receipts[0]
+        if isinstance(receipts, list) and len(receipts) == 1
+        else {}
+    )
+    result = receipt.get("result") if isinstance(receipt, dict) else None
+    if (
+        node_result.get("rejected") != 0
+        or not isinstance(receipt, dict)
+        or receipt.get("task_id") != task_id
+        or receipt.get("status") != "completed"
+        or not isinstance(result, dict)
+        or result.get("evidence_verified") is not True
+        or result.get("dispute_id") != dispute_id
+    ):
+        raise RuntimeError(
+            "tunneled node did not return an evidence-verified bound receipt"
+        )
+    return receipt
 
 
 def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
@@ -645,7 +674,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         tunnel_dir = local_output / "tunnel"
         tunnel_dir.mkdir(parents=True, exist_ok=False)
         tunnel_process: subprocess.Popen[str] | None = None
-        node_process: subprocess.Popen[str] | None = None
+        node_processes: list[subprocess.Popen[str]] = []
         report: dict[str, Any] | None = None
         owned_cleanup = False
         cleanup_verification: dict[str, int | bool] = {
@@ -684,7 +713,6 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             remote_pilot = f"~/{deployment_rel}/tmp/tunnel-pilot"
             invite_path = tunnel_dir / "pilot-invite.json"
             trust_policy_path = tunnel_dir / "pilot-trust-policy.json"
-            profile_path = tunnel_dir / "node-1.json"
             package_path = tunnel_dir / "loveengine-witness.zip"
             self._copy_from_remote(
                 f"{remote_pilot}/pilot-invite.json",
@@ -693,10 +721,6 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             self._copy_from_remote(
                 f"{remote_pilot}/pilot-trust-policy.json",
                 trust_policy_path,
-            )
-            self._copy_from_remote(
-                f"{remote_pilot}/profiles/node-1.json",
-                profile_path,
             )
             remote_package = self._remote_package_archive(
                 remote_deployment,
@@ -718,61 +742,83 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 + "\n",
                 encoding="utf-8",
             )
-            profile = json.loads(profile_path.read_text(encoding="utf-8"))
-            node = str(profile["profile"]["node"])
-            dispute_id = "remote-tunnel-dispute"
-            task_id = "remote-tunnel-late-task"
-            verdicts_path = tunnel_dir / "verdicts.json"
-            verdicts_path.write_text(
-                json.dumps({dispute_id: "dismiss"}, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            node_result_path = tunnel_dir / "node-result.json"
             uv = _resolve_executable(None, "uv")
-            node_process = subprocess.Popen(
-                [
-                    uv,
-                    "run",
-                    "loveengine",
-                    "node",
-                    "connect",
-                    "--invite",
-                    str(invite_path),
-                    "--trust-policy",
-                    str(trust_policy_path),
-                    "--package",
-                    str(package_path),
-                    "--profile",
-                    str(profile_path),
-                    "--rpc-url",
-                    f"http://127.0.0.1:{local_rpc_port}",
-                    "--address",
-                    node,
-                    "--cursor-db",
-                    str(tunnel_dir / "node.cursor.sqlite"),
-                    "--verdicts",
-                    str(verdicts_path),
-                    "--expected-tasks",
-                    "1",
-                    "--output",
-                    str(node_result_path),
-                ],
-                cwd=ROOT,
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+            node_runs: list[dict[str, Any]] = []
+            for index in range(1, TUNNEL_NODE_COUNT + 1):
+                profile_path = tunnel_dir / f"node-{index}.json"
+                self._copy_from_remote(
+                    f"{remote_pilot}/profiles/node-{index}.json",
+                    profile_path,
+                )
+                profile = json.loads(profile_path.read_text(encoding="utf-8"))
+                node = str(profile["profile"]["node"])
+                dispute_id = f"remote-tunnel-dispute-{index}"
+                task_id = f"remote-tunnel-late-task-{index}"
+                verdicts_path = tunnel_dir / f"node-{index}-verdicts.json"
+                verdicts_path.write_text(
+                    json.dumps({dispute_id: "dismiss"}, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                node_result_path = tunnel_dir / f"node-{index}-result.json"
+                node_process = subprocess.Popen(
+                    [
+                        uv,
+                        "run",
+                        "loveengine",
+                        "node",
+                        "connect",
+                        "--invite",
+                        str(invite_path),
+                        "--trust-policy",
+                        str(trust_policy_path),
+                        "--package",
+                        str(package_path),
+                        "--profile",
+                        str(profile_path),
+                        "--rpc-url",
+                        f"http://127.0.0.1:{local_rpc_port}",
+                        "--address",
+                        node,
+                        "--cursor-db",
+                        str(tunnel_dir / f"node-{index}.cursor.sqlite"),
+                        "--verdicts",
+                        str(verdicts_path),
+                        "--expected-tasks",
+                        "1",
+                        "--output",
+                        str(node_result_path),
+                    ],
+                    cwd=ROOT,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                node_processes.append(node_process)
+                node_runs.append(
+                    {
+                        "index": index,
+                        "node": node,
+                        "task_id": task_id,
+                        "dispute_id": dispute_id,
+                        "result_path": node_result_path,
+                        "process": node_process,
+                    }
+                )
             connected_deadline = time.monotonic() + 60
             metrics: dict[str, Any] | None = None
             while time.monotonic() < connected_deadline:
-                if node_process.poll() is not None:
-                    _, detail = node_process.communicate()
-                    raise RuntimeError(
-                        f"tunneled node exited before connecting: {detail.strip()}"
-                    )
+                for node_run in node_runs:
+                    node_process = node_run["process"]
+                    if node_process.poll() is not None:
+                        _, detail = node_process.communicate()
+                        raise RuntimeError(
+                            "tunneled node "
+                            f"{node_run['index']} exited before connecting: "
+                            f"{detail.strip()}"
+                        )
                 metrics = _wait_http_json_or_none(
                     base_url + "/v1/metrics",
                     timeout=2,
@@ -780,45 +826,64 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 )
                 if metrics is None:
                     continue
-                if int(metrics["connections"]["agents"]) >= 1:
+                if (
+                    int(metrics["connections"]["agents"])
+                    >= TUNNEL_NODE_COUNT
+                ):
                     break
                 time.sleep(0.25)
             else:
-                raise RuntimeError("tunneled node did not connect within 60 seconds")
-
-            enqueue_command = _remote_bash(
-                "set -eu; "
-                "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
-                "foundry-v1.7.1:$HOME/.foundry/bin:$HOME/.cargo/bin:$PATH\"; "
-                f"cd \"{remote_deployment}\"; "
-                "uv run python tools/enqueue_pilot_task.py "
-                "--root tmp/tunnel-pilot --profile-index 1 "
-                f"--task-id {task_id} --dispute-id {dispute_id} "
-                f"--evidence-base-url http://127.0.0.1:{local_pilot_port}"
-            )
-            submitted = self.ssh_run(enqueue_command, timeout=30)
-            submission = _last_json_object(submitted.stdout)
-            stdout, stderr = node_process.communicate(timeout=90)
-            if node_process.returncode != 0:
                 raise RuntimeError(
-                    "tunneled node failed: "
-                    + (stderr.strip() or stdout.strip() or str(node_process.returncode))
+                    f"{TUNNEL_NODE_COUNT} tunneled nodes did not connect "
+                    "within 60 seconds"
                 )
-            node_result = json.loads(node_result_path.read_text(encoding="utf-8"))
-            receipt = (
-                node_result.get("receipts", [{}])[0]
-                if len(node_result.get("receipts", [])) == 1
-                else {}
-            )
-            if (
-                node_result.get("rejected") != 0
-                or receipt.get("task_id") != task_id
-                or receipt.get("status") != "completed"
-                or receipt.get("result", {}).get("evidence_verified") is not True
-                or receipt.get("result", {}).get("dispute_id") != dispute_id
-            ):
-                raise RuntimeError(
-                    "tunneled node did not return an evidence-verified bound receipt"
+
+            submissions: list[dict[str, Any]] = []
+            for node_run in node_runs:
+                enqueue_command = _remote_bash(
+                    "set -eu; "
+                    "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
+                    "foundry-v1.7.1:$HOME/.foundry/bin:$HOME/.cargo/bin:$PATH\"; "
+                    f"cd \"{remote_deployment}\"; "
+                    "uv run python tools/enqueue_pilot_task.py "
+                    "--root tmp/tunnel-pilot "
+                    f"--profile-index {node_run['index']} "
+                    f"--task-id {node_run['task_id']} "
+                    f"--dispute-id {node_run['dispute_id']} "
+                    f"--evidence-base-url http://127.0.0.1:{local_pilot_port}"
+                )
+                submitted = self.ssh_run(enqueue_command, timeout=30)
+                submissions.append(_last_json_object(submitted.stdout))
+
+            receipt_summaries: list[dict[str, Any]] = []
+            for node_run in node_runs:
+                node_process = node_run["process"]
+                stdout, stderr = node_process.communicate(timeout=90)
+                if node_process.returncode != 0:
+                    raise RuntimeError(
+                        f"tunneled node {node_run['index']} failed: "
+                        + (
+                            stderr.strip()
+                            or stdout.strip()
+                            or str(node_process.returncode)
+                        )
+                    )
+                node_result = json.loads(
+                    node_run["result_path"].read_text(encoding="utf-8")
+                )
+                receipt = _validated_review_receipt(
+                    node_result,
+                    task_id=node_run["task_id"],
+                    dispute_id=node_run["dispute_id"],
+                )
+                receipt_summaries.append(
+                    {
+                        "node": node_run["node"],
+                        "task_id": receipt["task_id"],
+                        "dispute_id": receipt["result"]["dispute_id"],
+                        "status": receipt["status"],
+                        "evidence_verified": True,
+                    }
                 )
             metrics_deadline = time.monotonic() + 15
             while time.monotonic() < metrics_deadline:
@@ -830,8 +895,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 if metrics is None:
                     continue
                 if (
-                    int(metrics["relay"]["acked"]) == 1
-                    and int(metrics["relay"]["receipt_confirmed"]) == 1
+                    int(metrics["relay"]["acked"]) == TUNNEL_NODE_COUNT
+                    and int(metrics["relay"]["receipt_confirmed"])
+                    == TUNNEL_NODE_COUNT
                 ):
                     break
                 time.sleep(0.25)
@@ -846,9 +912,11 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "remote_rpc_port": remote_rpc_port,
                 "local_pilot_port": local_pilot_port,
                 "local_rpc_port": local_rpc_port,
-                "node": node,
-                "task_submission": submission,
-                "receipt_count": 1,
+                "node_count": TUNNEL_NODE_COUNT,
+                "nodes": [node_run["node"] for node_run in node_runs],
+                "task_submissions": submissions,
+                "receipt_count": len(receipt_summaries),
+                "receipts": receipt_summaries,
                 "evidence_verified": True,
                 "relay_acked": int(metrics["relay"]["acked"]),
                 "relay_receipt_confirmed": int(
@@ -856,13 +924,14 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 ),
             }
         finally:
-            if node_process is not None and node_process.poll() is None:
-                node_process.terminate()
-                try:
-                    node_process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    node_process.kill()
-                    node_process.wait(timeout=5)
+            for node_process in node_processes:
+                if node_process.poll() is None:
+                    node_process.terminate()
+                    try:
+                        node_process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        node_process.kill()
+                        node_process.wait(timeout=5)
             if tunnel_process is not None and tunnel_process.poll() is None:
                 tunnel_process.terminate()
                 try:

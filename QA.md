@@ -195,8 +195,9 @@ dispute 是否已 `dismissed`。通过后返回 proposal plan；失败则给出�
 candidate baseline `2fd3a29` 已完成该短验收；其机器报告 SHA-256 为
 `0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
 当前 runner 又要求节点实际复算 tunnel evidence，并对失败写出 postflight 报告。
-增强报告还必须证明 Relay 已确认节点的 receipt confirmation，而不只记录 stored
-ACK。
+增强报告还必须在任务入队前同时连上 3 个公开 node 进程，得到 3 个分别绑定的
+evidence-verified receipt，并证明 Relay 已记录 3 个 ACK 和 3 个 receipt
+confirmation，而不只记录单个 stored ACK。
 
 **当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；
 `0.6.1-contract-public-pilot` 仍是 candidate，不是已发布版本。一次共享主机
@@ -231,11 +232,14 @@ key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净
 tunnel 收到连接后任务并返回绑定 receipt。2026-07-27 的 source commit
 `2fd3a29` 实测得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过，
 tunnel 得到 1 个绑定回执和 1 个 Relay ACK，owned process 清理验证和另行只读
-检查均通过。
+检查均通过。这是旧的单节点 tunnel baseline；当前 runner 的短时跨主机门要求
+3 个公开 node 进程先全部连接，再分别完成 3 个 evidence-bound review task，
+并精确记录 3 个 ACK 和 3 个 receipt confirmation。
 
 **当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；30 分钟
 和 4 小时 soak 尚未执行。它仍不证明生产 signer、TLS、HA、公共测试网、现实
-见证者独立性、事实真实性或企业系统已经接入。
+见证者独立性、事实真实性或企业系统已经接入。三个本机进程和三个实验 profile
+也不能替代三个现实组织。
 
 旧 baseline 的 tunnel review 只覆盖任务/回执绑定；当前代码已经补上真实
 finalized evidence 复算、ACK-loss journal 恢复、双向 receipt confirmation 和

@@ -105,8 +105,9 @@ read-only resource gate, deploys one clean commit to a unique directory, limits
 the experiment to two CPUs with lower scheduling priority, and downloads the
 report/transcript for another local offline verification. Run mode also maps
 the remote loopback through an SSH tunnel and proves that the public node CLI
-receives a task queued after connection, verifies retrievable finalized
-evidence, and returns one bound receipt.
+starts three authenticated processes before task submission; each receives its
+own post-connection task, verifies retrievable finalized evidence, and returns
+an individually bound receipt.
 
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -125,7 +126,12 @@ review receipts, Gate ready, and passing recovery checks. The downloaded
 transcript verified as `offline_integrity` with `trust_bound:false`; the public
 node CLI received one post-connection signed task, Relay stored one bound
 receipt, and the post-run read-only gate found no related process left behind.
-The 30-minute and four-hour soak gates remain deferred.
+That result is the previous one-node tunnel baseline. The strengthened runner
+now requires three connected public-node processes, three evidence-verified
+receipts, three Relay ACKs, and three receipt confirmations in the same short
+cross-host run. These are simulated profiles and processes, not proof of
+socially independent witnesses. The 30-minute and four-hour soak gates remain
+deferred.
 
 ## Roles
 

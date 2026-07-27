@@ -80,8 +80,9 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 完成 0.6.1 本机核心和共享 Linux 短实验后，下一阶段仍需逐项决策和验收：
 
 - 共享远程实验：旧 baseline 的短 core/recovery 和公开 node CLI tunnel 已通过；
-  增强后的 evidence/reconnect/receipt-confirmation/postflight 路径以新机器报告
-  逐次复验。30 分钟与 4 小时 soak 只在独立空闲窗口执行。
+  增强后的 evidence/reconnect/receipt-confirmation/postflight 路径增加 3 个
+  公开节点同时连接后的独立任务/回执门，并以新机器报告逐次复验。30 分钟与
+  4 小时 soak 只在独立空闲窗口执行。
 - 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
 - PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
 - UHAH：只在真实需求和独立安全审计成立后评估。

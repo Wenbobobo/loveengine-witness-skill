@@ -198,10 +198,12 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
   和 profile，首次之后还重验 Registry release。它仍是有界会话，不是常驻
   scheduler 或生产级 daemon。
 - 共享远程实验固定 host key、只接受 SSH key，并通过 tunnel 保持 Pilot/Anvil
-  的 loopback 边界；本机公开 node CLI 经 tunnel 完成连接后任务和 receipt 验证，
-  但不开放 Tailscale 或公网监听。改进前 baseline `2fd3a29` 的机器报告已验证
-  基础路径；增强路径必须以每次机器报告中的精确 source_commit 逐次复验。长 soak
-  和生产网络仍未验证。
+  的 loopback 边界；本机先同时连接 3 个公开 node CLI 进程，再让每个节点经
+  tunnel 完成自己的连接后任务、evidence 复算和 receipt 验证，但不开放
+  Tailscale 或公网监听。改进前 baseline `2fd3a29` 的机器报告只验证单节点基础
+  路径；增强路径必须以每次机器报告中的精确 source_commit、3 个 ACK 和 3 个
+  receipt confirmation 逐次复验。三个本机进程不等于三个现实组织；长 soak 和
+  生产网络仍未验证。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
 - 历史 V2 transcript 的最小 observe/review payload 仍能校验签名和交叉引用，但
