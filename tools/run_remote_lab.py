@@ -154,24 +154,50 @@ def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
     return value
 
 
-def _owned_group_stop_command(pid: int) -> str:
-    if pid <= 1:
-        raise ValueError("owned process-group PID must be greater than one")
+def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
+    if pid <= 1 or process_start_ticks <= 0:
+        raise ValueError("owned process identity must be positive")
     return _remote_bash(
         "set -eu; "
         f"pid={pid}; "
-        "if ! kill -0 \"$pid\" 2>/dev/null; then exit 0; fi; "
+        f"expected_start={process_start_ticks}; "
+        "group_has_live_members() { "
+        "while read -r pgid state; do "
+        "if [ \"$pgid\" = \"$pid\" ]; then "
+        "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
+        "fi; "
+        "done < <(ps -eo pgid=,stat=); "
+        "return 1; "
+        "}; "
+        "if [ ! -r \"/proc/$pid/stat\" ]; then "
+        "if group_has_live_members; then exit 10; fi; "
+        "exit 0; "
+        "fi; "
+        "stat=$(cat \"/proc/$pid/stat\"); "
+        "tail=${stat##*) }; "
+        "set -- $tail; "
+        "state=$1; "
+        "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
+        "if [ \"$state\" != \"Z\" ]; then "
         "command=$(tr '\\000' ' ' < \"/proc/$pid/cmdline\"); "
         "case \"$command\" in "
         "*\"loveengine pilot quickstart\"*) ;; "
         "*) exit 9 ;; "
         "esac; "
+        "fi; "
+        "if ! group_has_live_members; then exit 0; fi; "
         "kill -TERM -- \"-$pid\"; "
         "for _ in {1..20}; do "
-        "if ! kill -0 -- \"-$pid\" 2>/dev/null; then exit 0; fi; "
+        "if ! group_has_live_members; then exit 0; fi; "
         "sleep 0.25; "
         "done; "
-        "kill -KILL -- \"-$pid\""
+        "kill -KILL -- \"-$pid\"; "
+        "for _ in {1..8}; do "
+        "if ! group_has_live_members; then exit 0; fi; "
+        "sleep 0.25; "
+        "done; "
+        "exit 10"
     )
 
 
@@ -344,9 +370,11 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             deployment_rel,
         )
 
-    def _stop_owned_remote_group(self, pid: int) -> bool:
+    def _stop_owned_remote_group(
+        self, pid: int, process_start_ticks: int
+    ) -> bool:
         try:
-            command = _owned_group_stop_command(pid)
+            command = _owned_group_stop_command(pid, process_start_ticks)
         except ValueError:
             return False
         result = subprocess.run(
@@ -388,8 +416,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         started = self.ssh_run(start_command, timeout=30)
         start_info = _last_json_object(started.stdout)
         remote_pid = int(start_info["pid"])
-        if remote_pid <= 1:
-            raise RuntimeError("remote Quickstart returned an invalid PID")
+        process_start_ticks = int(start_info["process_start_ticks"])
+        if remote_pid <= 1 or process_start_ticks <= 0:
+            raise RuntimeError("remote Quickstart returned an invalid process identity")
 
         tunnel_dir = local_output / "tunnel"
         tunnel_dir.mkdir(parents=True, exist_ok=False)
@@ -593,7 +622,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 except subprocess.TimeoutExpired:
                     tunnel_process.kill()
                     tunnel_process.wait(timeout=5)
-            owned_cleanup = self._stop_owned_remote_group(remote_pid)
+            owned_cleanup = self._stop_owned_remote_group(
+                remote_pid, process_start_ticks
+            )
             try:
                 self._copy_from_remote(
                     f"~/{deployment_rel}/tmp/tunnel-pilot.log",

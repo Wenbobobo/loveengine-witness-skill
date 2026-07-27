@@ -21,6 +21,7 @@ from run_remote_lab import (  # noqa: E402
     _validate_target,
     build_parser,
 )
+from start_shared_quickstart import _parse_linux_process_start_ticks  # noqa: E402
 
 
 def _safe_snapshot() -> dict:
@@ -166,11 +167,25 @@ def test_remote_artifacts_must_remain_in_unique_deployment() -> None:
 
 
 def test_owned_process_cleanup_is_pid_and_command_guarded() -> None:
-    command = _owned_group_stop_command(4321)
+    command = _owned_group_stop_command(4321, 987654)
     assert "pid=4321" in command
+    assert "expected_start=987654" in command
+    assert "/proc/$pid/stat" in command
     assert "/proc/$pid/cmdline" in command
+    assert "ps -eo pgid=,stat=" in command
     assert "loveengine pilot quickstart" in command
     assert 'kill -TERM -- "-$pid"' in command
 
     with pytest.raises(ValueError):
-        _owned_group_stop_command(1)
+        _owned_group_stop_command(1, 987654)
+    with pytest.raises(ValueError):
+        _owned_group_stop_command(4321, 0)
+
+
+def test_linux_process_start_ticks_parser_handles_spaced_command_name() -> None:
+    prefix = "4321 (uv worker with spaces)"
+    fields_after_command = ["S"] + [str(index) for index in range(4, 23)]
+    fields_after_command[19] = "987654"
+    stat = prefix + " " + " ".join(fields_after_command)
+
+    assert _parse_linux_process_start_ticks(stat) == 987654

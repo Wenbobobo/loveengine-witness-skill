@@ -11,6 +11,25 @@ import subprocess
 from pathlib import Path
 
 
+def _parse_linux_process_start_ticks(stat: str) -> int:
+    closing_parenthesis = stat.rfind(")")
+    if closing_parenthesis < 0:
+        raise ValueError("invalid Linux process stat")
+    fields = stat[closing_parenthesis + 1 :].split()
+    if len(fields) <= 19:
+        raise ValueError("Linux process stat is missing the start time")
+    start_ticks = int(fields[19])
+    if start_ticks <= 0:
+        raise ValueError("Linux process start time must be positive")
+    return start_ticks
+
+
+def _linux_process_start_ticks(pid: int) -> int:
+    return _parse_linux_process_start_ticks(
+        Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    )
+
+
 def _limit_process(max_cpus: int, nice_increment: int) -> None:
     os.nice(nice_increment)
     if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
@@ -81,6 +100,7 @@ def start_quickstart(
         )
     return {
         "pid": process.pid,
+        "process_start_ticks": _linux_process_start_ticks(process.pid),
         "root": str(resolved_root),
         "log": str(resolved_log),
         "host": host,
