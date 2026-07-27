@@ -48,6 +48,7 @@ RELEASE_ROOT_REFS = [
     "schemas/pilot-invite-v1.schema.json",
     "schemas/pilot-config-v1.schema.json",
     "schemas/observe-live-text-payload-v1.schema.json",
+    "schemas/review-dispute-payload-v1.schema.json",
     "schemas/live-observation-receipt-v1.schema.json",
     "schemas/observation-set-v1.schema.json",
     "schemas/onchain-proposal-plan-v1.schema.json",
@@ -61,6 +62,8 @@ RELEASE_ROOT_REFS = [
     "src/loveengine_witness/cli_trust.py",
     "src/loveengine_witness/cli_pilot.py",
     "src/loveengine_witness/agent_session.py",
+    "src/loveengine_witness/review_evidence.py",
+    "src/loveengine_witness/secrets.py",
     "src/loveengine_witness/pilot_runtime.py",
     "src/loveengine_witness/pilot_config.py",
     "src/loveengine_witness/pilot_auth.py",
@@ -95,6 +98,7 @@ RELEASE_ROOT_REFS = [
     "tools/remote_host_preflight.py",
     "tools/enqueue_pilot_task.py",
     "tools/start_shared_quickstart.py",
+    "tools/start_shared_core.py",
     "tools/run_remote_lab.py",
 ]
 
@@ -210,7 +214,7 @@ def refresh_current() -> None:
             "pilot_demo": "loveengine demo lan-pilot --stage core --events 12 --observers 10",
             "governance_demo": "loveengine demo lan-pilot --stage governance --events 12 --observers 10",
             "pilot_transcript_verify": "loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]",
-            "pilot_soak": "loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10",
+            "pilot_soak": "loveengine pilot soak --stage core --duration-seconds 14400 --events 240 --observers 10",
             "core_experiment": "uv run python tools/run_core_experiments.py",
             "remote_lab": "uv run python tools/run_remote_lab.py preflight|run",
         }

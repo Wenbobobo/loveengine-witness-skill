@@ -56,7 +56,9 @@ docs/archive/source-materials/。
 - Core trust：deterministic ZIP、SkillRegistry、NodeTrustPolicyV1、profile/bootstrap、
   signed task/receipt、鉴权 task ingress 和 Relay。
 - Core evidence：session/event、artifact、ObservationSet、EvidenceBundle、critical
-  dispute 和 ProposalGate。
+  dispute、独立 review evidence 复算和 ProposalGate。
+- Runtime recovery：节点 task journal、issuer nonce 去重、有界重连和 receipt
+  ACK-loss confirmation。
 - Core verification：WitnessCoreTranscriptV1 的 offline/RPC/policy 模式。
 - Remote lab：只读资源门、key-only SSH、loopback 服务、低优先级 core/recovery，
   以及经 SSH tunnel 使用公开 node CLI 的连接后签名任务与回执验证。

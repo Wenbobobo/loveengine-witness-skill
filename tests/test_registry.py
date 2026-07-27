@@ -131,8 +131,9 @@ def test_onchain_release_binds_rpc_registry_package_and_manifest(
         version="0.6.1-contract-public-pilot",
         web3=_FakeWeb3(release),
     )
-    assert result["verification_level"] == "chain_verified"
-    assert result["trust_bound"] is True
+    assert result["verification_level"] == "chain_consistency"
+    assert result["chain_verified"] is True
+    assert result["trust_bound"] is False
     assert result["package_hash"] == package_hash
     assert observed == {
         "path": artifact,

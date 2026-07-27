@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/review-dispute-payload-v1.schema.json",
+  "title": "ReviewDisputePayloadV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dispute_id",
+    "bundle_hash",
+    "session_id",
+    "evidence_url",
+    "events_url",
+    "artifact_base_url",
+    "revision",
+    "event_count",
+    "head_event_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "loveengine.review-dispute-payload/1"},
+    "dispute_id": {"type": "string", "minLength": 1},
+    "bundle_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "session_id": {"type": "string", "minLength": 1},
+    "evidence_url": {"type": "string", "pattern": "^https?://"},
+    "events_url": {"type": "string", "pattern": "^https?://"},
+    "artifact_base_url": {"type": "string", "pattern": "^https?://"},
+    "revision": {"type": "string", "pattern": "^[0-9]+$"},
+    "event_count": {"type": "string", "pattern": "^[0-9]+$"},
+    "head_event_hash": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"}
+  }
+}

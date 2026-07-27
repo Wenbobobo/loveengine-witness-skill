@@ -8,6 +8,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from eth_account import Account
 from eth_account.messages import encode_typed_data
 
+from loveengine_witness import observation as observation_module
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.live_gateway import create_live_app
 from loveengine_witness.m4_network import build_receipt_v2
@@ -17,6 +18,7 @@ from loveengine_witness.observation import (
     aggregate_observations,
     observation_timeout_seconds,
     observe_live_session,
+    validate_observation_urls,
 )
 
 
@@ -78,6 +80,7 @@ def test_observation_set_requires_three_distinct_matching_receipts() -> None:
 
 def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def scenario() -> None:
         app = create_live_app(tmp_path / "live.sqlite", tmp_path / "artifacts")
@@ -128,15 +131,58 @@ def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
                 "initial_head_hash": "0x" + "00" * 32,
             }
             cursor = ObservationCursorStore(tmp_path / "cursor.sqlite")
-            first = await observe_live_session(payload, cursor, "node-1")
+            first = await observe_live_session(
+                payload,
+                cursor,
+                "node-1",
+                allowed_origin=base,
+            )
             assert first["event_count"] == "2"
             assert first["artifact_count"] == "2"
             assert first["recovered_from_cursor"] is False
 
-            second = await observe_live_session(payload, cursor, "node-1")
+            second = await observe_live_session(
+                payload,
+                cursor,
+                "node-1",
+                allowed_origin=base,
+            )
             assert second["event_count"] == "2"
             assert second["recovered_from_cursor"] is True
             assert second["head_event_hash"] == first["head_event_hash"]
+
+            monkeypatch.setattr(
+                observation_module,
+                "MAX_OBSERVATION_ARTIFACT_BYTES",
+                4,
+            )
+            with pytest.raises(LoveEngineError) as error:
+                await observe_live_session(
+                    payload,
+                    cursor,
+                    "node-artifact-budget",
+                    allowed_origin=base,
+                )
+            assert error.value.code == "observation_artifact_budget_exceeded"
+
+            monkeypatch.setattr(
+                observation_module,
+                "MAX_OBSERVATION_ARTIFACT_BYTES",
+                64 * 1024 * 1024,
+            )
+            monkeypatch.setattr(
+                observation_module,
+                "MAX_OBSERVATION_EVENTS",
+                1,
+            )
+            with pytest.raises(LoveEngineError) as error:
+                await observe_live_session(
+                    payload,
+                    cursor,
+                    "node-event-budget",
+                    allowed_origin=base,
+                )
+            assert error.value.code == "observation_event_limit_exceeded"
         finally:
             await client.close()
 
@@ -168,3 +214,38 @@ def test_observation_duration_is_signed_and_bounded() -> None:
     with pytest.raises(LoveEngineError) as error:
         observation_timeout_seconds(payload)
     assert error.value.code == "schema_validation_failed"
+
+
+@pytest.mark.parametrize(
+    ("field", "url"),
+    [
+        ("stream_url", "http://169.254.169.254/latest/meta-data"),
+        ("session_url", "http://user:password@127.0.0.1:8780/session"),
+        ("artifact_base_url", "http://127.0.0.1:8781/artifacts"),
+    ],
+)
+def test_observation_urls_are_bound_to_invite_origin(
+    field: str,
+    url: str,
+) -> None:
+    payload = {
+        "schema_version": "loveengine.observe-live-text-payload/1",
+        "session_id": "session-1",
+        "stream_url": "http://127.0.0.1:8780/stream",
+        "session_url": "http://127.0.0.1:8780/session",
+        "artifact_base_url": "http://127.0.0.1:8780/artifacts",
+        "start_cursor": "0",
+        "initial_head_hash": "0x" + "00" * 32,
+    }
+    payload[field] = url
+
+    with pytest.raises(LoveEngineError) as error:
+        validate_observation_urls(
+            payload,
+            allowed_origin="http://127.0.0.1:8780",
+        )
+
+    assert error.value.code in {
+        "invalid_observation_url",
+        "observation_origin_mismatch",
+    }

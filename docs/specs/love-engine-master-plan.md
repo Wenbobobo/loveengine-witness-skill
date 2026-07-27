@@ -31,8 +31,10 @@
 - M6 / v0.6.0-contract-public-pilot：最新发布 tag，是本机 Anvil/LAN 合约融合
   基线，不代表 Tailscale、公网或测试网部署。
 - 0.6.1 candidate：信任边界、核心/治理拆分、可解释实验和 CI 已完成本机加固；
-  source commit `63909b9` 已通过共享 ARM64 Linux 短实验门，长 soak 仍延期。
-  wire protocol 保持 loveengine-witness-net/0.6。
+  candidate baseline `2fd3a29` 已通过共享 ARM64 Linux 旧版短实验门。当前增强又
+  加入真实 review evidence 复算、durable task journal/ACK-loss 重连、精确依赖
+  commit 和失败/postflight 报告；增强路径以每次机器报告中的精确 source_commit
+  逐次验收，长 soak 延期。wire protocol 保持 loveengine-witness-net/0.6。
 
 当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
 签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
@@ -65,6 +67,8 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 - invite 不是信任根；节点执行任务前必须用外部 NodeTrustPolicyV1 和 RPC
   Registry 事实绑定 release。
 - Relay 只接受 bootstrap 成员，并把 receipt 绑定到鉴权连接及 pending task。
+- 公开 task ingress 只接受完整可执行 payload；节点以 taskId 和 issuer+nonce
+  持久去重，发送前保存 signed receipt，并用有界重连恢复 ACK-loss。
 - finalize 必须重新读取 artifact；GET 接口不改变 evidence。
 - Observation Agent 不签 vote；治理投票只能由 witness 通过外部 RPC signer
   显式批准。
@@ -75,8 +79,9 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 
 完成 0.6.1 本机核心和共享 Linux 短实验后，下一阶段仍需逐项决策和验收：
 
-- 共享远程实验：短 core/recovery 和公开 node CLI tunnel 已通过；30 分钟与
-  4 小时 soak 只在独立空闲窗口执行。
+- 共享远程实验：旧 baseline 的短 core/recovery 和公开 node CLI tunnel 已通过；
+  增强后的 evidence/reconnect/receipt-confirmation/postflight 路径以新机器报告
+  逐次复验。30 分钟与 4 小时 soak 只在独立空闲窗口执行。
 - 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
 - PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
 - UHAH：只在真实需求和独立安全审计成立后评估。

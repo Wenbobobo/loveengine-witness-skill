@@ -88,7 +88,7 @@ uv run loveengine registry verify --release .\release.json --artifact <archive.z
 profile、actual ZIP 与 release；不会从 Relay 或收到的任务反推信任值。
 
 ```powershell
-uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --output .\receipts.json
+uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --reconnect-attempts 3 --idle-timeout-seconds 60 --output .\receipts.json
 ```
 
 争议复核任务还需要由节点操作者提供 verdict map：
@@ -99,7 +99,11 @@ uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy
 
 `--dry-run` 可不带 trust policy，只验证 invite/profile 形状并返回
 `verification_level: connection_plan`、`trust_bound: false`。节点只建立出站
-WebSocket，不需要公网入站端口。断线后复用 durable cursor。
+WebSocket，不需要公网入站端口。断线后复用 durable cursor 与 task journal。
+`--reconnect-attempts` 范围为 0-10，`--idle-timeout-seconds` 范围为 1-900；
+默认值分别为 3 和 60。重连会重验 Registry release。signed receipt 在发送前
+落盘，Relay ACK 丢失时通过 `receipt_state`/`receipt_ack` 恢复；Relay 返回
+`receipt_confirmed` 后握手才闭合，不重复执行任务。
 
 ## 6. Evidence and authorization
 
@@ -173,7 +177,8 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 ```
 
 脚本覆盖仓库/hash、非集成 pytest、Foundry、M2-M6 E2E、确定性双构建、
-accelerated soak、secret scan 和 `git diff --check`。四小时墙钟 soak 需单独运行
+core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak 可用
+`--stage governance` 单独运行；四小时墙钟 soak 需单独运行
 并保存报告。
 
 跨平台核心实验入口为：
@@ -197,8 +202,11 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
 最多两核和低并发。它先运行 core/recovery，再建立本机 SSH tunnel，使用公开
 `loveengine node connect` 连接远端 Quickstart，并通过鉴权任务入口证明连接后任务
-和绑定 receipt。工具没有 password、sudo、systemd、public bind 或远端文件自动
-清理选项。资源门失败使用退出码 4。
+和绑定 receipt。tunnel review task 指向刚创建的 finalized evidence；节点实际
+取回 bundle、event 和 artifact 后才签名。成功或失败都会写
+`remote-lab-report.json`；最终 postflight 单独记录进程检查和残留状态。工具没有
+password、sudo、systemd、public bind 或远端文件自动清理选项。资源门失败使用
+退出码 4。
 
 ## 12. Stable command tree
 

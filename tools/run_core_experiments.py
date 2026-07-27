@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,10 @@ from remote_host_preflight import CapacityThresholds, run_preflight
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 FOUNDRY_VERSION = "1.7.1"
+FORGE_STD_COMMIT = "77041d2ce690e692d6e03cc812b57d1ddaa4d505"
+OPENZEPPELIN_COMMIT = "e4f70216d759d8e6a64144a9e1f7bbeed78e7079"
+MAX_SHARED_HOST_CPUS = 2
+MIN_SHARED_HOST_NICE_INCREMENT = 15
 
 
 def _utc_now() -> str:
@@ -59,7 +64,16 @@ def _foundry_binary(name: str) -> Path | None:
     )
 
 
+def is_exact_forge_version(output: str) -> bool:
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    return bool(
+        lines
+        and re.fullmatch(r"forge Version: 1\.7\.1", lines[0]) is not None
+    )
+
+
 def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, Any]:
+    validate_shared_host_limits(max_cpus, nice_increment)
     result: dict[str, Any] = {
         "nice_increment": 0,
         "cpu_affinity": None,
@@ -73,6 +87,13 @@ def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, A
             os.sched_setaffinity(0, selected)
             result["cpu_affinity"] = selected
     return result
+
+
+def validate_shared_host_limits(max_cpus: int, nice_increment: int) -> None:
+    if not 1 <= max_cpus <= MAX_SHARED_HOST_CPUS:
+        raise ValueError("shared-host max CPUs must be between 1 and 2")
+    if not MIN_SHARED_HOST_NICE_INCREMENT <= nice_increment <= 19:
+        raise ValueError("shared-host nice increment must be between 15 and 19")
 
 
 class Experiment:
@@ -142,16 +163,16 @@ def _prepare_contracts(experiment: Experiment) -> None:
     if forge is None:
         raise RuntimeError("forge is required")
     version = experiment.run("forge-version", [str(forge), "--version"])
-    if "1.7.1" not in version:
+    if not is_exact_forge_version(version):
         raise RuntimeError("Foundry 1.7.1 is required")
     dependencies = (
         (
             contracts / "lib" / "forge-std",
-            "foundry-rs/forge-std@v1.9.7",
+            f"foundry-rs/forge-std@{FORGE_STD_COMMIT}",
         ),
         (
             contracts / "lib" / "openzeppelin-contracts",
-            "OpenZeppelin/openzeppelin-contracts@v5.3.0",
+            f"OpenZeppelin/openzeppelin-contracts@{OPENZEPPELIN_COMMIT}",
         ),
     )
     for path, package in dependencies:
@@ -216,6 +237,7 @@ def main() -> int:
     if forge and anvil and forge.parent == anvil.parent:
         environment["FOUNDRY_BIN"] = str(forge.parent)
     if args.shared_host:
+        validate_shared_host_limits(args.max_cpus, args.nice_increment)
         thresholds = CapacityThresholds(
             max_load_per_cpu=args.max_load_per_cpu,
             min_available_memory_bytes=int(args.min_memory_gib * GIB),

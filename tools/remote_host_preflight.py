@@ -27,7 +27,15 @@ REQUIRED_TOOLS = (
     "forge",
     "anvil",
 )
-RELEVANT_PROCESSES = {"anvil", "forge", "loveengine"}
+RELEVANT_PROCESSES = {
+    "anvil",
+    "forge",
+    "loveengine",
+    "loveengine_witness",
+    "run_core_experiments.py",
+    "start_shared_quickstart.py",
+    "start_shared_core.py",
+}
 
 
 @dataclass(frozen=True)
@@ -92,12 +100,19 @@ def _tool_info(name: str) -> dict[str, Any]:
     return {"available": True, "path": path, "version": version}
 
 
-def _process_snapshot() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _process_snapshot(
+    ignored_pids: set[int] | None = None,
+) -> tuple[
+    bool,
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    str | None,
+]:
     if os.name == "nt":
-        return [], []
+        return False, [], [], "process inspection requires Linux ps"
     try:
         result = subprocess.run(
-            ["ps", "-eo", "pid=,comm=,%cpu=,%mem=", "--sort=-%cpu"],
+            ["ps", "-eo", "pid=,comm=,%cpu=,%mem=,args=", "--sort=-%cpu"],
             capture_output=True,
             check=True,
             text=True,
@@ -105,13 +120,28 @@ def _process_snapshot() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             errors="replace",
             timeout=5,
         )
-    except (OSError, subprocess.SubprocessError):
-        return [], []
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, [], [], type(exc).__name__
+    return _parse_process_snapshot(
+        result.stdout,
+        ignored_pids=ignored_pids,
+    )
+
+
+def _parse_process_snapshot(
+    output: str,
+    *,
+    ignored_pids: set[int] | None = None,
+) -> tuple[bool, list[dict[str, Any]], list[dict[str, Any]], str | None]:
+    ignored = ignored_pids or set()
     top: list[dict[str, Any]] = []
     relevant: list[dict[str, Any]] = []
-    for raw in result.stdout.splitlines():
-        parts = raw.split()
-        if len(parts) != 4:
+    parse_errors = 0
+    for raw in output.splitlines():
+        parts = raw.split(None, 4)
+        if len(parts) != 5:
+            if raw.strip():
+                parse_errors += 1
             continue
         try:
             item = {
@@ -121,13 +151,18 @@ def _process_snapshot() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
                 "memory_percent": float(parts[3]),
             }
         except ValueError:
+            parse_errors += 1
+            continue
+        if int(item["pid"]) in ignored:
             continue
         if len(top) < 8:
             top.append(item)
-        command = str(item["command"]).lower()
-        if any(name in command for name in RELEVANT_PROCESSES):
+        searchable = f"{item['command']} {parts[4]}".lower()
+        if any(name in searchable for name in RELEVANT_PROCESSES):
             relevant.append(item)
-    return top, relevant
+    if parse_errors:
+        return False, top, relevant, f"unparsed process rows: {parse_errors}"
+    return True, top, relevant, None
 
 
 def collect_host_snapshot(workspace: Path) -> dict[str, Any]:
@@ -142,7 +177,12 @@ def collect_host_snapshot(workspace: Path) -> dict[str, Any]:
         load = (0.0, 0.0, 0.0)
     memory_total, memory_available = _linux_memory()
     disk = shutil.disk_usage(_existing_path(workspace))
-    top_processes, relevant_processes = _process_snapshot()
+    (
+        process_snapshot_ok,
+        top_processes,
+        relevant_processes,
+        process_snapshot_error,
+    ) = _process_snapshot({os.getpid()})
     tools = {name: _tool_info(name) for name in REQUIRED_TOOLS}
     return {
         "hostname": platform.node(),
@@ -160,6 +200,8 @@ def collect_host_snapshot(workspace: Path) -> dict[str, Any]:
         "disk_total_bytes": disk.total,
         "disk_free_bytes": disk.free,
         "tools": tools,
+        "process_snapshot_ok": process_snapshot_ok,
+        "process_snapshot_error": process_snapshot_error,
         "top_processes": top_processes,
         "relevant_processes": relevant_processes,
     }
@@ -183,6 +225,8 @@ def evaluate_capacity(
         reasons.append("minimum CPU count weakens the shared-host limit")
     if snapshot.get("platform") != "linux":
         reasons.append("remote lab requires Linux")
+    if snapshot.get("process_snapshot_ok") is not True:
+        reasons.append("could not verify existing shared-host processes")
     if int(snapshot.get("cpu_count") or 0) < thresholds.min_cpu_count:
         reasons.append("insufficient CPU count")
     if float(snapshot.get("load_per_cpu_1m") or 0.0) > thresholds.max_load_per_cpu:

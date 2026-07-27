@@ -77,19 +77,43 @@ def enqueue_signed_task(hub: RelayHub, task: dict[str, Any]) -> dict[str, Any]:
         allowed_issuers=[bootstrap["publisher"]],
         expected_manifest_hash=release["manifest_hash"],
     )
+    expected_payload_schema = {
+        "observe_live_text": "loveengine.observe-live-text-payload/1",
+        "review_dispute": "loveengine.review-dispute-payload/1",
+    }[task["task_type"]]
+    if task["payload"].get("schema_version") != expected_payload_schema:
+        raise LoveEngineError(
+            "executable_task_payload_required",
+            "public tasks must bind the complete executable payload schema",
+        )
+    serialized_task = json.dumps(
+        task,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
     inserted = hub.store.enqueue(
         recipient,
         task["task_id"],
-        json.dumps(
-            task,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ),
+        serialized_task,
         task["issuer"],
         task["nonce"],
     )
     if not inserted:
+        existing = hub.store.task_state(recipient, task["task_id"])
+        if (
+            existing is not None
+            and existing["payload"] == serialized_task
+            and to_checksum_address(existing["issuer"])
+            == to_checksum_address(task["issuer"])
+            and str(existing["nonce"]) == str(task["nonce"])
+        ):
+            return {
+                "queued": True,
+                "idempotent_replay": True,
+                "task_id": task["task_id"],
+                "recipient": recipient,
+            }
         raise LoveEngineError(
             "task_conflict",
             "task ID or issuer nonce is already queued for this recipient",

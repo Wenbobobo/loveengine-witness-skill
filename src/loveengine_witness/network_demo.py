@@ -15,6 +15,7 @@ from typing import Any
 from aiohttp import ClientSession
 from web3 import HTTPProvider, Web3
 
+from .agent_session import relay_challenge_signing_text
 from .canonical import canonical_json_bytes
 from .demo import (
     RATE_PER_USER,
@@ -68,10 +69,13 @@ def _rpc_sign_typed_data(
     return str(response["result"])
 
 
-def _rpc_sign_challenge(w3: Web3, address: str, challenge: str) -> str:
+def _rpc_sign_challenge(
+    w3: Web3, address: str, challenge: dict[str, Any]
+) -> str:
+    signing_text = relay_challenge_signing_text(challenge, node=address)
     response = w3.provider.make_request(
         "eth_sign",
-        [address, Web3.to_hex(text=challenge)],
+        [address, Web3.to_hex(text=signing_text)],
     )
     if "error" in response:
         raise LoveEngineError("signer_error", str(response["error"]), 4)

@@ -414,6 +414,24 @@ def _verify_receipts(
             task["deadline"]
         ):
             raise LoveEngineError("receipt_task_mismatch", task_id)
+        if expected_type == "observe_live_text":
+            validate_schema(
+                receipt["result"], "live-observation-receipt-v1.schema.json"
+            )
+            _same(
+                receipt["result"]["session_id"],
+                task["payload"].get("session_id"),
+                "observation receipt/task session",
+            )
+        elif expected_type == "review_dispute":
+            result = receipt["result"]
+            payload = task["payload"]
+            for field in ("dispute_id", "bundle_hash"):
+                _same(
+                    result.get(field),
+                    payload.get(field),
+                    f"review receipt/task {field}",
+                )
         seen.add(task_id)
 
 
@@ -433,25 +451,51 @@ def _verify_artifacts(value: dict[str, Any]) -> None:
     _same(inventory, expected, "artifact inventory")
 
 
-def _verify_dispute_and_gate(value: dict[str, Any], members: dict[str, set[str]]) -> None:
+def _verify_dispute_and_gate(
+    value: dict[str, Any],
+    members: dict[str, set[str]],
+    tasks: dict[str, dict[str, Any]],
+) -> None:
     receipts = value["review_receipts"]
     if len(receipts) != 3:
         raise LoveEngineError("review_quorum_missing", "three receipts required")
     expected_nodes = {
         node for node, capabilities in members.items() if "review_dispute" in capabilities
     }
-    reviews = [
-        build_review(
-            receipt["task_id"],
-            value["dispute"],
-            receipt["node"],
-            receipt["result"]["verdict"],
-            receipt["result"]["reason_hash"],
-            receipt["completed_at"],
-            receipt["signature"],
+    reviews = []
+    for receipt in receipts:
+        task = tasks[receipt["task_id"]]
+        _same(
+            task["payload"].get("dispute_id"),
+            value["dispute"]["dispute_id"],
+            "review task/dispute",
         )
-        for receipt in receipts
-    ]
+        _same(
+            task["payload"].get("bundle_hash"),
+            value["dispute"]["bundle_hash"],
+            "review task/dispute bundle",
+        )
+        _same(
+            receipt["result"].get("dispute_id"),
+            value["dispute"]["dispute_id"],
+            "review receipt/dispute",
+        )
+        _same(
+            receipt["result"].get("bundle_hash"),
+            value["evidence_bundle"]["bundle_hash"],
+            "review receipt/evidence bundle",
+        )
+        reviews.append(
+            build_review(
+                receipt["task_id"],
+                value["dispute"],
+                receipt["node"],
+                receipt["result"]["verdict"],
+                receipt["result"]["reason_hash"],
+                receipt["completed_at"],
+                receipt["signature"],
+            )
+        )
     original = dict(value["dispute"])
     original["status"] = "open"
     original.pop("valid_review_count", None)
@@ -486,8 +530,27 @@ def verify_witness_evidence_stages(
     bundle = value["evidence_bundle"]
     observations = value["observation_set"]
     _same(session["status"], "closed", "session status")
+    for event in value["events"]:
+        _same(event["session_id"], session["session_id"], "event/session")
     _same(session["session_id"], bundle["session_id"], "session/bundle")
     _same(session["head_event_hash"], bundle["head_event_hash"], "session/bundle head")
+    _same(
+        str(int(session["next_sequence"]) - 1),
+        bundle["event_count"],
+        "session/bundle event count",
+    )
+    _same(str(len(value["events"])), bundle["event_count"], "events/bundle count")
+    bundle_events = bundle["events"]
+    _same(len(bundle_events), len(value["events"]), "bundle/event inventory count")
+    for event, bundled in zip(value["events"], bundle_events, strict=True):
+        for field in (
+            "event_id",
+            "sequence",
+            "category",
+            "event_hash",
+            "artifact_hash",
+        ):
+            _same(event[field], bundled[field], f"bundle/event {field}")
     _same(bundle["bundle_hash"], evidence_bundle_hash(bundle), "bundle hash")
     aggregated = aggregate_observations(
         value["observation_receipts"],
@@ -499,8 +562,23 @@ def verify_witness_evidence_stages(
         expected_registry=value["chain"]["registry"],
     )
     _same(aggregated, observations, "observation aggregation")
+    _same(
+        observations["session_id"],
+        session["session_id"],
+        "observation/session",
+    )
+    _same(
+        observations["head_event_hash"],
+        session["head_event_hash"],
+        "observation/session head",
+    )
+    _same(
+        observations["event_count"],
+        bundle["event_count"],
+        "observation/bundle event count",
+    )
     _same(observations["bundle_hash"], bundle["bundle_hash"], "observation/bundle")
-    _verify_dispute_and_gate(value, members)
+    _verify_dispute_and_gate(value, members, tasks)
     return members, tasks
 
 

@@ -87,7 +87,37 @@
     ],
     "status": "current",
     "canonical_role": "Test-only signed task producer for the remote tunnel lab",
-    "summary": "Builds and submits one signed review task using only the loopback Anvil signer and restricted Pilot token file."
+    "summary": "Creates finalized test evidence, builds a signed evidence-bound review task and submits it using only the loopback Anvil signer and restricted Pilot token file."
+  },
+  {
+    "id": "review-evidence-runtime",
+    "title": "Dispute evidence review runtime",
+    "path": "src/loveengine_witness/review_evidence.py",
+    "source_group": "runtime",
+    "layer": "evidence",
+    "domain_tags": [
+      "review",
+      "artifact",
+      "SSRF"
+    ],
+    "status": "current",
+    "canonical_role": "Independent review evidence verifier",
+    "summary": "Restricts review URLs to the invite origin and recomputes finalized bundle, event-chain, artifact and cross-reference integrity before a verdict receipt is signed."
+  },
+  {
+    "id": "review-dispute-payload-schema",
+    "title": "ReviewDisputePayloadV1 schema",
+    "path": "schemas/review-dispute-payload-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "network",
+    "domain_tags": [
+      "review",
+      "task payload",
+      "evidence"
+    ],
+    "status": "current",
+    "canonical_role": "Executable dispute-review task payload contract",
+    "summary": "Binds a signed review task to retrievable finalized evidence, events, artifacts, revision, event count and head hash."
   },
   {
     "id": "pilot-task-enqueue-helper",
@@ -120,6 +150,21 @@
     "summary": "Starts one loopback Pilot under a new process group with reduced priority, bounded CPU affinity and low dependency concurrency."
   },
   {
+    "id": "shared-core-launcher",
+    "title": "Shared-host core launcher",
+    "path": "tools/start_shared_core.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "remote lab",
+      "resource limits",
+      "process group"
+    ],
+    "status": "current",
+    "canonical_role": "Owned shared-host core process-group launcher",
+    "summary": "Starts the canonical core experiment under a separately identifiable process group with fixed CPU, priority and timeout constraints."
+  },
+  {
     "id": "remote-lab-runbook",
     "title": "Shared remote host experiment flow",
     "path": "docs/development/runbooks/remote-lab-flow.zh-CN.md",
@@ -148,6 +193,21 @@
     "status": "current",
     "canonical_role": "Repository secret material release gate",
     "summary": "Rejects sensitive file names, private key material and common credential token patterns without treating protocol hashes as keys."
+  },
+  {
+    "id": "protocol-secret-boundary",
+    "title": "Protocol secret-field boundary",
+    "path": "src/loveengine_witness/secrets.py",
+    "source_group": "runtime",
+    "layer": "security",
+    "domain_tags": [
+      "secrets",
+      "task",
+      "transcript"
+    ],
+    "status": "current",
+    "canonical_role": "Recursive protocol secret-field rejection",
+    "summary": "Rejects private-key, mnemonic, keystore and Pilot bearer-token field names before protocol objects enter storage, logs or transcripts."
   },
   {
     "id": "pilot-config-runtime",
@@ -282,7 +342,7 @@
     ],
     "status": "current",
     "canonical_role": "Unified outbound Agent session engine",
-    "summary": "Runs authenticated V1 and V2 outbound node sessions while keeping their codecs separate."
+    "summary": "Runs authenticated V1 and V2 outbound node sessions with a durable task journal, bounded reconnect, receipt confirmation and separate codecs."
   },
   {
     "id": "pilot-runtime",
@@ -1301,7 +1361,7 @@
     ],
     "status": "current",
     "canonical_role": "Auditable local M4 trial",
-    "summary": "Deploys five contracts, ingests twelve events and runs signed reviews in independent processes."
+    "summary": "Deploys five contracts, ingests twelve events and runs evidence-fetching signed reviews in independent processes."
   },
   {
     "id": "live-session-fixture",

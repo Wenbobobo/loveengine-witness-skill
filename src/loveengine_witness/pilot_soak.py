@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .core_transcript import verify_core_transcript
 from .errors import LoveEngineError
 from .jsonio import write_json
 from .pilot_demo import run_pilot_demo
@@ -17,8 +18,13 @@ from .pilot_transcript import verify_pilot_transcript
 
 
 def validate_pilot_soak_args(
-    duration_seconds: float, event_count: int, observers: int
+    duration_seconds: float,
+    event_count: int,
+    observers: int,
+    stage: str = "core",
 ) -> None:
+    if stage not in {"core", "governance"}:
+        raise LoveEngineError("invalid_pilot_stage", stage)
     if duration_seconds <= 0 or duration_seconds > 4 * 3600:
         raise LoveEngineError("invalid_soak_duration", str(duration_seconds))
     if event_count <= 0:
@@ -96,14 +102,17 @@ def run_pilot_soak(
     duration_seconds: float,
     event_count: int,
     observers: int = 10,
+    stage: str = "core",
 ) -> dict[str, Any]:
-    validate_pilot_soak_args(duration_seconds, event_count, observers)
+    validate_pilot_soak_args(
+        duration_seconds, event_count, observers, stage
+    )
     formal = duration_seconds >= 4 * 3600
     output = Path(output).resolve()
     started = time.monotonic()
     result = run_pilot_demo(
         output,
-        stage="governance",
+        stage=stage,
         event_count=event_count,
         observer_count=observers,
         event_interval=duration_seconds / event_count,
@@ -111,7 +120,10 @@ def run_pilot_soak(
     )
     elapsed = time.monotonic() - started
     transcript = result["transcript"]
-    verify_pilot_transcript(transcript)
+    if stage == "core":
+        verify_core_transcript(transcript)
+    else:
+        verify_pilot_transcript(transcript)
     relay = transcript["metrics"]
     latency = relay["latency_ms"]
     disk = _disk_bytes(output)
@@ -140,6 +152,7 @@ def run_pilot_soak(
             if duration_seconds >= 3600
             else "accelerated"
         ),
+        "stage": stage,
         "requested_duration_seconds": duration_seconds,
         "elapsed_seconds": round(elapsed, 3),
         "event_count": event_count,

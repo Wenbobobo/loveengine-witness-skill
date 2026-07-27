@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,16 @@ def test_witness_core_pilot_stops_at_gate(tmp_path: Path) -> None:
     assert "vote_approvals" not in transcript
     assert "final_state" not in transcript
     assert verify_core_transcript(transcript)["valid"] is True
+    audit_records = [
+        json.loads(line)
+        for line in (tmp_path / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    task_ingress = [
+        item
+        for item in audit_records
+        if item.get("path") == "/v1/relay/tasks" and item.get("status") == 202
+    ]
+    assert len(task_ingress) == 6
 
 
 @pytest.mark.integration

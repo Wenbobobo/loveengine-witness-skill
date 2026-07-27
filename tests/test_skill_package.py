@@ -148,24 +148,25 @@ def test_package_verify_rejects_tampering_and_unsafe_paths(tmp_path: Path) -> No
         install_package(unsafe, tmp_path / "unsafe-target", integrity_only=True)
     assert error.value.code == "unsafe_archive_path"
 
-    secret = tmp_path / "secret.zip"
-    with zipfile.ZipFile(result.archive) as source, zipfile.ZipFile(
-        secret, "w"
-    ) as output:
-        checksums = json.loads(source.read("checksums.json"))
-        checksums["files"][".env"] = (
-            "sha256:"
-            + __import__("hashlib").sha256(b"TOKEN=unsafe").hexdigest()
-        )
-        for info in source.infolist():
-            data = source.read(info.filename)
-            if info.filename == "checksums.json":
-                data = json.dumps(checksums).encode()
-            output.writestr(info, data)
-        output.writestr(".env", b"TOKEN=unsafe")
-    with pytest.raises(LoveEngineError) as error:
-        verify_package(secret, integrity_only=True)
-    assert error.value.code == "package_secret_file_forbidden"
+    for secret_name in (".env", ".env.production"):
+        secret = tmp_path / f"{secret_name.removeprefix('.')}.zip"
+        with zipfile.ZipFile(result.archive) as source, zipfile.ZipFile(
+            secret, "w"
+        ) as output:
+            checksums = json.loads(source.read("checksums.json"))
+            checksums["files"][secret_name] = (
+                "sha256:"
+                + __import__("hashlib").sha256(b"TOKEN=unsafe").hexdigest()
+            )
+            for info in source.infolist():
+                data = source.read(info.filename)
+                if info.filename == "checksums.json":
+                    data = json.dumps(checksums).encode()
+                output.writestr(info, data)
+            output.writestr(secret_name, b"TOKEN=unsafe")
+        with pytest.raises(LoveEngineError) as error:
+            verify_package(secret, integrity_only=True)
+        assert error.value.code == "package_secret_file_forbidden"
 
 
 @pytest.mark.integration

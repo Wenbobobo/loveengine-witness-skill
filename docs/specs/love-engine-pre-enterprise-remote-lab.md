@@ -60,7 +60,8 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 远端调用同一个 `tools/run_core_experiments.py`：
 
 - `uv sync --frozen`；
-- 缺少本地合约依赖时，以单线程安装固定依赖并执行 `forge build`；
+- 缺少本地合约依赖时，以单线程安装精确 commit 固定的 forge-std/OpenZeppelin，
+  并执行 `forge build`；
 - 12 个事件、3 个模拟观察者的 core stage；
 - offline/RPC/policy 三种验证等级；
 - trust policy 与 transcript 篡改测试；
@@ -75,9 +76,11 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 `run_remote_lab.py run` 在 core/recovery 通过后重新执行资源门，把远端 loopback
 Pilot/Anvil 映射到本机随机 loopback 端口，再使用公开 `loveengine node connect`。
 节点先完成连接，随后由远端 loopback 辅助程序使用 Anvil 测试 signer 创建签名
-NetworkTaskV2，并通过鉴权 `POST /v1/relay/tasks` 入队。验收必须得到一个绑定当前
-连接和 pending task 的 receipt。该阶段不得直接暴露远端 RPC，也不得把 Operator
-token 或 Anvil 测试账户用于非实验网络。
+NetworkTaskV2。辅助程序先创建、写入、关闭并 finalize 一份真实 evidence，再让
+review payload 通过 tunnel 可访问的 URL 绑定 bundle、events、artifacts、revision、
+event count 和 head hash，最后经鉴权 `POST /v1/relay/tasks` 入队。节点必须实际
+取回并复算证据后返回一个绑定当前连接和 pending task 的 receipt。该阶段不得直接
+暴露远端 RPC，也不得把 Operator token 或 Anvil 测试账户用于非实验网络。
 
 ### 5. 长时间门
 
@@ -92,24 +95,35 @@ CPU、内存、磁盘、ACK 和恢复报告。
   Gate ready；
 - restart/snapshot 测试通过，下载 transcript 在本机返回
   `offline_integrity`、`trust_bound:false`；
-- tunnel smoke 使用公开 node CLI 收到连接后任务，返回一个 receipt，Relay 记录
-  一个 ACK，并确认本次 Quickstart 进程组已停止；
+- tunnel smoke 使用公开 node CLI 收到连接后任务；receipt 必须包含
+  `evidence_verified:true`，Relay 必须记录一个 stored ACK 和一个
+  `receipt_confirmed`，并确认本次 Quickstart 进程组已停止；
+- 成功或失败均写 `remote-lab-report.json`；最终 postflight 必须成功检查进程，
+  且 `postflight_cleanup_verified:true`。postflight 的一分钟负载可保留刚结束
+  实验的影响，因此清理判定只依赖进程快照成功且无相关进程；
 - 没有监听非 loopback 端口，没有 sudo/systemd 和系统级安装；
 - 没有密码、token、私钥或 Anvil key 进入仓库、报告、日志和 transcript；
 - 本机全量发布门和 GitHub Actions 继续通过。
 
 ## 实测记录
 
-2026-07-27，source commit `63909b9` 在共享 ARM64 Linux 主机上通过短验收：
+2026-07-27，candidate baseline `2fd3a29` 在共享 ARM64 Linux 主机上通过短验收。
+本机保留报告的 SHA-256 为
+`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`：
 
-- preflight、core 前资源门、tunnel 前资源门和实验后 preflight 均为
-  `safe_to_run:true`，没有相关残留进程；
+- preflight、core 前资源门和 tunnel 前资源门均为 `safe_to_run:true`；owned
+  process stop/absence 校验通过，另行只读检查没有相关残留进程；
 - core 为 passed，3 个 observation receipt、3 个 review receipt、Gate ready，
   restart/snapshot 恢复测试通过；
 - 下载 transcript 在本机返回 `offline_integrity`、`trust_bound:false`；
 - 公开 node CLI 在连接后收到签名任务，返回 1 个绑定 receipt，Relay 记录 1 个
   ACK；
 - Quickstart 清理的 stop/absence 校验都返回 0，远端服务始终只绑定 loopback。
+
+该记录是改进前 baseline：当时 contract dependency 命令仍使用 release tag，
+tunnel review task 只证明任务/回执绑定。当前 runner 已把依赖固定到不可变 commit，
+并要求 review 节点实际复算 finalized evidence、完成双向 receipt confirmation；
+增强路径只接受精确匹配当前 source_commit 的新机器报告，不能用旧报告替代。
 
 主机最初因缺少固定 Foundry 1.7.1 被门禁阻断。操作者另行校验官方 immutable
 release 的 ARM64 归档、SHA-256 和 GitHub attestation，以原子方式放入用户专用

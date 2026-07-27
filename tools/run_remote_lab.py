@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import os
 import re
 import shlex
 import shutil
@@ -50,6 +52,26 @@ def _validate_remote_root(value: str) -> str:
     return path.as_posix()
 
 
+def _validate_remote_limits(
+    *,
+    max_load_per_cpu: float,
+    min_memory_gib: float,
+    min_disk_gib: float,
+    timeout_seconds: int,
+) -> None:
+    if (
+        not math.isfinite(max_load_per_cpu)
+        or not 0 < max_load_per_cpu <= 0.5
+    ):
+        raise ValueError("max load per CPU must be between 0 and 0.5")
+    if not math.isfinite(min_memory_gib) or min_memory_gib < 3:
+        raise ValueError("minimum available memory cannot be below 3 GiB")
+    if not math.isfinite(min_disk_gib) or min_disk_gib < 5:
+        raise ValueError("minimum free disk cannot be below 5 GiB")
+    if not 60 <= timeout_seconds <= 3_600:
+        raise ValueError("remote timeout must be between 60 and 3600 seconds")
+
+
 def _last_json_object(text: str) -> dict[str, Any]:
     for line in reversed(text.splitlines()):
         stripped = line.strip()
@@ -80,6 +102,8 @@ def _ssh_options(args: argparse.Namespace) -> list[str]:
     if not known_hosts.is_file() or known_hosts.stat().st_size == 0:
         raise ValueError(f"known_hosts file is missing or empty: {known_hosts}")
     return [
+        "-F",
+        "NUL" if os.name == "nt" else "/dev/null",
         "-p",
         str(args.port),
         "-i",
@@ -87,9 +111,29 @@ def _ssh_options(args: argparse.Namespace) -> list[str]:
         "-o",
         "IdentitiesOnly=yes",
         "-o",
+        "PreferredAuthentications=publickey",
+        "-o",
+        "PubkeyAuthentication=yes",
+        "-o",
         "BatchMode=yes",
         "-o",
         "PasswordAuthentication=no",
+        "-o",
+        "KbdInteractiveAuthentication=no",
+        "-o",
+        "GSSAPIAuthentication=no",
+        "-o",
+        "HostbasedAuthentication=no",
+        "-o",
+        "ControlMaster=no",
+        "-o",
+        "ControlPath=none",
+        "-o",
+        "ControlPersist=no",
+        "-o",
+        "ForwardAgent=no",
+        "-o",
+        "RequestTTY=no",
         "-o",
         "StrictHostKeyChecking=yes",
         "-o",
@@ -105,7 +149,8 @@ def _ssh_options(args: argparse.Namespace) -> list[str]:
 
 def _scp_options(args: argparse.Namespace) -> list[str]:
     options = _ssh_options(args)
-    options[0] = "-P"
+    port_index = options.index("-p")
+    options[port_index] = "-P"
     return options
 
 
@@ -204,6 +249,7 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
         "case \"$command\" in "
         "\"\") ;; "
         "*\"loveengine pilot quickstart\"*) ;; "
+        "*\"run_core_experiments.py\"*) ;; "
         "*) exit 9 ;; "
         "esac; "
         "fi; "
@@ -222,9 +268,16 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
     )
 
 
-def _owned_group_absence_command(pid: int, process_start_ticks: int) -> str:
+def _owned_group_absence_command(
+    pid: int,
+    process_start_ticks: int,
+    *,
+    attempts: int = 20,
+) -> str:
     if pid <= 1 or process_start_ticks <= 0:
         raise ValueError("owned process identity must be positive")
+    if not 1 <= attempts <= 100_000:
+        raise ValueError("owned process wait attempts must be bounded")
     return _remote_nonlogin_bash(
         "set -eu; "
         f"pid={pid}; "
@@ -238,7 +291,7 @@ def _owned_group_absence_command(pid: int, process_start_ticks: int) -> str:
         "done <<< \"$snapshot\"; "
         "return 1; "
         "}; "
-        "for _ in {1..20}; do "
+        f"for _ in {{1..{attempts}}}; do "
         "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
         "if [ -n \"$stat\" ]; then "
         "tail=${stat##*) }; "
@@ -257,12 +310,22 @@ class RemoteLab:
     def __init__(self, args: argparse.Namespace) -> None:
         _validate_target(args.host, args.user, args.port)
         self.remote_root = _validate_remote_root(args.remote_root)
+        _validate_remote_limits(
+            max_load_per_cpu=args.max_load_per_cpu,
+            min_memory_gib=args.min_memory_gib,
+            min_disk_gib=args.min_disk_gib,
+            timeout_seconds=args.timeout_seconds,
+        )
         self.args = args
         self.ssh = _resolve_executable(args.ssh, "ssh")
         self.scp = _resolve_executable(args.scp, "scp")
         self.target = f"{args.user}@{args.host}"
         self.ssh_options = _ssh_options(args)
         self.scp_options = _scp_options(args)
+        self.current_phase = "not_started"
+        self.current_output: Path | None = None
+        self.current_commit: str | None = None
+        self.last_preflight: dict[str, Any] | None = None
 
     def ssh_run(
         self,
@@ -273,7 +336,14 @@ class RemoteLab:
         allow_capacity_rejection: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
-            [self.ssh, *self.ssh_options, self.target, command],
+            [
+                self.ssh,
+                *self.ssh_options,
+                "-o",
+                "DisableForwarding=yes",
+                self.target,
+                command,
+            ],
             input=input_text,
             capture_output=True,
             check=False,
@@ -437,7 +507,14 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "absence_returncode": -1,
             }
         stop_result = subprocess.run(
-            [self.ssh, *self.ssh_options, self.target, stop_command],
+            [
+                self.ssh,
+                *self.ssh_options,
+                "-o",
+                "DisableForwarding=yes",
+                self.target,
+                stop_command,
+            ],
             capture_output=True,
             check=False,
             text=True,
@@ -446,7 +523,14 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             timeout=20,
         )
         absence_result = subprocess.run(
-            [self.ssh, *self.ssh_options, self.target, absence_command],
+            [
+                self.ssh,
+                *self.ssh_options,
+                "-o",
+                "DisableForwarding=yes",
+                self.target,
+                absence_command,
+            ],
             capture_output=True,
             check=False,
             text=True,
@@ -459,6 +543,71 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "stop_returncode": stop_result.returncode,
             "absence_returncode": absence_result.returncode,
         }
+
+    def _run_owned_remote_core(
+        self,
+        *,
+        deployment_rel: str,
+        remote_deployment: str,
+        local_output: Path,
+    ) -> tuple[dict[str, Any], dict[str, int | bool]]:
+        start_command = _remote_bash(
+            "set -eu; "
+            "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
+            "foundry-v1.7.1:$HOME/.foundry/bin:$HOME/.cargo/bin:$PATH\"; "
+            f"cd \"{remote_deployment}\"; "
+            "python3 tools/start_shared_core.py "
+            "--output tmp/remote-core --log tmp/remote-core.log "
+            f"--max-load-per-cpu {self.args.max_load_per_cpu} "
+            f"--min-memory-gib {self.args.min_memory_gib} "
+            f"--min-disk-gib {self.args.min_disk_gib} "
+            "--max-cpus 2 --nice-increment 15"
+        )
+        started = self.ssh_run(start_command, timeout=30)
+        start_info = _last_json_object(started.stdout)
+        remote_pid = int(start_info["pid"])
+        process_start_ticks = int(start_info["process_start_ticks"])
+        if remote_pid <= 1 or process_start_ticks <= 0:
+            raise RuntimeError("remote core returned an invalid process identity")
+        cleanup: dict[str, int | bool] = {
+            "verified": False,
+            "stop_returncode": -1,
+            "absence_returncode": -1,
+        }
+        try:
+            wait_command = _owned_group_absence_command(
+                remote_pid,
+                process_start_ticks,
+                attempts=max(20, self.args.timeout_seconds * 4),
+            )
+            self.ssh_run(
+                wait_command,
+                timeout=self.args.timeout_seconds + 30,
+            )
+        finally:
+            cleanup = self._stop_owned_remote_group(
+                remote_pid,
+                process_start_ticks,
+            )
+            try:
+                self._copy_from_remote(
+                    f"~/{deployment_rel}/tmp/remote-core.log",
+                    local_output / "remote-core.log",
+                )
+            except (OSError, RuntimeError, subprocess.SubprocessError):
+                pass
+        if not cleanup["verified"]:
+            raise RuntimeError("could not verify cleanup of the remote core process group")
+        self._copy_from_remote(
+            f"~/{deployment_rel}/tmp/remote-core/core-experiment-report.json",
+            local_output / "core-experiment-report.json",
+        )
+        remote_report = json.loads(
+            (local_output / "core-experiment-report.json").read_text(encoding="utf-8")
+        )
+        if remote_report.get("status") != "passed":
+            raise RuntimeError("remote core experiment did not pass")
+        return remote_report, cleanup
 
     def _tunnel_smoke(
         self,
@@ -513,9 +662,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     "-T",
                     "-N",
                     "-L",
-                    f"{local_pilot_port}:127.0.0.1:{remote_pilot_port}",
+                    f"127.0.0.1:{local_pilot_port}:127.0.0.1:{remote_pilot_port}",
                     "-L",
-                    f"{local_rpc_port}:127.0.0.1:{remote_rpc_port}",
+                    f"127.0.0.1:{local_rpc_port}:127.0.0.1:{remote_rpc_port}",
                     self.target,
                 ],
                 stdin=subprocess.DEVNULL,
@@ -643,7 +792,8 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 f"cd \"{remote_deployment}\"; "
                 "uv run python tools/enqueue_pilot_task.py "
                 "--root tmp/tunnel-pilot --profile-index 1 "
-                f"--task-id {task_id} --dispute-id {dispute_id}"
+                f"--task-id {task_id} --dispute-id {dispute_id} "
+                f"--evidence-base-url http://127.0.0.1:{local_pilot_port}"
             )
             submitted = self.ssh_run(enqueue_command, timeout=30)
             submission = _last_json_object(submitted.stdout)
@@ -654,12 +804,21 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     + (stderr.strip() or stdout.strip() or str(node_process.returncode))
                 )
             node_result = json.loads(node_result_path.read_text(encoding="utf-8"))
+            receipt = (
+                node_result.get("receipts", [{}])[0]
+                if len(node_result.get("receipts", [])) == 1
+                else {}
+            )
             if (
                 node_result.get("rejected") != 0
-                or len(node_result.get("receipts", [])) != 1
-                or node_result["receipts"][0].get("task_id") != task_id
+                or receipt.get("task_id") != task_id
+                or receipt.get("status") != "completed"
+                or receipt.get("result", {}).get("evidence_verified") is not True
+                or receipt.get("result", {}).get("dispute_id") != dispute_id
             ):
-                raise RuntimeError("tunneled node did not return the bound receipt")
+                raise RuntimeError(
+                    "tunneled node did not return an evidence-verified bound receipt"
+                )
             metrics_deadline = time.monotonic() + 15
             while time.monotonic() < metrics_deadline:
                 metrics = _wait_http_json_or_none(
@@ -669,7 +828,10 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 )
                 if metrics is None:
                     continue
-                if int(metrics["relay"]["acked"]) == 1:
+                if (
+                    int(metrics["relay"]["acked"]) == 1
+                    and int(metrics["relay"]["receipt_confirmed"]) == 1
+                ):
                     break
                 time.sleep(0.25)
             else:
@@ -686,7 +848,11 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "node": node,
                 "task_submission": submission,
                 "receipt_count": 1,
+                "evidence_verified": True,
                 "relay_acked": int(metrics["relay"]["acked"]),
+                "relay_receipt_confirmed": int(
+                    metrics["relay"]["receipt_confirmed"]
+                ),
             }
         finally:
             if node_process is not None and node_process.poll() is None:
@@ -726,8 +892,10 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             )
         return report
 
-    def run(self) -> dict[str, Any]:
+    def _run_once(self) -> dict[str, Any]:
+        self.current_phase = "preflight"
         preflight = self.preflight()
+        self.last_preflight = preflight
         if not preflight.get("safe_to_run"):
             return {
                 "schema_version": "loveengine.remote-lab-report/1",
@@ -736,7 +904,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "authentication": "publickey",
                 "preflight": preflight,
             }
+        self.current_phase = "source_validation"
         commit = self._require_clean_source()
+        self.current_commit = commit
         suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         deployment_rel = f"{self.remote_root}/{commit[:12]}-{suffix}"
         remote_deployment = f"$HOME/{deployment_rel}"
@@ -752,14 +922,17 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             ).resolve()
         )
         local_output.mkdir(parents=True, exist_ok=False)
+        self.current_output = local_output
         started_at = _utc_now()
 
+        self.current_phase = "remote_deployment_create"
         create_command = _remote_bash(
             "set -eu; umask 077; "
             f"test ! -e \"{remote_deployment}\"; "
             f"mkdir -p \"{remote_deployment}\""
         )
         self.ssh_run(create_command, timeout=30)
+        self.current_phase = "source_archive_upload"
         with tempfile.TemporaryDirectory(prefix="loveengine-remote-lab-") as raw_temp:
             archive = Path(raw_temp) / "source.tar"
             subprocess.run(
@@ -773,6 +946,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 f"~/{deployment_rel}/source.tar",
             )
 
+        self.current_phase = "remote_source_extract"
         extract_command = _remote_bash(
             "set -eu; "
             f"cd \"{remote_deployment}\"; "
@@ -780,32 +954,18 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "rm -f source.tar"
         )
         self.ssh_run(extract_command, timeout=120)
-        run_command = _remote_bash(
-            "set -eu; "
-            "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
-            "foundry-v1.7.1:$HOME/.foundry/bin:$HOME/.cargo/bin:$PATH\"; "
-            f"cd \"{remote_deployment}\"; "
-            "python3 tools/run_core_experiments.py "
-            "--shared-host --prepare-contracts --include-recovery-tests "
-            f"--max-load-per-cpu {self.args.max_load_per_cpu} "
-            f"--min-memory-gib {self.args.min_memory_gib} "
-            f"--min-disk-gib {self.args.min_disk_gib} "
-            "--max-cpus 2 --nice-increment 15 --events 12 --observers 3 "
-            "--output tmp/remote-core"
+        self.current_phase = "remote_core"
+        remote_report, core_cleanup = self._run_owned_remote_core(
+            deployment_rel=deployment_rel,
+            remote_deployment=remote_deployment,
+            local_output=local_output,
         )
-        result = self.ssh_run(run_command, timeout=self.args.timeout_seconds)
-        remote_report = _last_json_object(result.stdout)
-        if remote_report.get("status") != "passed":
-            raise RuntimeError("remote core experiment did not pass")
-
-        self._copy_from_remote(
-            f"~/{deployment_rel}/tmp/remote-core/core-experiment-report.json",
-            local_output / "core-experiment-report.json",
-        )
+        self.current_phase = "transcript_download"
         self._copy_from_remote(
             f"~/{deployment_rel}/tmp/remote-core/witness-core-transcript.json",
             local_output / "witness-core-transcript.json",
         )
+        self.current_phase = "local_transcript_verification"
         uv = _resolve_executable(None, "uv")
         verification = subprocess.run(
             [
@@ -831,11 +991,13 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             or offline.get("trust_bound") is not False
         ):
             raise RuntimeError("downloaded transcript failed offline boundary checks")
+        self.current_phase = "tunnel_smoke"
         tunnel = self._tunnel_smoke(
             deployment_rel=deployment_rel,
             remote_deployment=remote_deployment,
             local_output=local_output,
         )
+        self.current_phase = "reporting"
         report = {
             "schema_version": "loveengine.remote-lab-report/1",
             "status": "passed",
@@ -858,12 +1020,101 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "downloaded_transcript_verification": offline,
             "local_output": str(local_output),
             "owned_process_cleanup": tunnel["owned_process_cleanup"],
+            "core_cleanup_verification": core_cleanup,
             "remote_file_cleanup_performed": False,
         }
         (local_output / "remote-lab-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        return report
+
+    def _write_report(self, report: dict[str, Any]) -> None:
+        output = self.current_output
+        if output is None:
+            suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            output = (
+                self.args.output.resolve()
+                if self.args.output
+                else (
+                    ROOT
+                    / "tmp"
+                    / "remote-experiments"
+                    / self.args.host
+                    / f"failed-{suffix}"
+                ).resolve()
+            )
+            output.mkdir(parents=True, exist_ok=True)
+            self.current_output = output
+        (output / "remote-lab-report.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
+            + "\n",
+            encoding="utf-8",
+        )
+
+    def run(self) -> dict[str, Any]:
+        try:
+            report = self._run_once()
+        except Exception as exc:
+            try:
+                postflight = self.preflight()
+            except Exception as postflight_exc:
+                postflight = {
+                    "available": False,
+                    "error_type": type(postflight_exc).__name__,
+                }
+            report = {
+                "schema_version": "loveengine.remote-lab-report/1",
+                "status": "failed",
+                "target": self.args.host,
+                "authentication": "publickey",
+                "source_commit": self.current_commit,
+                "phase": self.current_phase,
+                "error": {
+                    "type": type(exc).__name__,
+                    "message": str(exc)[:2000],
+                },
+                "preflight": self.last_preflight,
+                "postflight": postflight,
+                "postflight_cleanup_verified": bool(
+                    postflight.get("host", {}).get("process_snapshot_ok")
+                    and not postflight.get("host", {}).get(
+                        "relevant_processes"
+                    )
+                ),
+                "completed_at": _utc_now(),
+                "remote_file_cleanup_performed": False,
+            }
+            self._write_report(report)
+            return report
+        if report.get("status") != "passed":
+            report.setdefault("phase", self.current_phase)
+            report.setdefault("completed_at", _utc_now())
+            self._write_report(report)
+            return report
+        self.current_phase = "postflight"
+        try:
+            postflight = self.preflight()
+        except Exception as exc:
+            postflight = {
+                "available": False,
+                "error_type": type(exc).__name__,
+            }
+        cleanup_verified = bool(
+            postflight.get("host", {}).get("process_snapshot_ok")
+            and not postflight.get("host", {}).get("relevant_processes")
+        )
+        report["postflight"] = postflight
+        report["postflight_cleanup_verified"] = cleanup_verified
+        if not cleanup_verified:
+            report["status"] = "failed"
+            report["phase"] = "postflight"
+            report["error"] = {
+                "type": "PostflightCleanupError",
+                "message": "could not verify absence of lab processes",
+            }
+        report["completed_at"] = _utc_now()
+        self._write_report(report)
         return report
 
 

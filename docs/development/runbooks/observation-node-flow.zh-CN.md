@@ -35,15 +35,22 @@ dry-run 可以不带 trust policy，只检查连接计划，必须返回 trust_b
 ## Live connect
 
 ```powershell
-uv run loveengine node connect --invite .\pilot-invite.json --trust-policy .\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --output .\receipts.json
+uv run loveengine node connect --invite .\pilot-invite.json --trust-policy .\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --reconnect-attempts 3 --idle-timeout-seconds 60 --output .\receipts.json
 ```
 
 节点先比较 policy、invite、profile、RPC active release 和 actual ZIP，随后建立出站
 WebSocket。任务还要匹配 allowed issuer、recipient、nonce 和 deadline。收到合法
 任务后先 ACK，完成事件/artifact 或 dispute 验证后再签 receipt。
 
-cursor-db 用于 SSE/WebSocket 重连。Relay 是 at-least-once；重复任务必须幂等，
-同 ID 不同 payload、非成员、恶意 issuer、错绑或重复 receipt 均拒绝。
+review_dispute 任务必须绑定 finalized bundle、event 和 artifact URL。节点会
+检查全部 URL 与 invite server 同源，重新获取和复算 bundle/event/artifact 后，
+才使用操作者提供的 verdict map 形成结果；verdict map 本身不是证据验证。
 
-当前 node connect 是 expected-tasks/idle timeout 约束的有界会话，不是长期
-scheduler 或自动直播发现服务。
+cursor-db 同时保存 SSE cursor 与 task journal。Relay 是 at-least-once；完全相同
+的 signed task 重试幂等，同 ID/issuer nonce 不同内容、非成员、恶意 issuer、
+错绑或重复 receipt 均拒绝。signed receipt 在发送前落盘；Relay ACK 丢失时，
+节点重连并确认同一 receipt，不重做任务。
+
+当前 node connect 是 expected-tasks、最多 0-10 次重连和 1-900 秒 idle timeout
+约束的有界会话；默认 3 次/60 秒。重连重验 Registry release。它不是长期 scheduler
+或自动直播发现服务。

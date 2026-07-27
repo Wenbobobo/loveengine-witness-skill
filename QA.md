@@ -45,7 +45,8 @@ Python runtime、schema、Relay 和合约完成。
 **当前已证明：** 节点通过显式 `loveengine node connect` 建立出站 WebSocket；
 经过信任策略、Registry release、节点 profile 和任务签名校验后，Relay 才能向该
 连接推送 `observe_live_text` 或 `review_dispute`。触发来自主持人或实验 runner
-创建并分配任务，不依赖 Agent 猜测用户意图。
+创建并分配任务，不依赖 Agent 猜测用户意图。节点会在有界次数内重连，并在每次
+重连时重新验证连接身份；首次之后还重查 Registry release。
 
 **当前未证明：** 没有自动搜索互联网直播、长期链事件监听服务、日历调度 daemon
 或“每天自行询问”的发现机制。公司直播接入已明确延期。
@@ -58,7 +59,9 @@ Python runtime、schema、Relay 和合约完成。
 **状态：`[已实现] [治理实验]`**
 
 **当前已证明：** 主持人负责鉴权写入、关闭 session 和显式 finalize；观察 Agent
-验证事件/artifact 或复核争议并签任务回执；ProposalGate 只检查证据完整性和
+验证事件/artifact 或复核争议并签任务回执。review 节点签名前必须重新取回
+finalized bundle、完整事件链和每个 artifact，不能只从 verdict map 抄一个结论；
+ProposalGate 只检查证据完整性和
 关键争议状态；投票见证者在可选治理实验中亲自通过外部 RPC signer 批准投票。
 Relay 只传递任务，不能替任何角色签名。
 
@@ -78,6 +81,10 @@ review 和 cursor 元数据写入 `pilot.sqlite`；原文 bytes 按 SHA-256 写�
 `relay.sqlite`；关键写入另记入 hash-linked `audit.jsonl`。观察节点用 SSE 读取
 事件，用 HTTP 读取 artifact，并通过 WebSocket 返回签名 receipt。链上只保存
 release、治理和会计所需的 hash/状态，不存文字原文。
+
+节点另有自己的 SQLite task journal，持久保存 taskId、issuer+nonce、完整签名
+task、签名 receipt 和确认状态。这样 Relay ACK 丢失时可重连确认同一回执，而不
+重复执行观察或复核。
 
 **当前未证明：** 这些本机文件不是多副本对象存储、灾备系统或长期可用性承诺。
 SHA-256 能证明取回的 bytes 是否一致，不能证明文件永远可取。
@@ -184,8 +191,12 @@ dispute 是否已 `dismissed`。通过后返回 proposal plan；失败则给出�
 **当前已证明：** 开发成员可在 Python 3.11+、uv 和固定 Foundry 1.7.1 环境中
 执行分层实验：包信任、Relay/receipt、证据/finalize、争议/Gate，以及可选的
 治理合约流程。每层都有机器可读结果和自动测试；远端 runner 还会用公开
-`node connect` 经 SSH tunnel 验证连接后任务和绑定 receipt。source commit
-`63909b9` 已完成该短验收，并在实验后通过无残留进程的只读门禁。
+`node connect` 经 SSH tunnel 验证连接后任务和绑定 receipt。2026-07-27 保留的
+candidate baseline `2fd3a29` 已完成该短验收；其机器报告 SHA-256 为
+`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
+当前 runner 又要求节点实际复算 tunnel evidence，并对失败写出 postflight 报告。
+增强报告还必须证明 Relay 已确认节点的 receipt confirmation，而不只记录 stored
+ACK。
 
 **当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；
 `0.6.1-contract-public-pilot` 仍是 candidate，不是已发布版本。一次共享主机
@@ -218,12 +229,18 @@ key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净
 限制为 nice +15 和最多两核，并保持远端 Pilot/Anvil loopback。短实验还覆盖
 持久 Anvil 重启、Quickstart Relay、snapshot 恢复，以及公开 node CLI 经 SSH
 tunnel 收到连接后任务并返回绑定 receipt。2026-07-27 的 source commit
-`63909b9` 实测得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过，
-tunnel 得到 1 个绑定回执和 1 个 Relay ACK，清理验证与实验后 preflight 均通过。
+`2fd3a29` 实测得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过，
+tunnel 得到 1 个绑定回执和 1 个 Relay ACK，owned process 清理验证和另行只读
+检查均通过。
 
 **当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；30 分钟
 和 4 小时 soak 尚未执行。它仍不证明生产 signer、TLS、HA、公共测试网、现实
 见证者独立性、事实真实性或企业系统已经接入。
+
+旧 baseline 的 tunnel review 只覆盖任务/回执绑定；当前代码已经补上真实
+finalized evidence 复算、ACK-loss journal 恢复、双向 receipt confirmation 和
+机器可读 postflight；增强路径必须由精确匹配的 `source_commit` 报告逐次验收，
+不能把旧结果自动外推。
 
 **验证入口：**
 [远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、

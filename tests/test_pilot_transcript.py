@@ -31,7 +31,7 @@ from loveengine_witness.m4_typed_data import (
     build_receipt_v2_typed_data,
     build_task_v2_typed_data,
 )
-from loveengine_witness.observation import aggregate_observations
+from loveengine_witness.observation import aggregate_observations, observation_set_hash
 from loveengine_witness.pilot_transcript import (
     pilot_transcript_hash,
     verify_pilot_transcript,
@@ -571,6 +571,49 @@ def test_v2_transcript_rejects_stage_tampering(mutate: object, code: str) -> Non
         verify_pilot_transcript(value)
 
     assert exc.value.code == code
+
+
+def test_v2_rejects_signed_reviews_rebound_to_another_dispute() -> None:
+    value = _v2_fixture()
+    value["dispute"]["dispute_id"] = "replayed-critical-dispute"
+    value["proposal_gate"] = build_proposal_plan(
+        session=value["session"],
+        bundle=value["evidence_bundle"],
+        disputes=[value["dispute"]],
+        proposal=value["proposal_gate"]["proposal"],
+    )
+    value["transcript_hash"] = pilot_transcript_hash(value)
+
+    with pytest.raises(LoveEngineError) as exc:
+        verify_pilot_transcript(value)
+
+    assert exc.value.code == "pilot_cross_reference_mismatch"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda value: value["observation_set"].update(
+            {"session_id": "another-session"}
+        ),
+        lambda value: value["observation_set"].update(
+            {"head_event_hash": "0x" + "99" * 32}
+        ),
+        lambda value: value["observation_set"].update({"event_count": "2"}),
+    ],
+)
+def test_v2_observation_set_binds_session_head_and_count(mutate: object) -> None:
+    value = _v2_fixture()
+    mutate(value)
+    value["observation_set"]["observation_set_hash"] = observation_set_hash(
+        value["observation_set"]
+    )
+    value["transcript_hash"] = pilot_transcript_hash(value)
+
+    with pytest.raises(LoveEngineError) as exc:
+        verify_pilot_transcript(value)
+
+    assert exc.value.code == "pilot_cross_reference_mismatch"
 
 
 def test_v2_rejects_contract_pointer_outside_code_inventory() -> None:

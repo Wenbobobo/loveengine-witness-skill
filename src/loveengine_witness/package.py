@@ -101,6 +101,7 @@ def _safe_archive_path(name: str) -> PurePosixPath:
     lowered = [part.lower() for part in path.parts]
     if (
         any(part in FORBIDDEN_ARCHIVE_NAMES for part in lowered)
+        or any(part.startswith(".env.") for part in lowered)
         or any("keystore" in part for part in lowered)
         or PurePosixPath(lowered[-1]).suffix in FORBIDDEN_ARCHIVE_SUFFIXES
     ):

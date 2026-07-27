@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile-index", type=int, default=1)
     parser.add_argument("--task-id", required=True)
     parser.add_argument("--dispute-id", required=True)
+    parser.add_argument("--evidence-base-url")
     return parser
 
 
@@ -26,6 +27,7 @@ def main() -> int:
         profile_index=args.profile_index,
         task_id=args.task_id,
         dispute_id=args.dispute_id,
+        evidence_base_url=args.evidence_base_url,
     )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
     return 0 if result["queued"] else 4

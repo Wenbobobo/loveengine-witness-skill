@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import shutil
 import subprocess
 from pathlib import Path
@@ -31,11 +32,32 @@ def _linux_process_start_ticks(pid: int) -> int:
 
 
 def _limit_process(max_cpus: int, nice_increment: int) -> None:
+    validate_shared_host_limits(max_cpus, nice_increment)
     os.nice(nice_increment)
     if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
         available = sorted(os.sched_getaffinity(0))
         selected = available[: max(1, min(max_cpus, len(available)))]
         os.sched_setaffinity(0, selected)
+
+
+def validate_shared_host_limits(max_cpus: int, nice_increment: int) -> None:
+    if not 1 <= max_cpus <= 2:
+        raise ValueError("shared-host max CPUs must be between 1 and 2")
+    if not 15 <= nice_increment <= 19:
+        raise ValueError("shared-host nice increment must be between 15 and 19")
+
+
+def _stop_failed_start(process: subprocess.Popen[bytes]) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=5)
+    except (ProcessLookupError, subprocess.TimeoutExpired):
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=5)
 
 
 def start_quickstart(
@@ -52,6 +74,7 @@ def start_quickstart(
         raise RuntimeError("shared-host Quickstart launcher requires POSIX")
     if host not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("shared-host Quickstart must bind loopback")
+    validate_shared_host_limits(max_cpus, nice_increment)
     if not 1 <= port <= 65535 or not 1 <= rpc_port <= 65535 or port == rpc_port:
         raise ValueError("invalid or conflicting Quickstart ports")
     uv = shutil.which("uv")
@@ -98,9 +121,14 @@ def start_quickstart(
             start_new_session=True,
             preexec_fn=lambda: _limit_process(max_cpus, nice_increment),
         )
+    try:
+        process_start_ticks = _linux_process_start_ticks(process.pid)
+    except (OSError, ValueError):
+        _stop_failed_start(process)
+        raise
     return {
         "pid": process.pid,
-        "process_start_ticks": _linux_process_start_ticks(process.pid),
+        "process_start_ticks": process_start_ticks,
         "root": str(resolved_root),
         "log": str(resolved_log),
         "host": host,

@@ -37,7 +37,7 @@ flowchart LR
     Server -->|SSE / artifact HTTP| Node
     Server --> Relay["outbound WebSocket Relay"]
     Relay --> Node
-    Node -->|ACK + signed receipt| Relay
+    Node -->|ACK + signed receipt + receipt confirmation| Relay
     Store --> Review["dispute aggregation"]
     Review --> Gate["ProposalGate"]
     Gate -. optional .-> DAO["WitnessDAO governance lab"]
@@ -76,6 +76,8 @@ sequenceDiagram
     N->>N: verify issuer, recipient, nonce and deadline
     N-->>H: acceptance ACK
     N-->>H: signed TaskReceiptV2 after completion
+    H-->>N: receipt stored ACK
+    N-->>H: receipt ACK confirmation
 ~~~
 
 invite 只提供连接位置和方便核对的公开元数据，不是信任根。NodeTrustPolicyV1
@@ -99,6 +101,9 @@ sequenceDiagram
     O->>S: POST close
     O->>S: POST evidence/finalize
     S->>D: reread bytes and recompute every hash
+    S->>A: signed review tasks bind bundle/events/artifact URLs
+    A->>S: refetch and recompute bundle, event chain and artifacts
+    A-->>S: signed review receipts
     S->>S: aggregate ObservationSet and critical reviews
     S->>S: evaluate ProposalGate
     S-->>O: ready plan or explicit blocking reasons
@@ -108,7 +113,9 @@ sequenceDiagram
 finalize 后 bundle 不可原地修改，需要新 revision。critical dispute 由三个不同的
 bootstrap 成员复核：至少两票 dismiss 才能 dismissed，至少两票 uphold 才能
 upheld，其余为 unresolved。Gate 只在 bundle finalized 且所有 critical dispute
-均 dismissed 时返回 ready plan。
+均 dismissed 时返回 ready plan。verdict map 只表达节点操作者的结论；节点在签名
+前还必须从 invite 绑定的同一 HTTP origin 取回 finalized bundle、完整事件链和
+每个 artifact，复算 hash、顺序、category count 与 bundle 引用。
 
 ### 3. 可选治理实验
 
@@ -137,6 +144,7 @@ sequenceDiagram
 | --- | --- | --- |
 | session、event 元数据、bundle、dispute、review、cursor | pilot.sqlite | 单机 SQLite；可 snapshot，不是 HA |
 | Relay queue、delivery、ACK、receipt 状态 | relay.sqlite | at-least-once；消费者必须幂等 |
+| 节点 task journal 与 observation cursor | node cursor.sqlite | taskId + issuer/nonce、signed receipt、cursor；用于断线恢复 |
 | 文字原文 bytes | artifacts/sha256/[prefix]/[digest] | 内容寻址；存在性仍依赖单机磁盘 |
 | 关键写入和拒绝 | audit.jsonl | hash-linked append log |
 | Anvil deployment/state、交易和 code hash | Pilot chain root | 本机实验链；不是公共测试网 |
@@ -172,19 +180,32 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 
 - Agent 只建立出站 WebSocket；Relay 可以在连接建立后继续推送新任务。
 - Pilot 的鉴权 task ingress 只接受已经签名的 NetworkTaskV2；write token 只授权
-  入队，不赋予 Pilot 代替 Publisher 签名的能力。
-- Relay 使用 at-least-once 语义。重复 task/event 必须幂等；同 ID 不同内容拒绝。
+  入队，不赋予 Pilot 代替 Publisher 签名的能力。入口要求完整可执行 payload；
+  字节完全相同的 signed task 重试幂等成功，同 ID/nonce 不同内容拒绝。
+- Relay 使用 at-least-once 语义。节点以 taskId 和 issuer+nonce 双重去重，并在
+  发回前把 signed receipt 落入本地 SQLite journal。
 - 接收 ACK 延迟和任务完成延迟分别记录；长观察任务期间继续处理 heartbeat。
 - observation cursor 持久化，SSE 重连携带 Last-Event-ID 或 after。
 - receipt 必须属于当前鉴权连接和该节点已接受的 pending task；伪造、错绑或重复
   receipt 均拒绝。
-- 当前 node connect 是有界会话，不是常驻 scheduler 或生产级 daemon。
+- Relay 保存 receipt 后返回 ACK，节点再回 receipt confirmation。若第一份 ACK
+  丢失，重连后 Relay 发送 `receipt_state`；节点只有在它与本地 journal 完全一致
+  时才确认，Relay 再返回 `receipt_confirmed`，整个过程不重复执行。
+- observation 单次执行最多处理 10,000 个新事件和 64 MiB artifact；review
+  最多处理 1,000 个事件和 32 MiB artifact。JSON/SSE 单响应上限 1 MiB，单个
+  artifact 上限 8 MiB，所有取回都禁用 redirect。
+- 当前 node connect 默认最多重连 3 次、idle timeout 60 秒；每次重连重验 challenge
+  和 profile，首次之后还重验 Registry release。它仍是有界会话，不是常驻
+  scheduler 或生产级 daemon。
 - 共享远程实验固定 host key、只接受 SSH key，并通过 tunnel 保持 Pilot/Anvil
   的 loopback 边界；本机公开 node CLI 经 tunnel 完成连接后任务和 receipt 验证，
-  但不开放 Tailscale 或公网监听。source commit `63909b9` 的短实验已验证该路径，
-  长 soak 和生产网络仍未验证。
+  但不开放 Tailscale 或公网监听。改进前 baseline `2fd3a29` 的机器报告已验证
+  基础路径；增强路径必须以每次机器报告中的精确 source_commit 逐次复验。长 soak
+  和生产网络仍未验证。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
+- 历史 V2 transcript 的最小 observe/review payload 仍能校验签名和交叉引用，但
+  公开任务入口只接收带 URL、cursor、revision、count 和 head hash 的完整 payload。
 
 ## Transcript 能与不能证明什么
 

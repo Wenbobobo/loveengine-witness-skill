@@ -22,8 +22,11 @@ class RelayTransport:
     expected_tasks: int
     expected_issuer: str
     expected_manifest_hash: str
-    sign_challenge: Callable[[str], str]
+    sign_challenge: Callable[[dict[str, Any]], str]
     sign_typed_data: Callable[[dict[str, Any]], str]
+    allowed_http_origin: str | None = None
+    reconnect_attempts: int = 0
+    idle_timeout_seconds: float = 30
 
     async def connect(self) -> dict[str, Any]:
         return await run_agent_session(
@@ -35,4 +38,7 @@ class RelayTransport:
             expected_manifest_hash=self.expected_manifest_hash,
             sign_challenge=self.sign_challenge,
             sign_typed_data=self.sign_typed_data,
+            allowed_http_origin=self.allowed_http_origin,
+            reconnect_attempts=self.reconnect_attempts,
+            idle_timeout_seconds=self.idle_timeout_seconds,
         )

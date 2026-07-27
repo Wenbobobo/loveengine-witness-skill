@@ -59,6 +59,7 @@ try {
 
     Invoke-CheckedNative "accelerated soak" {
         uv run loveengine pilot soak `
+            --stage core `
             --duration-seconds 1 `
             --events 12 `
             --observers 10 `

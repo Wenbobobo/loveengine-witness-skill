@@ -40,6 +40,8 @@ def add_node_connect_parser(node_commands: Any) -> None:
     parser.add_argument("--cursor-db", type=Path)
     parser.add_argument("--verdicts", type=Path)
     parser.add_argument("--expected-tasks", type=int, default=0)
+    parser.add_argument("--reconnect-attempts", type=int, default=3)
+    parser.add_argument("--idle-timeout-seconds", type=float, default=60)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--dry-run", action="store_true")
 
@@ -113,6 +115,18 @@ def handle_node_connect(args: argparse.Namespace) -> dict[str, Any]:
         node_address = verify_node_profile(signed_profile)
     if args.expected_tasks < 0:
         raise LoveEngineError("invalid_arguments", "expected tasks cannot be negative", 2)
+    if args.reconnect_attempts < 0 or args.reconnect_attempts > 10:
+        raise LoveEngineError(
+            "invalid_arguments",
+            "reconnect attempts must be between 0 and 10",
+            2,
+        )
+    if args.idle_timeout_seconds < 1 or args.idle_timeout_seconds > 900:
+        raise LoveEngineError(
+            "invalid_arguments",
+            "idle timeout must be between 1 and 900 seconds",
+            2,
+        )
     if args.dry_run:
         return {
             "connected": False,
@@ -121,6 +135,8 @@ def handle_node_connect(args: argparse.Namespace) -> dict[str, Any]:
             "url": url,
             "trust_bound": False,
             "verification_level": "connection_plan",
+            "reconnect_attempts": args.reconnect_attempts,
+            "idle_timeout_seconds": args.idle_timeout_seconds,
             "trust_policy": {
                 "path": str(args.trust_policy.resolve()),
                 "chain_id": trust_policy["chain_id"],
@@ -154,6 +170,16 @@ def handle_node_connect(args: argparse.Namespace) -> dict[str, Any]:
             "live connect requires --package, --rpc-url, and --address",
             4,
         )
+    if (
+        signed_profile.get("schema_version")
+        == "loveengine.signed-agent-node-profile/2"
+        and invite is None
+    ):
+        raise LoveEngineError(
+            "pilot_invite_required",
+            "V2 live connect requires an invite to bind evidence HTTP origin",
+            4,
+        )
     if to_checksum_address(args.address) != to_checksum_address(node_address):
         raise LoveEngineError("wrong_node_address", "signer address does not match profile")
     release = verify_onchain_release(
@@ -166,8 +192,26 @@ def handle_node_connect(args: argparse.Namespace) -> dict[str, Any]:
         version=trust_policy["version"],
     )
     verify_release_against_policy(release, trust_policy)
+    release_check_count = 0
+
+    def revalidate_release() -> None:
+        nonlocal release_check_count
+        release_check_count += 1
+        if release_check_count == 1:
+            return
+        current = verify_onchain_release(
+            args.package,
+            rpc_url=args.rpc_url,
+            expected_chain_id=trust_policy["chain_id"],
+            registry=trust_policy["registry"],
+            publisher=trust_policy["publisher"],
+            skill_id=trust_policy["skill_id"],
+            version=trust_policy["version"],
+        )
+        verify_release_against_policy(current, trust_policy)
+
     cursor_database = args.cursor_db
-    if cursor_database is None and signed_profile.get("schema_version", "").endswith("/2"):
+    if cursor_database is None:
         cursor_database = args.profile.with_suffix(".cursor.sqlite")
     return connect_node(
         url=url,
@@ -181,6 +225,10 @@ def handle_node_connect(args: argparse.Namespace) -> dict[str, Any]:
         cursor_database=cursor_database,
         verdicts_path=args.verdicts,
         output=args.output,
+        allowed_http_origin=(invite["server_url"] if invite is not None else None),
+        reconnect_attempts=args.reconnect_attempts,
+        idle_timeout_seconds=args.idle_timeout_seconds,
+        before_connect=revalidate_release,
     )
 
 

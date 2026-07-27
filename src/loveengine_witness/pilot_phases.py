@@ -346,6 +346,23 @@ def _start_observation_processes(
     return started
 
 
+async def _enqueue_task_through_operator_api(
+    environment: PilotEnvironment,
+    client: ClientSession,
+    task: dict[str, Any],
+) -> None:
+    response = await client.post(
+        environment.runtime.invite["server_url"] + "/v1/relay/tasks",
+        json=task,
+        headers=environment.headers,
+    )
+    if response.status != 202:
+        raise LoveEngineError(
+            "pilot_task_enqueue_failed",
+            f"{task['task_id']}: {await response.text()}",
+        )
+
+
 async def _run_observation_phase(
     environment: PilotEnvironment,
     client: ClientSession,
@@ -408,13 +425,7 @@ async def _run_observation_phase(
             build_task_v2_typed_data(task),
         )
         tasks.append(task)
-        hub.store.enqueue(
-            node,
-            task["task_id"],
-            json.dumps(task, sort_keys=True),
-            environment.deployer,
-            task["nonce"],
-        )
+        await _enqueue_task_through_operator_api(environment, client, task)
         result_path = environment.output / "observations" / f"node-{index}.json"
         result_path.parent.mkdir(parents=True, exist_ok=True)
         observation_specs.append((index, node, result_path))
@@ -550,8 +561,22 @@ async def _run_evidence_phase(
             recipient=node,
             manifest_hash=environment.manifest_hash,
             payload={
+                "schema_version": "loveengine.review-dispute-payload/1",
                 "dispute_id": dispute["dispute_id"],
                 "bundle_hash": bundle["bundle_hash"],
+                "session_id": environment.session_id,
+                "evidence_url": (
+                    base
+                    + f"/v1/live/sessions/{environment.session_id}/evidence"
+                ),
+                "events_url": (
+                    base
+                    + f"/v1/live/sessions/{environment.session_id}/events"
+                ),
+                "artifact_base_url": base + "/v1/live/artifacts",
+                "revision": bundle["revision"],
+                "event_count": bundle["event_count"],
+                "head_event_hash": bundle["head_event_hash"],
             },
             nonce=str(100 + index),
             deadline=environment.deadline,
@@ -562,13 +587,7 @@ async def _run_evidence_phase(
             build_task_v2_typed_data(task),
         )
         observation.tasks.append(task)
-        observation.hub.store.enqueue(
-            node,
-            task["task_id"],
-            json.dumps(task, sort_keys=True),
-            environment.deployer,
-            task["nonce"],
-        )
+        await _enqueue_task_through_operator_api(environment, client, task)
         verdict_path = environment.output / "verdicts" / f"node-{index}.json"
         verdict_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(verdict_path, {dispute["dispute_id"]: verdict})

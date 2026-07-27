@@ -8,19 +8,26 @@ from .errors import LoveEngineError
 
 
 FORBIDDEN_KEYS = {
-    "private_key",
     "privatekey",
     "mnemonic",
     "keystore",
-    "auth_token",
-    "access_token",
+    "authtoken",
+    "accesstoken",
+    "writetoken",
+    "operatortoken",
+    "pilottoken",
+    "bearertoken",
 }
 
 
 def reject_secret_fields(value: Any, path: str = "$") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            normalized = key.lower().replace("-", "_")
+            normalized = "".join(
+                character
+                for character in str(key).casefold()
+                if character.isalnum()
+            )
             if normalized in FORBIDDEN_KEYS:
                 raise LoveEngineError(
                     "forbidden_secret_field",

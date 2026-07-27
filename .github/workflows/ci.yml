@@ -36,8 +36,8 @@ jobs:
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
       - name: Contract tests
         working-directory: contracts
         run: forge test
@@ -59,8 +59,8 @@ jobs:
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
       - name: Three-node network integration
         run: uv run pytest tests/integration/test_network_demo.py
 
@@ -79,8 +79,8 @@ jobs:
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
       - name: Live evidence integration
         run: uv run pytest tests/integration/test_live_evidence_demo.py
 
@@ -99,8 +99,8 @@ jobs:
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
           forge build
       - name: Build twice and verify deterministic package
         id: package
@@ -164,11 +164,13 @@ jobs:
       - name: Install pinned contract dependencies
         working-directory: contracts
         run: |
-          forge install foundry-rs/forge-std@v1.9.7 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
       - name: Persistent chain integration
         run: uv run pytest tests/integration/test_pilot_chain.py
       - name: Unified package-to-PublicSink E2E
         run: uv run pytest tests/integration/test_pilot_demo.py
+      - name: Public Quickstart and node-connect integration
+        run: uv run pytest tests/integration/test_pilot_quickstart.py
       - name: Accelerated faults and ten-observer soak
         run: uv run pytest tests/integration/test_pilot_soak.py

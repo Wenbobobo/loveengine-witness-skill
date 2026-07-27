@@ -48,6 +48,14 @@ NetworkTaskV2 当前只允许 observe_live_text 和 review_dispute。旧 V1 的
 propagate_skill、observe_broadcast 保留历史兼容，但不属于 V2 执行集合。
 TaskReceiptV2 对 task、node、status、result hash、nonce 和 completedAt 签名。
 
+可执行 `review_dispute` 使用 ReviewDisputePayloadV1，绑定 finalized bundle 的
+URL、events URL、artifact base URL、session、revision、event count 和 head hash。
+节点只访问与 invite server 完全同源的 HTTP(S) URL，禁用 redirect 并限制响应
+大小；随后复算 bundle hash、完整 event chain、artifact bytes、category counts
+和 bundle event references。verdict map 只提供操作者判断，不能绕过这些证据检查。
+历史 transcript 的 `{dispute_id,bundle_hash}` 最小 payload 只保留一致性校验，
+Pilot task ingress 不执行它。
+
 critical dispute 由 bootstrap 内三个不同节点复核：
 
 - 至少两票 dismiss：dismissed；

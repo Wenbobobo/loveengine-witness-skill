@@ -180,8 +180,9 @@ def verify_onchain_release(
         )
     return {
         "valid": True,
-        "trust_bound": True,
-        "verification_level": "chain_verified",
+        "chain_verified": True,
+        "trust_bound": False,
+        "verification_level": "chain_consistency",
         "chain_id": actual_chain_id,
         "registry": registry_address,
         "publisher": publisher_address,

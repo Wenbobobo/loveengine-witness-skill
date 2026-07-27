@@ -91,6 +91,7 @@ def add_pilot_parser(commands: Any) -> None:
     soak.add_argument("--duration-seconds", type=float, default=14400)
     soak.add_argument("--events", type=int, default=240)
     soak.add_argument("--observers", type=int, default=10)
+    soak.add_argument("--stage", choices=("core", "governance"), default="core")
     soak.add_argument("--output", type=Path, required=True)
     soak.add_argument("--background", action="store_true")
     soak_status = pilot_commands.add_parser("soak-status")
@@ -167,12 +168,14 @@ def handle_pilot(args: argparse.Namespace) -> dict[str, Any]:
                 duration_seconds=args.duration_seconds,
                 event_count=args.events,
                 observers=args.observers,
+                stage=args.stage,
             )
         return run_pilot_soak(
             args.output,
             duration_seconds=args.duration_seconds,
             event_count=args.events,
             observers=args.observers,
+            stage=args.stage,
         )
     if args.pilot_command == "soak-status":
         return background_soak_status(args.state)

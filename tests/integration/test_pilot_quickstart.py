@@ -145,13 +145,14 @@ def test_quickstart_runtime_exposes_trust_bound_public_node_path(
                 assert queued_value["recipient"] == node
                 duplicate = await session.post(
                     base_url + "/v1/relay/tasks",
-                    json=task,
+                    json=queued_value["task"],
                     headers={
                         "Authorization": f"Bearer {runtime.config.write_token}",
                         "Origin": base_url,
                     },
                 )
-                assert duplicate.status == 409
+                assert duplicate.status == 202
+                assert (await duplicate.json())["idempotent_replay"] is True
 
             stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
             assert process.returncode == 0, stderr.decode("utf-8", errors="replace")

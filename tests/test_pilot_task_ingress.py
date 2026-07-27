@@ -17,6 +17,7 @@ from loveengine_witness.m4_typed_data import (
     build_node_profile_v2_typed_data,
     build_task_v2_typed_data,
 )
+from loveengine_witness.network_typed_data import payload_hash
 from loveengine_witness.pilot_task_ingress import enqueue_signed_task
 from loveengine_witness.relay import RelayStore
 from loveengine_witness.relay_server import RelayHub
@@ -123,8 +124,16 @@ def _task(
         recipient=recipient,
         manifest_hash=manifest_hash,
         payload={
+            "schema_version": "loveengine.review-dispute-payload/1",
             "dispute_id": "dispute-1",
             "bundle_hash": "0x" + "5" * 64,
+            "session_id": "session-1",
+            "evidence_url": "http://127.0.0.1:8080/v1/live/sessions/session-1/evidence",
+            "events_url": "http://127.0.0.1:8080/v1/live/sessions/session-1/events",
+            "artifact_base_url": "http://127.0.0.1:8080/v1/live/artifacts",
+            "revision": "1",
+            "event_count": "1",
+            "head_event_hash": "0x" + "7" * 64,
         },
         nonce=nonce,
         deadline=deadline,
@@ -147,9 +156,14 @@ def test_signed_v2_task_is_queued_once(tmp_path: Path) -> None:
     pending = hub.store.pending(node.address)
     assert len(pending) == 1
     assert pending[0].task_id == "task-1"
-    with pytest.raises(LoveEngineError, match="already queued") as duplicate:
-        enqueue_signed_task(hub, task)
-    assert duplicate.value.code == "task_conflict"
+    duplicate = enqueue_signed_task(hub, task)
+    assert duplicate == {
+        "queued": True,
+        "idempotent_replay": True,
+        "task_id": "task-1",
+        "recipient": node.address,
+    }
+    assert len(hub.store.pending(node.address)) == 1
 
 
 def test_task_nonce_cannot_be_reused_for_same_issuer_and_recipient(
@@ -252,4 +266,26 @@ def test_task_ingress_rejects_invalid_signature(tmp_path: Path) -> None:
         enqueue_signed_task(hub, task)
 
     assert rejected.value.code == "invalid_signature"
+    assert hub.store.metrics()["queued"] == 0
+
+
+def test_task_ingress_rejects_historical_minimal_payload(
+    tmp_path: Path,
+) -> None:
+    hub, publisher, node = _hub(tmp_path)
+    task = _task(publisher, node.address)
+    task["payload"] = {
+        "dispute_id": "dispute-1",
+        "bundle_hash": "0x" + "5" * 64,
+    }
+    task["payload_hash"] = payload_hash(task["payload"])
+    task["signature"] = _sign(
+        publisher,
+        build_task_v2_typed_data(task),
+    )
+
+    with pytest.raises(LoveEngineError) as rejected:
+        enqueue_signed_task(hub, task)
+
+    assert rejected.value.code == "executable_task_payload_required"
     assert hub.store.metrics()["queued"] == 0

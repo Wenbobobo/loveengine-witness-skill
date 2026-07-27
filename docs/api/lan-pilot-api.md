@@ -72,12 +72,16 @@ localStorage、日志或 transcript。
 `POST /v1/relay/tasks` 只接受完整签名的 NetworkTaskV2。Pilot 会在写入
 `relay.sqlite` 前验证 active release、bootstrap 成员、chainId、Registry、
 recipient、Publisher issuer、manifest hash、deadline 和 EIP-712 签名。成功返回
-202；重复 task ID 或相同 recipient/issuer/nonce 返回 409。端点不创建签名，也不
-接受 V1 task。
+202。完全相同的 signed task 重试仍返回 202 并标记 idempotent replay；相同
+task ID 或 recipient/issuer/nonce 对应不同内容返回 409。observe/review 还必须
+携带完整可执行 payload schema；历史 transcript 的最小 payload 不在此执行。
+端点不创建签名，也不接受 V1 task。
 
 SSE 通过 Last-Event-ID/after 恢复。Relay 只接受 bootstrap profile，区分接收 ACK
 和最终 receipt；它可在连接建立后继续推送任务。receipt 必须属于当前连接、当前
-节点和已接受 pending task，伪造、重复或错绑均拒绝。
+节点和已接受 pending task，伪造、重复或错绑均拒绝。节点发送前将 receipt 写入
+本地 journal；Relay 保存后 ACK，节点再确认。ACK 丢失时重连恢复同一 receipt，
+不重复执行。
 
 ## Observation
 
@@ -92,6 +96,12 @@ initial head 和 max_duration_seconds。节点验证：
 
 当前核心实验聚合三个不同签名节点；结果不一致则 ObservationSet 失败。固定三节点
 是实验 quorum，不是通用共识算法。
+
+ReviewDisputePayloadV1 绑定 dispute/bundle、session、evidence/events/artifact
+URL、revision、event count 和 head hash。全部 URL 必须与 invite 的 server origin
+一致。节点重新获取 finalized bundle 和事件，限制响应/事件/总 artifact 大小，
+复算事件链、每个 artifact、category counts 与 bundle references，成功后才根据
+操作者显式 verdict 签回执。
 
 ## Core 与 governance stages
 

@@ -104,8 +104,11 @@ def start_background_soak(
     duration_seconds: float,
     event_count: int,
     observers: int,
+    stage: str = "core",
 ) -> dict[str, Any]:
-    validate_pilot_soak_args(duration_seconds, event_count, observers)
+    validate_pilot_soak_args(
+        duration_seconds, event_count, observers, stage
+    )
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     state_path = output / STATE_FILENAME
@@ -132,6 +135,8 @@ def start_background_soak(
         str(event_count),
         "--observers",
         str(observers),
+        "--stage",
+        stage,
         "--output",
         str(output),
     ]
@@ -145,6 +150,7 @@ def start_background_soak(
         "duration_seconds": duration_seconds,
         "event_count": event_count,
         "observer_count": observers,
+        "stage": stage,
         "output": str(output),
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),

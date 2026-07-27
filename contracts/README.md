@@ -3,14 +3,16 @@
 Required toolchain:
 
 - Foundry `v1.7.1`
-- forge-std `v1.9.7`
-- OpenZeppelin Contracts `v5.3.0`
+- forge-std `v1.9.7` at commit
+  `77041d2ce690e692d6e03cc812b57d1ddaa4d505`
+- OpenZeppelin Contracts `v5.3.0` at commit
+  `e4f70216d759d8e6a64144a9e1f7bbeed78e7079`
 
 Install ignored, pinned dependencies:
 
 ```powershell
-forge install foundry-rs/forge-std@v1.9.7 --no-git
-forge install OpenZeppelin/openzeppelin-contracts@v5.3.0 --no-git
+forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
+forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
 ```
 
 Run:

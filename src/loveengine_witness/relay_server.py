@@ -15,15 +15,22 @@ from eth_account import Account
 from eth_account.messages import encode_defunct, encode_typed_data
 from eth_utils import to_checksum_address
 
-from .agent_session import run_agent_session, run_with_keepalive
+from .agent_session import (
+    build_relay_challenge,
+    relay_challenge_signing_text,
+    run_agent_session,
+    run_with_keepalive,
+)
 from .canonical import canonical_json_bytes
 from .errors import LoveEngineError
 from .network_protocol import (
+    verify_bootstrap,
     verify_node_profile,
     verify_receipt,
     verify_task,
 )
 from .m4_network import (
+    verify_bootstrap_v2,
     verify_node_profile_v2,
     verify_receipt_v2,
     verify_task_v2,
@@ -83,6 +90,23 @@ def verify_relay_profile_binding(
             "profile_not_in_directory",
             "profile is not a member of the signed bootstrap directory",
         )
+
+
+def verify_relay_bootstrap(bootstrap: dict[str, Any]) -> None:
+    schema_version = bootstrap.get("schema_version")
+    verifier = {
+        "loveengine.bootstrap-bundle/1": verify_bootstrap,
+        "loveengine.bootstrap-bundle/2": verify_bootstrap_v2,
+    }.get(schema_version)
+    if verifier is None:
+        raise LoveEngineError(
+            "unsupported_bootstrap_schema", str(schema_version)
+        )
+    verifier(
+        bootstrap,
+        bootstrap.get("chain_id"),
+        bootstrap.get("registry"),
+    )
 
 
 def verify_task_for_node(
@@ -245,10 +269,24 @@ class RelayHub:
         return web.Response(body=value, content_type="application/octet-stream")
 
     async def websocket(self, request: web.Request) -> web.WebSocketResponse:
+        try:
+            verify_relay_bootstrap(self.bootstrap)
+        except LoveEngineError as exc:
+            self.rejected += 1
+            raise web.HTTPServiceUnavailable(
+                text=json.dumps(
+                    {"error": {"code": exc.code, "message": exc.message}}
+                ),
+                content_type="application/json",
+            ) from exc
         ws = web.WebSocketResponse(heartbeat=10)
         await ws.prepare(request)
-        challenge = secrets.token_hex(32)
-        await ws.send_json({"type": "challenge", "challenge": challenge})
+        challenge = build_relay_challenge(
+            chain_id=self.bootstrap["chain_id"],
+            registry=self.bootstrap["registry"],
+            nonce=secrets.token_hex(32),
+        )
+        await ws.send_json(challenge)
         auth = await ws.receive_json()
         if auth.get("type") != "authenticate":
             self.rejected += 1
@@ -259,7 +297,9 @@ class RelayHub:
             verify_relay_profile_binding(auth["profile"], self.bootstrap)
             node = verify_profile(auth["profile"])
             recovered = Account.recover_message(
-                encode_defunct(text=challenge),
+                encode_defunct(
+                    text=relay_challenge_signing_text(challenge, node=node)
+                ),
                 signature=auth["challenge_signature"],
             )
             if recovered != node:
@@ -279,9 +319,24 @@ class RelayHub:
                 async with send_lock:
                     await ws.send_json(value)
 
+            stored_receipts = self.store.stored_receipts(node)
             await send_json(
-                {"type": "ack", "status": "authenticated", "node": node}
+                {
+                    "type": "ack",
+                    "status": "authenticated",
+                    "node": node,
+                    "receipt_state_count": len(stored_receipts),
+                }
             )
+            for stored_receipt in stored_receipts:
+                receipt = json.loads(stored_receipt)
+                await send_json(
+                    {
+                        "type": "receipt_state",
+                        "task_id": receipt["task_id"],
+                        "receipt": receipt,
+                    }
+                )
             starts: dict[str, float] = {}
 
             async def deliver_pending() -> None:
@@ -312,6 +367,26 @@ class RelayHub:
                     continue
                 if value.get("type") == "heartbeat":
                     await send_json({"type": "heartbeat"})
+                    continue
+                if value.get("type") == "receipt_ack":
+                    task_id = value.get("task_id")
+                    confirmed = (
+                        isinstance(task_id, str)
+                        and self.store.confirm_receipt(node, task_id)
+                    )
+                    if not confirmed:
+                        self.rejected += 1
+                        await send_json(
+                            {"type": "error", "code": "invalid_receipt_ack"}
+                        )
+                    else:
+                        await send_json(
+                            {
+                                "type": "ack",
+                                "status": "receipt_confirmed",
+                                "task_id": task_id,
+                            }
+                        )
                     continue
                 if value.get("type") == "ack":
                     task_id = value.get("task_id")
@@ -484,7 +559,7 @@ async def run_node_client(
     node_address: str,
     signed_profile: dict[str, Any],
     expected_tasks: int,
-    sign_challenge: Callable[[str], str],
+    sign_challenge: Callable[[dict[str, Any]], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
     *,
     expected_issuer: str,
@@ -508,7 +583,7 @@ async def run_v2_review_client(
     signed_profile: dict[str, Any],
     expected_tasks: int,
     verdicts: dict[str, str],
-    sign_challenge: Callable[[str], str],
+    sign_challenge: Callable[[dict[str, Any]], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
     *,
     expected_issuer: str,
@@ -533,7 +608,7 @@ async def run_v2_observation_client(
     signed_profile: dict[str, Any],
     expected_tasks: int,
     cursor_database: str,
-    sign_challenge: Callable[[str], str],
+    sign_challenge: Callable[[dict[str, Any]], str],
     sign_typed_data: Callable[[dict[str, Any]], str],
     *,
     expected_issuer: str,

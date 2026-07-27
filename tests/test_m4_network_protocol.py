@@ -11,6 +11,7 @@ from loveengine_witness.m4_network import (
     verify_task_v2,
 )
 from loveengine_witness.m4_typed_data import build_task_v2_typed_data
+from loveengine_witness.network_typed_data import payload_hash
 
 
 REGISTRY = "0x00000000000000000000000000000000000000aa"
@@ -149,3 +150,71 @@ def test_v2_malformed_signature_returns_protocol_error() -> None:
         )
 
     assert exc.value.code == "invalid_signature"
+
+
+def test_legacy_review_payload_requires_a_bytes32_bundle_hash() -> None:
+    issuer = Account.create()
+    recipient = Account.create()
+    task = build_task_v2(
+        chain_id="31337",
+        registry=REGISTRY,
+        task_id="invalid-legacy-review",
+        task_type="review_dispute",
+        issuer=issuer.address,
+        recipient=recipient.address,
+        manifest_hash="0x" + "11" * 32,
+        payload={"dispute_id": "d1", "bundle_hash": "not-a-hash"},
+        nonce="4",
+        deadline="1770000100",
+    )
+    task["payload_hash"] = payload_hash(task["payload"])
+    task["signature"] = "0x" + Account.sign_message(
+        encode_typed_data(full_message=build_task_v2_typed_data(task)),
+        issuer.key,
+    ).signature.hex()
+
+    with pytest.raises(LoveEngineError) as error:
+        verify_task_v2(
+            task,
+            expected_chain_id="31337",
+            expected_registry=REGISTRY,
+            expected_recipient=recipient.address,
+            expected_issuer=issuer.address,
+            expected_manifest_hash=task["manifest_hash"],
+            now=1770000000,
+        )
+
+    assert error.value.code == "invalid_legacy_review_payload"
+
+
+@pytest.mark.parametrize(
+    "secret_key",
+    [
+        "write_token",
+        "write-token",
+        "writeToken",
+        "operator_token",
+        "pilotToken",
+        "bearer_token",
+    ],
+)
+def test_v2_task_rejects_pilot_write_token_fields(secret_key: str) -> None:
+    with pytest.raises(LoveEngineError) as exc:
+        build_task_v2(
+            chain_id="31337",
+            registry=REGISTRY,
+            task_id=f"secret-{secret_key}",
+            task_type="review_dispute",
+            issuer=Account.create().address,
+            recipient=Account.create().address,
+            manifest_hash="0x" + "11" * 32,
+            payload={
+                "dispute_id": "d1",
+                "bundle_hash": "0x" + "22" * 32,
+                secret_key: "must-not-enter-protocol-storage",
+            },
+            nonce="4",
+            deadline="1770000100",
+        )
+
+    assert exc.value.code == "forbidden_secret_field"

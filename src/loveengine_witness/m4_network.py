@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from time import time
 from typing import Any
 
@@ -196,6 +197,40 @@ def verify_task_v2(
     validate_schema(task, "network-task-v2.schema.json")
     if task["task_type"] not in TASK_TYPES_V2:
         raise LoveEngineError("unsupported_task_type", task["task_type"])
+    if task["task_type"] == "observe_live_text":
+        if "schema_version" in task["payload"]:
+            validate_schema(
+                task["payload"], "observe-live-text-payload-v1.schema.json"
+            )
+        elif (
+            set(task["payload"]) != {"session_id"}
+            or not isinstance(task["payload"]["session_id"], str)
+            or not task["payload"]["session_id"]
+        ):
+            raise LoveEngineError(
+                "invalid_legacy_observation_payload",
+                "legacy observation payload must bind only session_id",
+            )
+    else:
+        if "schema_version" in task["payload"]:
+            validate_schema(
+                task["payload"], "review-dispute-payload-v1.schema.json"
+            )
+        elif (
+            set(task["payload"]) != {"dispute_id", "bundle_hash"}
+            or not isinstance(task["payload"]["dispute_id"], str)
+            or not task["payload"]["dispute_id"]
+            or not isinstance(task["payload"]["bundle_hash"], str)
+            or re.fullmatch(
+                r"0x[0-9a-fA-F]{64}",
+                task["payload"]["bundle_hash"],
+            )
+            is None
+        ):
+            raise LoveEngineError(
+                "invalid_legacy_review_payload",
+                "legacy review payload must bind only dispute_id and bundle_hash",
+            )
     verify_task_binding(
         task,
         expected_chain_id=expected_chain_id,

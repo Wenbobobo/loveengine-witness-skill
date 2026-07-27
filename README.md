@@ -27,8 +27,8 @@ transcripts remain verifiable.
 | Company livestream adapter and autonomous discovery | Not implemented |
 | Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
 
-The local tests and the 2026-07-27 shared ARM64 Linux short acceptance of source
-commit `63909b9` demonstrate protocol separation, tamper detection,
+The local tests and the 2026-07-27 shared ARM64 Linux short acceptance of
+candidate baseline `2fd3a29` demonstrate protocol separation, tamper detection,
 cross-platform repeatability, and the public-node SSH tunnel path. They do not
 demonstrate independent real-world organizations, statement truth, public
 deployment, or long-term artifact availability.
@@ -72,6 +72,11 @@ Relay, uses the public node CLI, verifies artifacts, resolves a fixed dispute,
 evaluates ProposalGate, and writes WitnessCoreTranscriptV1. Its output marks
 environment: local_anvil and actors_simulated: true.
 
+The review nodes do not sign a verdict from a lookup table alone. Before
+signing, each node retrieves the finalized bundle, event list, and
+content-addressed artifacts from the invite-bound HTTP origin and independently
+recomputes the event chain and bundle references.
+
 Run the optional governance extension separately:
 
 ```powershell
@@ -100,7 +105,8 @@ read-only resource gate, deploys one clean commit to a unique directory, limits
 the experiment to two CPUs with lower scheduling priority, and downloads the
 report/transcript for another local offline verification. Run mode also maps
 the remote loopback through an SSH tunnel and proves that the public node CLI
-receives a task queued after connection and returns one bound receipt.
+receives a task queued after connection, verifies retrievable finalized
+evidence, and returns one bound receipt.
 
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -110,6 +116,9 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 The remote runner deliberately has no password option and does not use sudo,
 systemd, public binds, or automatic cleanup. See the
 [shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
+Success and failure both produce a machine-readable report. The final
+postflight records whether process inspection succeeded and no lab process
+remained; one-minute load can still reflect the experiment that just ended.
 
 The completed short acceptance produced three observation receipts, three
 review receipts, Gate ready, and passing recovery checks. The downloaded
@@ -136,6 +145,13 @@ The 30-minute and four-hour soak gates remain deferred.
   bytes; GET endpoints never finalize or mutate evidence.
 - Relay accepts bootstrap members only and binds each receipt to its
   authenticated WebSocket node and accepted pending task.
+- Public task submission is idempotent only for byte-identical signed tasks.
+  Nodes durably bind task ID and issuer nonce, persist receipts before sending,
+  and use bounded reconnect plus a Relay-confirmed receipt handshake to recover
+  an ACK-loss window without executing the task twice.
+- One observation execution is capped at 10,000 new events and 64 MiB of
+  artifacts; one review is capped at 1,000 events and 32 MiB. Each artifact is
+  capped at 8 MiB.
 - Offline integrity is not chain trust. A verifier reports trust_bound: true
   only when RPC facts also match an externally supplied trust policy.
 - The Windows quickstart does not configure or verify an explicit NTFS ACL for

@@ -10,8 +10,10 @@ TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 
 import run_remote_lab  # noqa: E402
+import run_core_experiments  # noqa: E402
 from remote_host_preflight import (  # noqa: E402
     CapacityThresholds,
+    _parse_process_snapshot,
     evaluate_capacity,
 )
 from run_remote_lab import (  # noqa: E402
@@ -19,12 +21,16 @@ from run_remote_lab import (  # noqa: E402
     _owned_group_stop_command,
     _ssh_options,
     _validate_remote_artifact,
+    _validate_remote_limits,
     _validate_remote_root,
     _validate_target,
     _wait_http_json_or_none,
     build_parser,
 )
-from start_shared_quickstart import _parse_linux_process_start_ticks  # noqa: E402
+from start_shared_quickstart import (  # noqa: E402
+    _parse_linux_process_start_ticks,
+    validate_shared_host_limits as validate_quickstart_limits,
+)
 
 
 def _safe_snapshot() -> dict:
@@ -58,6 +64,8 @@ def _safe_snapshot() -> dict:
         "memory_available_bytes": 8 * 1024**3,
         "disk_free_bytes": 20 * 1024**3,
         "tools": tools,
+        "process_snapshot_ok": True,
+        "process_snapshot_error": None,
         "relevant_processes": [],
     }
 
@@ -85,6 +93,72 @@ def test_remote_preflight_rejects_missing_or_unpinned_toolchain() -> None:
     assert safe is False
     assert "required tool is missing: uv" in reasons
     assert "forge is not pinned Foundry 1.7.1" in reasons
+
+
+def test_core_runner_accepts_only_exact_multiline_foundry_version() -> None:
+    assert run_core_experiments.is_exact_forge_version(
+        "forge Version: 1.7.1\n"
+        "Commit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\n"
+    )
+    assert not run_core_experiments.is_exact_forge_version(
+        "forge Version: 11.7.10\n"
+    )
+    assert not run_core_experiments.is_exact_forge_version(
+        "wrapper output\nforge Version: 1.7.1\n"
+    )
+
+
+def test_remote_preflight_fails_closed_when_process_inspection_fails() -> None:
+    snapshot = _safe_snapshot()
+    snapshot["process_snapshot_ok"] = False
+    snapshot["process_snapshot_error"] = "TimeoutExpired"
+
+    safe, reasons = evaluate_capacity(snapshot, CapacityThresholds())
+
+    assert safe is False
+    assert "could not verify existing shared-host processes" in reasons
+
+
+def test_remote_preflight_detects_python_launched_loveengine(
+) -> None:
+    ok, _, relevant, error = _parse_process_snapshot(
+        (
+            "4321 python3 1.5 0.2 "
+            "python3 -m loveengine_witness.cli pilot serve --config fixture.json\n"
+        )
+    )
+
+    assert ok is True
+    assert error is None
+    assert relevant == [
+        {
+            "pid": 4321,
+            "command": "python3",
+            "cpu_percent": 1.5,
+            "memory_percent": 0.2,
+        }
+    ]
+
+
+def test_remote_preflight_ignores_only_the_current_lab_process() -> None:
+    ok, _, relevant, error = _parse_process_snapshot(
+        (
+            "4321 python3 1.5 0.2 python3 tools/run_core_experiments.py\n"
+            "4322 python3 1.0 0.1 python3 tools/run_core_experiments.py\n"
+        ),
+        ignored_pids={4321},
+    )
+
+    assert ok is True
+    assert error is None
+    assert relevant == [
+        {
+            "pid": 4322,
+            "command": "python3",
+            "cpu_percent": 1.0,
+            "memory_percent": 0.1,
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -134,6 +208,28 @@ def test_remote_root_must_stay_below_remote_home(value: str) -> None:
         _validate_remote_root(value)
 
 
+@pytest.mark.parametrize(
+    "values",
+    (
+        (0.6, 3.0, 5.0, 1800),
+        (0.5, 2.9, 5.0, 1800),
+        (0.5, 3.0, 4.9, 1800),
+        (0.5, 3.0, 5.0, 30),
+        (float("nan"), 3.0, 5.0, 1800),
+    ),
+)
+def test_remote_runner_limits_cannot_be_weakened(
+    values: tuple[float, float, float, int],
+) -> None:
+    with pytest.raises(ValueError):
+        _validate_remote_limits(
+            max_load_per_cpu=values[0],
+            min_memory_gib=values[1],
+            min_disk_gib=values[2],
+            timeout_seconds=values[3],
+        )
+
+
 def test_remote_ssh_is_key_only_and_has_no_password_option(tmp_path: Path) -> None:
     identity = tmp_path / "identity"
     known_hosts = tmp_path / "known_hosts"
@@ -148,7 +244,26 @@ def test_remote_ssh_is_key_only_and_has_no_password_option(tmp_path: Path) -> No
     assert "BatchMode=yes" in options
     assert "PasswordAuthentication=no" in options
     assert "StrictHostKeyChecking=yes" in options
+    assert "ControlMaster=no" in options
+    assert "ForwardAgent=no" in options
+    assert options[options.index("-F") + 1] in {"NUL", "/dev/null"}
     assert "password" not in build_parser().format_help().lower()
+
+
+@pytest.mark.parametrize(
+    ("max_cpus", "nice_increment"),
+    [(3, 15), (2, 14), (0, 15), (2, 20)],
+)
+def test_shared_host_resource_limits_cannot_be_weakened(
+    max_cpus: int, nice_increment: int
+) -> None:
+    with pytest.raises(ValueError):
+        validate_quickstart_limits(max_cpus, nice_increment)
+    with pytest.raises(ValueError):
+        run_core_experiments.validate_shared_host_limits(
+            max_cpus,
+            nice_increment,
+        )
 
 
 def test_remote_artifacts_must_remain_in_unique_deployment() -> None:
@@ -181,6 +296,7 @@ def test_owned_process_cleanup_is_pid_and_command_guarded() -> None:
     assert "snapshot=$(ps -eo pgid=,stat=) || return 0" in command
     assert 'kill -TERM -- "-$pid" 2>/dev/null || true' in command
     assert "loveengine pilot quickstart" in command
+    assert "run_core_experiments.py" in command
 
     with pytest.raises(ValueError):
         _owned_group_stop_command(1, 987654)
@@ -239,3 +355,58 @@ def test_http_wait_timeout_is_transient_only_while_tunnel_is_live(
             timeout=0.1,
             process=Process(1),  # type: ignore[arg-type]
         )
+
+
+def test_remote_runner_writes_failure_phase_and_postflight_cleanup(
+    tmp_path: Path,
+) -> None:
+    lab = object.__new__(run_remote_lab.RemoteLab)
+    lab.args = Namespace(host="test-host", output=tmp_path)
+    lab.current_phase = "remote_core"
+    lab.current_output = tmp_path
+    lab.current_commit = "a" * 40
+    lab.last_preflight = {"safe_to_run": True}
+
+    def fail() -> dict:
+        raise RuntimeError("bounded fixture failure")
+
+    lab._run_once = fail
+    lab.preflight = lambda: {
+        "safe_to_run": False,
+        "host": {
+            "process_snapshot_ok": True,
+            "relevant_processes": [],
+        },
+    }
+
+    report = lab.run()
+
+    assert report["status"] == "failed"
+    assert report["phase"] == "remote_core"
+    assert report["error"]["type"] == "RuntimeError"
+    assert report["postflight_cleanup_verified"] is True
+    assert (
+        tmp_path / "remote-lab-report.json"
+    ).read_text(encoding="utf-8").find('"status": "failed"') >= 0
+
+
+def test_remote_runner_writes_capacity_block_report(tmp_path: Path) -> None:
+    lab = object.__new__(run_remote_lab.RemoteLab)
+    lab.args = Namespace(host="test-host", output=tmp_path)
+    lab.current_phase = "preflight"
+    lab.current_output = None
+    lab.current_commit = None
+    lab.last_preflight = None
+    lab._run_once = lambda: {
+        "schema_version": "loveengine.remote-lab-report/1",
+        "status": "blocked",
+        "target": "test-host",
+        "preflight": {"safe_to_run": False},
+    }
+
+    report = lab.run()
+
+    assert report["status"] == "blocked"
+    assert report["phase"] == "preflight"
+    saved = tmp_path / "remote-lab-report.json"
+    assert '"status": "blocked"' in saved.read_text(encoding="utf-8")

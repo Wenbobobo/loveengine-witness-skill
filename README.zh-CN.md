@@ -24,7 +24,8 @@ loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验�
 | 公司直播 adapter 和自动发现 | 未实现 |
 | Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
 
-本机测试和 2026-07-27 的共享 ARM64 Linux 短验收（source commit `63909b9`）
+本机测试和 2026-07-27 的共享 ARM64 Linux 短验收（candidate baseline
+`2fd3a29`）
 证明协议分权、篡改检测、跨平台复跑和 SSH tunnel 公共节点路径；它们不证明现实
 中的组织彼此独立、发言内容为真、已经公开部署或 artifact 能长期可用。
 
@@ -64,6 +65,10 @@ uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --outpu
 artifact、复核固定争议、执行 ProposalGate，并写出 WitnessCoreTranscriptV1。
 结果明确标记 environment: local_anvil 和 actors_simulated: true。
 
+复核节点不是只从本地 verdict 表取一个结论就签名。签名前，每个节点都会从 invite
+绑定的 HTTP origin 取回 finalized bundle、事件列表和内容寻址 artifact，独立复算
+事件链、artifact bytes 和 bundle 引用。
+
 可选治理扩展单独执行：
 
 ```powershell
@@ -90,6 +95,7 @@ host key，只接受 public-key 认证，先执行只读资源门，再把一个
 唯一目录；实验最多使用两个 CPU、降低调度优先级，最后下载报告和 transcript，
 在本机再次离线验证。run 模式还会建立本机 SSH tunnel，使用公开 node CLI 连接
 远端 loopback Quickstart，证明节点在连接后收到新任务并返回一个绑定 receipt。
+该任务引用真实 finalized evidence，节点会经 tunnel 取回并验证后才签回执。
 
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -98,6 +104,8 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 
 远程 runner 故意不提供 password 参数，也不使用 sudo、systemd、公开端口绑定或
 自动清理。完整步骤见[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
+成功和失败都会产生机器可读报告。最终 postflight 明确记录进程检查是否成功、是否
+无本次实验残留；一分钟负载仍可能包含刚结束实验的影响。
 
 已完成的短验收得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过；
 下载 transcript 为 `offline_integrity` / `trust_bound:false`。公开 node CLI 在
@@ -122,6 +130,11 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
   接口不会 finalize 或改变 evidence。
 - Relay 只接受 bootstrap 成员，并把 receipt 绑定到当前鉴权 WebSocket 节点和
   它已接受的 pending task。
+- 公开任务入口只把字节完全相同的签名任务重试视为幂等。节点持久绑定 task ID 与
+  issuer nonce，发送前保存回执，并用有界重连和 receipt confirmation 覆盖 ACK
+  丢失窗口；Relay 会再确认该 confirmation，避免连接关闭前留下不确定状态。
+- 观察任务每次执行最多处理 10,000 个新事件和 64 MiB artifact，复核任务最多
+  1,000 个事件和 32 MiB artifact；单个 artifact 上限均为 8 MiB。
 - 离线完整性不等于链上信任。只有 RPC 事实同时匹配外部 trust policy 时，
   verifier 才返回 trust_bound: true。
 - Windows 本机 token 文件尚未显式配置或验收 NTFS ACL，只能视为 loopback 实验
