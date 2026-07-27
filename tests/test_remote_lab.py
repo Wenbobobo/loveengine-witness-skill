@@ -171,13 +171,16 @@ def test_remote_artifacts_must_remain_in_unique_deployment() -> None:
 
 def test_owned_process_cleanup_is_pid_and_command_guarded() -> None:
     command = _owned_group_stop_command(4321, 987654)
+    assert command.startswith("bash -c ")
+    assert not command.startswith("bash -lc ")
     assert "pid=4321" in command
     assert "expected_start=987654" in command
     assert "/proc/$pid/stat" in command
     assert "/proc/$pid/cmdline" in command
     assert "ps -eo pgid=,stat=" in command
+    assert "snapshot=$(ps -eo pgid=,stat=) || return 0" in command
+    assert 'kill -TERM -- "-$pid" 2>/dev/null || true' in command
     assert "loveengine pilot quickstart" in command
-    assert 'kill -TERM -- "-$pid"' in command
 
     with pytest.raises(ValueError):
         _owned_group_stop_command(1, 987654)
@@ -187,10 +190,12 @@ def test_owned_process_cleanup_is_pid_and_command_guarded() -> None:
 
 def test_owned_process_absence_check_is_read_only_and_identity_guarded() -> None:
     command = _owned_group_absence_command(4321, 987654)
+    assert command.startswith("bash -c ")
     assert "pid=4321" in command
     assert "expected_start=987654" in command
     assert "/proc/$pid/stat" in command
     assert "ps -eo pgid=,stat=" in command
+    assert "2>/dev/null || true" in command
     assert "kill -" not in command
 
     with pytest.raises(ValueError):

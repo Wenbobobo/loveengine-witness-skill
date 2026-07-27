@@ -113,6 +113,10 @@ def _remote_bash(script: str) -> str:
     return "bash -lc " + shlex.quote(script)
 
 
+def _remote_nonlogin_bash(script: str) -> str:
+    return "bash -c " + shlex.quote(script)
+
+
 def _free_local_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
@@ -171,42 +175,45 @@ def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
 def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
     if pid <= 1 or process_start_ticks <= 0:
         raise ValueError("owned process identity must be positive")
-    return _remote_bash(
+    return _remote_nonlogin_bash(
         "set -eu; "
         f"pid={pid}; "
         f"expected_start={process_start_ticks}; "
         "group_has_live_members() { "
+        "snapshot=$(ps -eo pgid=,stat=) || return 0; "
         "while read -r pgid state; do "
         "if [ \"$pgid\" = \"$pid\" ]; then "
         "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
         "fi; "
-        "done < <(ps -eo pgid=,stat=); "
+        "done <<< \"$snapshot\"; "
         "return 1; "
         "}; "
-        "if [ ! -r \"/proc/$pid/stat\" ]; then "
+        "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
+        "if [ -z \"$stat\" ]; then "
         "if group_has_live_members; then exit 10; fi; "
         "exit 0; "
         "fi; "
-        "stat=$(cat \"/proc/$pid/stat\"); "
         "tail=${stat##*) }; "
         "set -- $tail; "
         "state=$1; "
         "eval \"current_start=\\${20}\"; "
         "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
         "if [ \"$state\" != \"Z\" ]; then "
-        "command=$(tr '\\000' ' ' < \"/proc/$pid/cmdline\"); "
+        "command=$(tr '\\000' ' ' < \"/proc/$pid/cmdline\" 2>/dev/null "
+        "|| true); "
         "case \"$command\" in "
+        "\"\") ;; "
         "*\"loveengine pilot quickstart\"*) ;; "
         "*) exit 9 ;; "
         "esac; "
         "fi; "
         "if ! group_has_live_members; then exit 0; fi; "
-        "kill -TERM -- \"-$pid\"; "
+        "kill -TERM -- \"-$pid\" 2>/dev/null || true; "
         "for _ in {1..20}; do "
         "if ! group_has_live_members; then exit 0; fi; "
         "sleep 0.25; "
         "done; "
-        "kill -KILL -- \"-$pid\"; "
+        "kill -KILL -- \"-$pid\" 2>/dev/null || true; "
         "for _ in {1..8}; do "
         "if ! group_has_live_members; then exit 0; fi; "
         "sleep 0.25; "
@@ -218,21 +225,22 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
 def _owned_group_absence_command(pid: int, process_start_ticks: int) -> str:
     if pid <= 1 or process_start_ticks <= 0:
         raise ValueError("owned process identity must be positive")
-    return _remote_bash(
+    return _remote_nonlogin_bash(
         "set -eu; "
         f"pid={pid}; "
         f"expected_start={process_start_ticks}; "
         "group_has_live_members() { "
+        "snapshot=$(ps -eo pgid=,stat=) || return 0; "
         "while read -r pgid state; do "
         "if [ \"$pgid\" = \"$pid\" ]; then "
         "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
         "fi; "
-        "done < <(ps -eo pgid=,stat=); "
+        "done <<< \"$snapshot\"; "
         "return 1; "
         "}; "
         "for _ in {1..20}; do "
-        "if [ -r \"/proc/$pid/stat\" ]; then "
-        "stat=$(cat \"/proc/$pid/stat\"); "
+        "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
+        "if [ -n \"$stat\" ]; then "
         "tail=${stat##*) }; "
         "set -- $tail; "
         "eval \"current_start=\\${20}\"; "
