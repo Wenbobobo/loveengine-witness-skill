@@ -14,6 +14,7 @@ from remote_host_preflight import (  # noqa: E402
     evaluate_capacity,
 )
 from run_remote_lab import (  # noqa: E402
+    _owned_group_absence_command,
     _owned_group_stop_command,
     _ssh_options,
     _validate_remote_artifact,
@@ -180,6 +181,18 @@ def test_owned_process_cleanup_is_pid_and_command_guarded() -> None:
         _owned_group_stop_command(1, 987654)
     with pytest.raises(ValueError):
         _owned_group_stop_command(4321, 0)
+
+
+def test_owned_process_absence_check_is_read_only_and_identity_guarded() -> None:
+    command = _owned_group_absence_command(4321, 987654)
+    assert "pid=4321" in command
+    assert "expected_start=987654" in command
+    assert "/proc/$pid/stat" in command
+    assert "ps -eo pgid=,stat=" in command
+    assert "kill -" not in command
+
+    with pytest.raises(ValueError):
+        _owned_group_absence_command(1, 987654)
 
 
 def test_linux_process_start_ticks_parser_handles_spaced_command_name() -> None:

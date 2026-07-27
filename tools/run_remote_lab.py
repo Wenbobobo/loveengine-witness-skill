@@ -201,6 +201,36 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
     )
 
 
+def _owned_group_absence_command(pid: int, process_start_ticks: int) -> str:
+    if pid <= 1 or process_start_ticks <= 0:
+        raise ValueError("owned process identity must be positive")
+    return _remote_bash(
+        "set -eu; "
+        f"pid={pid}; "
+        f"expected_start={process_start_ticks}; "
+        "group_has_live_members() { "
+        "while read -r pgid state; do "
+        "if [ \"$pgid\" = \"$pid\" ]; then "
+        "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
+        "fi; "
+        "done < <(ps -eo pgid=,stat=); "
+        "return 1; "
+        "}; "
+        "for _ in {1..20}; do "
+        "if [ -r \"/proc/$pid/stat\" ]; then "
+        "stat=$(cat \"/proc/$pid/stat\"); "
+        "tail=${stat##*) }; "
+        "set -- $tail; "
+        "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
+        "fi; "
+        "if ! group_has_live_members; then exit 0; fi; "
+        "sleep 0.25; "
+        "done; "
+        "exit 10"
+    )
+
+
 class RemoteLab:
     def __init__(self, args: argparse.Namespace) -> None:
         _validate_target(args.host, args.user, args.port)
@@ -372,13 +402,20 @@ print(json.dumps({"package_archive": config["package_archive"]}))
 
     def _stop_owned_remote_group(
         self, pid: int, process_start_ticks: int
-    ) -> bool:
+    ) -> dict[str, int | bool]:
         try:
-            command = _owned_group_stop_command(pid, process_start_ticks)
+            stop_command = _owned_group_stop_command(pid, process_start_ticks)
+            absence_command = _owned_group_absence_command(
+                pid, process_start_ticks
+            )
         except ValueError:
-            return False
-        result = subprocess.run(
-            [self.ssh, *self.ssh_options, self.target, command],
+            return {
+                "verified": False,
+                "stop_returncode": -1,
+                "absence_returncode": -1,
+            }
+        stop_result = subprocess.run(
+            [self.ssh, *self.ssh_options, self.target, stop_command],
             capture_output=True,
             check=False,
             text=True,
@@ -386,7 +423,20 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             errors="replace",
             timeout=20,
         )
-        return result.returncode == 0
+        absence_result = subprocess.run(
+            [self.ssh, *self.ssh_options, self.target, absence_command],
+            capture_output=True,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+        return {
+            "verified": absence_result.returncode == 0,
+            "stop_returncode": stop_result.returncode,
+            "absence_returncode": absence_result.returncode,
+        }
 
     def _tunnel_smoke(
         self,
@@ -426,6 +476,11 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         node_process: subprocess.Popen[str] | None = None
         report: dict[str, Any] | None = None
         owned_cleanup = False
+        cleanup_verification: dict[str, int | bool] = {
+            "verified": False,
+            "stop_returncode": -1,
+            "absence_returncode": -1,
+        }
         try:
             tunnel_process = subprocess.Popen(
                 [
@@ -622,9 +677,10 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 except subprocess.TimeoutExpired:
                     tunnel_process.kill()
                     tunnel_process.wait(timeout=5)
-            owned_cleanup = self._stop_owned_remote_group(
+            cleanup_verification = self._stop_owned_remote_group(
                 remote_pid, process_start_ticks
             )
+            owned_cleanup = bool(cleanup_verification["verified"])
             try:
                 self._copy_from_remote(
                     f"~/{deployment_rel}/tmp/tunnel-pilot.log",
@@ -635,8 +691,13 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         if report is None:
             raise RuntimeError("tunnel smoke ended without a report")
         report["owned_process_cleanup"] = owned_cleanup
+        report["cleanup_verification"] = cleanup_verification
         if not owned_cleanup:
-            raise RuntimeError("could not verify cleanup of the remote process group")
+            raise RuntimeError(
+                "could not verify cleanup of the remote process group "
+                f"(stop={cleanup_verification['stop_returncode']}, "
+                f"absence={cleanup_verification['absence_returncode']})"
+            )
         return report
 
     def run(self) -> dict[str, Any]:
