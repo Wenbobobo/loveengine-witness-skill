@@ -99,6 +99,36 @@ def test_observation_set_requires_three_distinct_matching_receipts() -> None:
         )
 
 
+def test_observation_set_rejects_a_signed_rejected_receipt() -> None:
+    accounts = [Account.create() for _ in range(3)]
+    receipts = [_signed_receipt(account, i) for i, account in enumerate(accounts)]
+    rejected = build_receipt_v2(
+        chain_id="31337",
+        registry=REGISTRY,
+        task_id="observe-2",
+        node=accounts[2].address,
+        status="rejected",
+        result={"error_code": "sequence_gap", "task_type": "observe_live_text"},
+        nonce="2",
+        completed_at="1770000100",
+    )
+    rejected["signature"] = "0x" + Account.sign_message(
+        encode_typed_data(full_message=build_receipt_v2_typed_data(rejected)),
+        accounts[2].key,
+    ).signature.hex()
+    receipts[2] = rejected
+
+    with pytest.raises(LoveEngineError) as error:
+        aggregate_observations(
+            receipts,
+            expected_nodes={account.address for account in accounts},
+            expected_chain_id="31337",
+            expected_registry=REGISTRY,
+        )
+
+    assert error.value.code == "observation_receipt_rejected"
+
+
 def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

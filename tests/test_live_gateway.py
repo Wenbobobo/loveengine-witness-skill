@@ -3,9 +3,15 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from loveengine_witness.live_gateway import create_live_app
+from loveengine_witness.live_gateway import (
+    ARTIFACTS_KEY,
+    METADATA_KEY,
+    create_live_app,
+    stream_events,
+)
 
 
 def test_sse_waits_for_new_events_instead_of_busy_polling(tmp_path: Path) -> None:
@@ -43,6 +49,42 @@ def test_sse_waits_for_new_events_instead_of_busy_polling(tmp_path: Path) -> Non
             assert appended.status == 202
             response = await asyncio.wait_for(waiting, timeout=1)
             assert "id: 1" in await response.text()
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
+def test_sse_catches_events_committed_before_a_closed_snapshot() -> None:
+    class ClosingSnapshotMetadata:
+        def __init__(self) -> None:
+            self.list_calls = 0
+
+        def list_events(self, _: str, __: int) -> list[dict[str, object]]:
+            self.list_calls += 1
+            if self.list_calls == 1:
+                return []
+            return [{"sequence": "1", "event_id": "final-event"}]
+
+        @staticmethod
+        def get_session(_: str) -> dict[str, str]:
+            return {"status": "closed"}
+
+    async def scenario() -> None:
+        app = web.Application()
+        metadata = ClosingSnapshotMetadata()
+        app[METADATA_KEY] = metadata  # type: ignore[assignment]
+        app[ARTIFACTS_KEY] = object()  # type: ignore[assignment]
+        app.router.add_get("/sessions/{session_id}/stream", stream_events)
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            response = await client.get("/sessions/closed-race/stream?after=0")
+            assert response.status == 200
+            body = await response.text()
+            assert "id: 1" in body
+            assert '"event_id": "final-event"' in body
+            assert metadata.list_calls == 2
         finally:
             await client.close()
 

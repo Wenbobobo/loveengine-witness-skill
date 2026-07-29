@@ -368,6 +368,18 @@ def aggregate_observations(
         if node in nodes:
             raise LoveEngineError("duplicate_observer", node)
         nodes.add(node)
+        if receipt.get("status") != "completed":
+            result = receipt.get("result")
+            error_code = (
+                result.get("error_code", "unknown")
+                if isinstance(result, dict)
+                else "unknown"
+            )
+            raise LoveEngineError(
+                "observation_receipt_rejected",
+                f"{receipt.get('task_id', 'unknown')}:{error_code}",
+                4,
+            )
         validate_schema(receipt["result"], "live-observation-receipt-v1.schema.json")
         comparable = {
             key: receipt["result"][key]

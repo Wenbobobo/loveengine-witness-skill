@@ -34,6 +34,9 @@ bundle_revision_conflict。
 ## Event 与 artifact
 
 - sequence 从 1 连续递增；previous_event_hash 必须等于 session head。
+- SSE 是从持久 event log 按 cursor 重放的有限响应。读取到 `closed` 后，服务端会
+  再读取一次该 cursor 之后的持久事件；关闭前已提交的最后事件不会被 keepalive 隐藏。
+  节点仍必须逐项验证连续 sequence、previous_event_hash、event_hash 和 artifact。
 - event_hash 是排除自身后的 canonical JSON Keccak-256。
 - content_hash 与 artifact 地址使用 exact source bytes 的 SHA-256。
 - artifact 路径是 artifacts/sha256/[前两位]/[完整 digest]。
