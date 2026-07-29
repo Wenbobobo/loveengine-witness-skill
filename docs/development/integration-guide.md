@@ -155,15 +155,16 @@ postflight 另验无相关残留。详细门槛见
 路径能否经安全 tunnel 完成连接后任务和 receipt。
 不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
 
-2026-07-27 的 candidate baseline `2fd3a29` 已通过旧版短实验：3 个 observation
-receipt、3 个 review receipt、Gate ready、恢复测试通过；下载 transcript 为
-`offline_integrity` / `trust_bound:false`，tunnel 节点得到 1 个绑定 receipt，
-Relay 记录 1 个 ACK，清理检查未发现相关残留进程。机器报告 SHA-256 为
-`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
-这是改进前报告；增强后的 runner 以每次新报告中的精确 source_commit、
-三节点/三回执、`evidence_verified`、`relay_receipt_confirmed` 和 postflight
-字段逐次验收。
-30 分钟和 4 小时 soak 仍延期。
+2026-07-27 的 candidate baseline `2fd3a29` 已通过旧版短实验；它只提供单节点
+tunnel 的历史证据。2026-07-29 的合并 commit
+`76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短实验：3 个
+observation receipt、3 个 review receipt、Gate ready、恢复测试通过，下载
+transcript 为 `offline_integrity` / `trust_bound:false`；3 个公开 node 分别得到
+evidence-verified 绑定 receipt，Relay 精确记录 `acked:3` 和
+`receipt_confirmed:3`，postflight 未发现相关残留进程。增强后的 runner 仍必须以
+每次报告中的精确 source_commit、三节点/三回执、`evidence_verified`、
+`relay_receipt_confirmed` 和 postflight 字段逐次验收。本机前台 30 分钟 core soak
+已通过；远端 30 分钟和全部 4 小时 soak 仍延期。
 
 ## 变更验收
 

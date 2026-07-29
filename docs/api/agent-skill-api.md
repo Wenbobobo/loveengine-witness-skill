@@ -218,10 +218,21 @@ loveengine pilot snapshot prune --output <dir> --older-than-days 30
 loveengine witness vote approve --proposal-plan <path> --rpc-url <url> --address <address>
 loveengine demo lan-pilot --stage core|governance --events 12 --observers 10 --output <dir>
 loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]
-loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir>
+loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir> [--background]
+loveengine pilot soak-status <dir>/pilot-soak-run.json
 ```
 
 Each command should support machine-readable output. Prefer JSON output by default for Agent adapters; human text can be added with `--pretty`.
+
+### Background soak lifecycle
+
+`--background` returns a state-file path immediately; poll it with `pilot soak-status`.
+`status: passed` is valid only when the final `pilot-soak-report.json` exists and
+passes. A terminal `failure_reason` is intentionally narrow: `launch_failed`,
+`soak_report_failed`, or `process_exited_without_report`. The last value means
+the recorded PID is no longer alive and no final report exists; partial artifacts
+are diagnostic only and must not be treated as a passing soak. It does not claim
+to identify why an external host or supervisor ended the process.
 
 ## Adapter expectations
 
