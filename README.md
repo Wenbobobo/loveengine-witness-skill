@@ -121,17 +121,17 @@ Success and failure both produce a machine-readable report. The final
 postflight records whether process inspection succeeded and no lab process
 remained; one-minute load can still reflect the experiment that just ended.
 
-The completed short acceptance produced three observation receipts, three
-review receipts, Gate ready, and passing recovery checks. The downloaded
-transcript verified as `offline_integrity` with `trust_bound:false`; the public
-node CLI received one post-connection signed task, Relay stored one bound
-receipt, and the post-run read-only gate found no related process left behind.
-That result is the previous one-node tunnel baseline. The strengthened runner
-now requires three connected public-node processes, three evidence-verified
-receipts, three Relay ACKs, and three receipt confirmations in the same short
-cross-host run. These are simulated profiles and processes, not proof of
-socially independent witnesses. The 30-minute and four-hour soak gates remain
-deferred.
+The latest accepted short cross-host run used merged commit
+`76b7163fc2a72c503db6a1b34fd2670b5b9ab580`. It produced three observation
+receipts, three review receipts, Gate ready, and passing recovery checks. The
+downloaded transcript verified as `offline_integrity` with `trust_bound:false`;
+the tunnel started three public node CLI processes, each received a
+post-connection evidence-verified task and returned its own bound receipt.
+Relay recorded `acked:3` and `receipt_confirmed:3`, and the post-run read-only
+gate found no related process left behind. These are simulated profiles and
+processes, not proof of socially independent witnesses. A foreground 30-minute
+local core soak has passed; remote 30-minute and all four-hour soak evidence
+remain deferred.
 
 ## Roles
 

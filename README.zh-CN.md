@@ -108,13 +108,14 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 成功和失败都会产生机器可读报告。最终 postflight 明确记录进程检查是否成功、是否
 无本次实验残留；一分钟负载仍可能包含刚结束实验的影响。
 
-已完成的短验收得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过；
-下载 transcript 为 `offline_integrity` / `trust_bound:false`。公开 node CLI 在
-连接后收到一个签名任务，Relay 保存一个绑定回执，实验后的只读门禁未发现相关
-残留进程。这是旧的单节点 tunnel baseline；增强后的 runner 要求在同一次短时
-跨主机实验中得到 3 个公开节点连接、3 个 evidence-verified 回执、3 个 Relay
-ACK 和 3 个 receipt confirmation。三个 profile/进程仍是模拟 actor，不代表
-现实社会独立性。30 分钟和 4 小时 soak 仍未执行。
+最新一次已验收的短时跨主机实验使用合并后的 commit
+`76b7163fc2a72c503db6a1b34fd2670b5b9ab580`。它得到 3 个观察回执、3 个复核
+回执、Gate ready 和恢复测试通过；下载 transcript 为 `offline_integrity` /
+`trust_bound:false`。tunnel 启动 3 个公开 node CLI 进程，三者各自在连接后收到
+一份 evidence-verified 任务并返回自己的绑定回执；Relay 记录 `acked:3` 和
+`receipt_confirmed:3`，实验后的只读门禁未发现相关残留进程。三个 profile/进程
+仍是模拟 actor，不代表现实社会独立性。本机前台 30 分钟 core soak 已通过；远端
+30 分钟和全部 4 小时 soak 证据仍待独立空闲窗口执行。
 
 ## 角色
 

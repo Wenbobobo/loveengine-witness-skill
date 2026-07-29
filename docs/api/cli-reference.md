@@ -181,6 +181,17 @@ core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak �
 `--stage governance` 单独运行；四小时墙钟 soak 需单独运行
 并保存报告。
 
+后台运行时使用：
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 1800 --events 30 --observers 10 --output .\pilot-soak --background
+uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
+```
+
+只有最终 `pilot-soak-report.json` 存在且 `status: passed` 才构成通过证据。
+`process_exited_without_report` 只说明记录的 PID 已不存在且未产生最终报告；部分
+artifact 仅供诊断，不能作为成功结果，也不能据此归因外部宿主为何终止了进程。
+
 跨平台核心实验入口为：
 
 ```powershell

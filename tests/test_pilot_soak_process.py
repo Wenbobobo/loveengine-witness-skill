@@ -43,6 +43,7 @@ def test_background_soak_writes_queryable_state(
 
     state_path = Path(started["state_path"])
     assert started["status"] == "running"
+    assert started["process_alive"] is True
     assert state_path.is_file()
     assert "--background" not in captured["command"]
     assert "--duration-seconds" in captured["command"]
@@ -80,6 +81,8 @@ def test_background_soak_status_uses_completed_report(
     status = background_soak_status(Path(started["state_path"]))
 
     assert status["status"] == "passed"
+    assert status["process_alive"] is False
+    assert "failure_reason" not in status
     assert status["report"]["passed"] is True
     assert status["progress_percent"] == 100
 
@@ -132,5 +135,54 @@ def test_background_soak_status_marks_dead_process_without_report_failed(
     status = background_soak_status(Path(started["state_path"]))
 
     assert status["status"] == "failed"
+    assert status["process_alive"] is False
+    assert status["failure_reason"] == "process_exited_without_report"
     assert status["report"] is None
     assert status["stderr_path"].endswith("pilot-soak.stderr.log")
+
+
+def test_background_soak_status_names_failed_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps({"passed": False}), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["failure_reason"] == "soak_report_failed"
+
+
+def test_background_soak_status_names_launch_failure(tmp_path: Path) -> None:
+    state_path = tmp_path / "pilot-soak-run.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "loveengine.pilot-soak-run/1",
+                "status": "failed",
+                "pid": None,
+                "launch_error": "OSError",
+                "started_at_epoch": 0,
+                "duration_seconds": 60,
+                "output": str(tmp_path),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = background_soak_status(state_path)
+
+    assert status["status"] == "failed"
+    assert status["process_alive"] is False
+    assert status["failure_reason"] == "launch_failed"

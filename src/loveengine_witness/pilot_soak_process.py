@@ -77,25 +77,38 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
     report_path = output / REPORT_FILENAME
     report = read_json(report_path) if report_path.is_file() else None
     pid = int(state.get("pid") or 0)
+    process_alive = _process_alive(pid)
+    failure_reason: str | None = None
     if isinstance(report, dict):
         status = "passed" if report.get("passed") is True else "failed"
-    elif _process_alive(pid):
+        if status == "failed":
+            failure_reason = "soak_report_failed"
+    elif process_alive:
         status = "running"
     else:
         status = "failed"
+        failure_reason = (
+            "launch_failed"
+            if state.get("launch_error")
+            else "process_exited_without_report"
+        )
     duration = float(state["duration_seconds"])
     elapsed = max(0.0, time.time() - float(state["started_at_epoch"]))
     progress = 100.0 if report is not None else min(99.9, elapsed / duration * 100)
-    return {
+    result = {
         **state,
         "state_path": str(state_path),
         "status": status,
+        "process_alive": process_alive,
         "checked_at": _utc_now(),
         "elapsed_seconds": round(elapsed, 3),
         "remaining_seconds": round(max(0.0, duration - elapsed), 3),
         "progress_percent": round(progress, 2),
         "report": report,
     }
+    if failure_reason is not None:
+        result["failure_reason"] = failure_reason
+    return result
 
 
 def start_background_soak(

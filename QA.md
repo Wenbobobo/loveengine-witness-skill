@@ -229,17 +229,17 @@ tunnel，不能外推为公共测试网或企业部署。
 key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净 commit，
 限制为 nice +15 和最多两核，并保持远端 Pilot/Anvil loopback。短实验还覆盖
 持久 Anvil 重启、Quickstart Relay、snapshot 恢复，以及公开 node CLI 经 SSH
-tunnel 收到连接后任务并返回绑定 receipt。2026-07-27 的 source commit
-`2fd3a29` 实测得到 3 个观察回执、3 个复核回执、Gate ready、恢复测试通过，
-tunnel 得到 1 个绑定回执和 1 个 Relay ACK，owned process 清理验证和另行只读
-检查均通过。这是旧的单节点 tunnel baseline；当前 runner 的短时跨主机门要求
-3 个公开 node 进程先全部连接，再分别完成 3 个 evidence-bound review task，
-并精确记录 3 个 ACK 和 3 个 receipt confirmation。
+tunnel 收到连接后任务并返回绑定 receipt。2026-07-29 的合并 commit
+`76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短时跨主机门：3 个
+公开 node 进程先全部连接，各自完成 1 个 evidence-bound review task；core 得到
+3 个观察回执、3 个复核回执、Gate ready 和恢复测试通过，tunnel 得到 3 个
+evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation，owned process
+清理验证与独立 postflight 均通过。
 
-**当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；30 分钟
-和 4 小时 soak 尚未执行。它仍不证明生产 signer、TLS、HA、公共测试网、现实
-见证者独立性、事实真实性或企业系统已经接入。三个本机进程和三个实验 profile
-也不能替代三个现实组织。
+**当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；远端
+30 分钟和全部 4 小时 soak 尚未执行（本机前台 30 分钟 core soak 已通过）。它仍
+不证明生产 signer、TLS、HA、公共测试网、现实见证者独立性、事实真实性或企业
+系统已经接入。三个本机进程和三个实验 profile 也不能替代三个现实组织。
 
 旧 baseline 的 tunnel review 只覆盖任务/回执绑定；当前代码已经补上真实
 finalized evidence 复算、ACK-loss journal 恢复、双向 receipt confirmation 和
