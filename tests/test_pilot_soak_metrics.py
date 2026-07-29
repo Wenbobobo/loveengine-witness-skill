@@ -79,6 +79,7 @@ def test_pilot_soak_reports_runtime_tree_metrics(
     monkeypatch.setattr(
         pilot_soak, "verify_core_transcript", lambda transcript: {"valid": True}
     )
+    monkeypatch.setenv("LOVEENGINE_PILOT_SOAK_RUN_ID", "background-run-123")
 
     report = pilot_soak.run_pilot_soak(
         tmp_path, duration_seconds=1, event_count=1, observers=10
@@ -87,6 +88,7 @@ def test_pilot_soak_reports_runtime_tree_metrics(
     assert sampler.started is True
     assert sampler.stopped is True
     assert report["passed"] is True
+    assert report["run_id"] == "background-run-123"
     assert set(report["checks"]) == SOAK_SUCCESS_CHECK_KEYS
     assert report["peak_rss_bytes"] == 123
     assert report["peak_rss_bytes_scope"] == "root_process_os_peak"

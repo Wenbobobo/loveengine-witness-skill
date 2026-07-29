@@ -134,9 +134,11 @@ uv run loveengine pilot transcript verify .\governance-output\pilot.fixture.json
 verification level 写入机器输出，随后关闭该链。链关闭后只能使用上面的离线命令；
 手工传 `--rpc-url` 时必须保证它仍是 transcript 记录的同一条链。
 
-V1 返回 `legacy_consistency`。Core/V2 离线返回 `offline_integrity` 和
-`trust_bound: false`；只有 RPC 返回 `chain_consistency`，仍不代表调用方认可
-该 Publisher；RPC 加外部 trust policy 才返回 `chain_verified` 与
+V1 和含旧式最小 review payload 的 V2 都返回 `legacy_consistency`。只有带完整
+review payload、跨字段 evidence binding 和 `evidence_verified:true` receipt 的
+Core/当前 V2，离线才返回 `offline_integrity` 和 `trust_bound: false`；只有 RPC
+返回 `chain_consistency`，仍不代表调用方认可该 Publisher；RPC 加外部 trust policy
+才返回 `chain_verified` 与
 `trust_bound: true`。RPC 查询固定在 transcript 的 final block，并核对区块
 hash/timestamp、Registry、交易、code 和相应最终状态。
 
@@ -195,10 +197,11 @@ uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 只说明记录的 PID 已不存在且未产生最终报告；部分 artifact 仅供诊断，不能作为成功结果，
 也不能据此归因外部宿主为何终止了进程。
 
-状态读取器还会把通过报告绑定到固定 schema、stage、事件数、观察者数与请求时长，并要求
-完整的标准成功检查集和所有已报告的 `checks` 都严格为 true。格式错误、跨运行错绑、
-缺少标准 checks 或 `passed:true` 与 checks 矛盾的报告都会返回失败和
-`report_validation_error`，不能作为通过证据。
+每次后台启动还会生成非敏感 `run_id`，并拒绝已有而无 state 的 report。状态读取器仅在
+该 ID 与 report 匹配、记录的子进程已退出后，才会把通过报告绑定到固定 schema、stage、
+事件数、观察者数与请求时长；它同时要求完整的标准成功检查集和所有已报告的 `checks`
+都严格为 true。格式错误、stale/cross-run 错绑、缺少标准 checks 或 `passed:true` 与
+checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
 
 `peak_rss_bytes` 保留为兼容字段，且由 `peak_rss_bytes_scope` 明确标记为根进程的
 OS 峰值。`memory.root_process_peak_rss_bytes` 也是该局部诊断；完整实验的资源门是

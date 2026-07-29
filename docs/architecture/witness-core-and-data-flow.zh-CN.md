@@ -206,8 +206,11 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
   生产网络仍未验证。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
-- 历史 V2 transcript 的最小 observe/review payload 仍能校验签名和交叉引用，但
-  公开任务入口只接收带 URL、cursor、revision、count 和 head hash 的完整 payload。
+- 历史 V2 transcript 的最小 observe/review payload 仍可由兼容 reader 校验签名和
+  交叉引用，但只返回 `legacy_consistency`，不再获得 release/chain 信任结论。当前
+  Core/V2 路径要求完整 payload，review receipt 必须带 `evidence_verified:true`，并把
+  dispute、bundle、session、revision、count、head hash 全部回绑；公开任务入口同样只接收
+  带 URL、cursor、revision、count 和 head hash 的完整 payload。
 
 ## Transcript 能与不能证明什么
 
@@ -216,9 +219,10 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 | PilotTranscriptV1 | 历史字段一致性 | 发布信任或链事实；返回 legacy_consistency |
 | WitnessCoreTranscriptV1 offline | 核心阶段的 hash、签名、成员、quorum 与引用一致 | Registry/链事实；trust_bound:false |
 | WitnessCoreTranscriptV1 RPC + policy | 核心 release anchor 与记录区块的链事实 | 现实陈述真实性、成员社会独立性 |
-| PilotTranscriptV2 offline | 治理实验内部一致性 | 外部信任绑定；返回 offline_integrity |
-| PilotTranscriptV2 RPC, no policy | 记录区块的链状态一致 | 谁授权这套 release；返回 chain_consistency |
-| PilotTranscriptV2 RPC + policy | policy、Registry、交易、区块、code 与最终状态一致 | 公共网络部署或现实事实；返回 chain_verified |
+| PilotTranscriptV2 legacy review payload | 历史签名与字段一致性 | release/chain 信任；返回 legacy_consistency |
+| PilotTranscriptV2 current offline | 完整 review 证据绑定和治理实验内部一致性 | 外部信任绑定；返回 offline_integrity |
+| PilotTranscriptV2 current RPC, no policy | 记录区块的链状态一致 | 谁授权这套 release；返回 chain_consistency |
+| PilotTranscriptV2 current RPC + policy | policy、Registry、交易、区块、code 与最终状态一致 | 公共网络部署或现实事实；返回 chain_verified |
 
 RPC verifier 读取 transcript 记录的最终区块号，并核对区块 hash 和 timestamp；
 链继续出块不会让旧 transcript 因“当前状态变化”失效。

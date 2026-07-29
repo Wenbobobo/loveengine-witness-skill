@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,9 @@ def _passed_report_issue(
         return "event_count_mismatch"
     if report.get("observer_count") != state.get("observer_count"):
         return "observer_count_mismatch"
+    run_id = state.get("run_id")
+    if isinstance(run_id, str) and run_id and report.get("run_id") != run_id:
+        return "run_id_mismatch"
     requested_duration = report.get("requested_duration_seconds")
     if (
         isinstance(requested_duration, bool)
@@ -123,7 +127,14 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
     if isinstance(report, dict):
         if report.get("passed") is True:
             report_error = _passed_report_issue(report, state)
-            status = "passed" if report_error is None else "failed"
+            if report_error is not None:
+                status = "failed"
+            elif process_alive:
+                # A child can write its report just before its process exits.
+                # Do not accept it until the recorded process has actually ended.
+                status = "running"
+            else:
+                status = "passed"
         else:
             status = "failed"
         if status == "failed":
@@ -142,7 +153,11 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         )
     duration = float(state["duration_seconds"])
     elapsed = max(0.0, time.time() - float(state["started_at_epoch"]))
-    progress = 100.0 if report is not None else min(99.9, elapsed / duration * 100)
+    progress = (
+        100.0
+        if status == "passed"
+        else min(99.9, elapsed / duration * 100)
+    )
     result = {
         **state,
         "state_path": str(state_path),
@@ -175,6 +190,7 @@ def start_background_soak(
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     state_path = output / STATE_FILENAME
+    report_path = output / REPORT_FILENAME
     if state_path.is_file():
         existing = background_soak_status(state_path)
         if existing["status"] == "running":
@@ -182,6 +198,8 @@ def start_background_soak(
                 "pilot_soak_already_running", str(state_path), 4
             )
         raise LoveEngineError("pilot_soak_state_exists", str(state_path), 3)
+    if report_path.exists():
+        raise LoveEngineError("pilot_soak_report_exists", str(report_path), 3)
 
     stdout_path = output / STDOUT_FILENAME
     stderr_path = output / STDERR_FILENAME
@@ -203,6 +221,7 @@ def start_background_soak(
         "--output",
         str(output),
     ]
+    run_id = uuid.uuid4().hex
     state: dict[str, Any] = {
         "schema_version": "loveengine.pilot-soak-run/1",
         "status": "starting",
@@ -214,10 +233,11 @@ def start_background_soak(
         "event_count": event_count,
         "observer_count": observers,
         "stage": stage,
+        "run_id": run_id,
         "output": str(output),
         "stdout_path": str(stdout_path),
         "stderr_path": str(stderr_path),
-        "report_path": str(output / REPORT_FILENAME),
+        "report_path": str(report_path),
         "package_root": str(Path(__file__).resolve().parents[2]),
     }
     write_json(state_path, state)
@@ -237,6 +257,10 @@ def start_background_soak(
     else:
         process_kwargs["start_new_session"] = True
     try:
+        process_kwargs["env"] = {
+            **os.environ,
+            "LOVEENGINE_PILOT_SOAK_RUN_ID": run_id,
+        }
         with (
             stdout_path.open("ab", buffering=0) as stdout,
             stderr_path.open("ab", buffering=0) as stderr,

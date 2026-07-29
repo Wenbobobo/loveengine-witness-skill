@@ -32,6 +32,7 @@ from .pilot_server import METRICS_KEY, RELAY_KEY, create_pilot_app
 from .pilot_snapshot import create_system_snapshot
 from .pilot_transcript import pilot_transcript_hash, verify_pilot_transcript
 from .release_identity import SKILL_VERSION
+from .review_evidence import require_verified_review_result
 from .typed_data import build_register_typed_data
 
 
@@ -522,7 +523,9 @@ async def _run_observation_phase(
 
 
 def _reviews_from_receipts(
-    dispute: dict[str, Any], review_receipts: list[dict[str, Any]]
+    dispute: dict[str, Any],
+    review_receipts: list[dict[str, Any]],
+    tasks: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
     reviews = []
     for receipt in review_receipts:
@@ -542,6 +545,12 @@ def _reviews_from_receipts(
         result = receipt.get("result")
         if not isinstance(result, dict):
             raise LoveEngineError("review_receipt_invalid", task_id or "unknown", 4)
+        task = tasks.get(task_id)
+        if task is None:
+            raise LoveEngineError("review_receipt_invalid", task_id or "unknown", 4)
+        require_verified_review_result(
+            task.get("payload"), result, task_id=task_id or "unknown"
+        )
         verdict = result.get("verdict")
         reason_hash = result.get("reason_hash")
         if not isinstance(verdict, str) or not isinstance(reason_hash, str):
@@ -669,7 +678,11 @@ async def _run_evidence_phase(
         for client_result in review_clients
         for receipt in client_result["receipts"]
     ]
-    reviews = _reviews_from_receipts(dispute, review_receipts)
+    reviews = _reviews_from_receipts(
+        dispute,
+        review_receipts,
+        {task["task_id"]: task for task in observation.tasks},
+    )
     resolved = aggregate_reviews(
         dispute, reviews, expected_nodes=set(environment.node_accounts)
     )

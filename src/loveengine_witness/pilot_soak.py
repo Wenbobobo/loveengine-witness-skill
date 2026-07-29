@@ -358,6 +358,7 @@ def _minimal_failure_report(
     elapsed_seconds: float,
     event_count: int,
     observers: int,
+    run_id: str | None,
     error: BaseException,
 ) -> dict[str, Any]:
     return {
@@ -368,6 +369,7 @@ def _minimal_failure_report(
         "elapsed_seconds": round(elapsed_seconds, 3),
         "event_count": event_count,
         "observer_count": observers,
+        "run_id": run_id,
         "disk_bytes": None,
         "peak_rss_bytes": None,
         "peak_rss_bytes_scope": "root_process_os_peak",
@@ -397,6 +399,7 @@ def run_pilot_soak(
     formal = duration_seconds >= 4 * 3600
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
+    run_id = os.environ.get("LOVEENGINE_PILOT_SOAK_RUN_ID")
     started = time.monotonic()
     sampler = _runtime_tree_metrics(os.getpid())
     try:
@@ -423,6 +426,7 @@ def run_pilot_soak(
             elapsed_seconds=elapsed,
             event_count=event_count,
             observers=observers,
+            run_id=run_id,
             error=error,
         )
         _write_report_best_effort(output, report)
@@ -476,6 +480,7 @@ def run_pilot_soak(
         "elapsed_seconds": round(elapsed, 3),
         "event_count": event_count,
         "observer_count": observers,
+        "run_id": run_id,
         "disk_bytes": disk,
         "peak_rss_bytes": memory["root_process_peak_rss_bytes"],
         "peak_rss_bytes_scope": "root_process_os_peak",

@@ -21,6 +21,19 @@ def _passing_checks() -> dict[str, bool]:
     return {key: True for key in SOAK_SUCCESS_CHECK_KEYS}
 
 
+def _passing_report(started: dict[str, object]) -> dict[str, object]:
+    return {
+        "schema_version": "loveengine.pilot-soak-report/1",
+        "passed": True,
+        "stage": "core",
+        "event_count": 12,
+        "observer_count": 10,
+        "requested_duration_seconds": 60,
+        "run_id": started["run_id"],
+        "checks": _passing_checks(),
+        "failure": None,
+    }
+
 def test_background_soak_writes_queryable_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -55,6 +68,7 @@ def test_background_soak_writes_queryable_state(
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["pid"] == FakeProcess.pid
     assert state["duration_seconds"] == 3600
+    assert state["run_id"] == captured["kwargs"]["env"]["LOVEENGINE_PILOT_SOAK_RUN_ID"]
     assert "token" not in state_path.read_text(encoding="utf-8").lower()
 
     status = background_soak_status(state_path)
@@ -75,16 +89,7 @@ def test_background_soak_status_uses_completed_report(
         event_count=12,
         observers=10,
     )
-    report = {
-        "schema_version": "loveengine.pilot-soak-report/1",
-        "passed": True,
-        "stage": "core",
-        "event_count": 12,
-        "observer_count": 10,
-        "requested_duration_seconds": 60,
-        "checks": _passing_checks(),
-        "failure": None,
-    }
+    report = _passing_report(started)
     (tmp_path / "pilot-soak-report.json").write_text(
         json.dumps(report), encoding="utf-8"
     )
@@ -111,21 +116,10 @@ def test_background_soak_rejects_incomplete_passing_report(
         event_count=12,
         observers=10,
     )
-    checks = _passing_checks()
-    checks["zero_event_loss"] = False
+    report = _passing_report(started)
+    report["checks"]["zero_event_loss"] = False
     (tmp_path / "pilot-soak-report.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "loveengine.pilot-soak-report/1",
-                "passed": True,
-                "stage": "core",
-                "event_count": 12,
-                "observer_count": 10,
-                "requested_duration_seconds": 60,
-                "checks": checks,
-                "failure": None,
-            }
-        ),
+        json.dumps(report),
         encoding="utf-8",
     )
 
@@ -149,19 +143,10 @@ def test_background_soak_rejects_minimal_passing_report(
         event_count=12,
         observers=10,
     )
+    report = _passing_report(started)
+    report["checks"] = {"complete": True}
     (tmp_path / "pilot-soak-report.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "loveengine.pilot-soak-report/1",
-                "passed": True,
-                "stage": "core",
-                "event_count": 12,
-                "observer_count": 10,
-                "requested_duration_seconds": 60,
-                "checks": {"complete": True},
-                "failure": None,
-            }
-        ),
+        json.dumps(report),
         encoding="utf-8",
     )
 
@@ -185,19 +170,10 @@ def test_background_soak_rejects_report_for_a_different_run(
         event_count=12,
         observers=10,
     )
+    report = _passing_report(started)
+    report["stage"] = "governance"
     (tmp_path / "pilot-soak-report.json").write_text(
-        json.dumps(
-            {
-                "schema_version": "loveengine.pilot-soak-report/1",
-                "passed": True,
-                "stage": "governance",
-                "event_count": 12,
-                "observer_count": 10,
-                "requested_duration_seconds": 60,
-                "checks": _passing_checks(),
-                "failure": None,
-            }
-        ),
+        json.dumps(report),
         encoding="utf-8",
     )
 
@@ -206,6 +182,76 @@ def test_background_soak_rejects_report_for_a_different_run(
     assert status["status"] == "failed"
     assert status["failure_reason"] == "soak_report_failed"
     assert status["report_validation_error"] == "stage_mismatch"
+
+
+def test_background_soak_status_requires_matching_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report["run_id"] = "different-run"
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["failure_reason"] == "soak_report_failed"
+    assert status["report_validation_error"] == "run_id_mismatch"
+
+
+def test_background_soak_status_waits_for_child_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process._process_alive", lambda pid: True
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(_passing_report(started)), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "running"
+    assert status["process_alive"] is True
+    assert status["progress_percent"] < 100
+
+
+def test_background_soak_rejects_orphaned_report_before_launch(
+    tmp_path: Path,
+) -> None:
+    report_path = tmp_path / "pilot-soak-report.json"
+    report_path.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(LoveEngineError) as error:
+        start_background_soak(
+            tmp_path,
+            duration_seconds=60,
+            event_count=12,
+            observers=10,
+        )
+
+    assert error.value.code == "pilot_soak_report_exists"
 
 
 def test_background_soak_rejects_second_live_process(
