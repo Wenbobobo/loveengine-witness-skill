@@ -227,12 +227,30 @@ Each command should support machine-readable output. Prefer JSON output by defau
 ### Background soak lifecycle
 
 `--background` returns a state-file path immediately; poll it with `pilot soak-status`.
-`status: passed` is valid only when the final `pilot-soak-report.json` exists and
-passes. A terminal `failure_reason` is intentionally narrow: `launch_failed`,
-`soak_report_failed`, or `process_exited_without_report`. The last value means
-the recorded PID is no longer alive and no final report exists; partial artifacts
-are diagnostic only and must not be treated as a passing soak. It does not claim
-to identify why an external host or supervisor ended the process.
+The `status` field belongs to that lifecycle response. `status: passed` is valid
+only when the final `pilot-soak-report.json` exists with `passed: true` and every
+reported check passes. The lifecycle reader also binds a passing report to its
+schema, stage, event count, observer count, and requested duration; a malformed,
+cross-run, self-contradictory, or incomplete success-check report is terminally
+failed. A terminal
+`failure_reason` is intentionally narrow:
+`launch_failed`, `soak_report_failed`, or `process_exited_without_report`.
+`soak_report_failed` means a final diagnostic report exists; read its stable
+`failure.code` and `checks` to identify the failed gate. The last value means the
+recorded PID is no longer alive and no final report exists; partial artifacts are
+diagnostic only and must not be treated as a passing soak. It does not claim to
+identify why an external host or supervisor ended the process.
+
+For resource evidence, the compatibility field `peak_rss_bytes` is explicitly
+scoped by `peak_rss_bytes_scope: root_process_os_peak`; it is not an entire-lab
+measurement. The nested `memory` object separately records the root process HWM
+and the sampled sum-RSS peak of the CLI process plus its recursive descendants.
+Only `checks.runtime_tree_memory_under_512mb` is the owned-lab 512 MiB sampled
+sum-RSS gate; it also requires a clean sample that observed at least the root
+plus three expected child processes. This is not a physical instantaneous memory
+upper bound: short-lived children may fall between samples. Sampling unavailable,
+failed, under-observed, or over the limit cannot produce a passing report;
+sampling is telemetry, not an OS-enforced resource reservation.
 
 ## Adapter expectations
 

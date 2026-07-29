@@ -67,7 +67,18 @@ async def _read_limited(
     limit: int,
     error_code: str,
 ) -> bytes:
-    body = await response.content.read(limit + 1)
+    # StreamReader.read(n) may return an available buffer before EOF. Keep the
+    # bounded read loop so a valid multi-buffer response is never parsed as a
+    # truncated document.
+    chunks: list[bytes] = []
+    remaining = limit + 1
+    while remaining:
+        chunk = await response.content.read(min(64 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    body = b"".join(chunks)
     if len(body) > limit:
         raise LoveEngineError(error_code, f"response exceeds {limit} bytes")
     return body

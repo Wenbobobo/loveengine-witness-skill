@@ -188,9 +188,25 @@ uv run loveengine pilot soak --stage core --duration-seconds 1800 --events 30 --
 uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 ```
 
-只有最终 `pilot-soak-report.json` 存在且 `status: passed` 才构成通过证据。
-`process_exited_without_report` 只说明记录的 PID 已不存在且未产生最终报告；部分
-artifact 仅供诊断，不能作为成功结果，也不能据此归因外部宿主为何终止了进程。
+只有 `pilot soak-status` 返回 `status: passed`，且最终
+`pilot-soak-report.json` 同时为 `passed: true` 时，才构成通过证据。失败报告仍是
+有效诊断产物：`failure_reason: soak_report_failed` 只是生命周期分类，具体稳定错误码和
+失败门应读取 `report.failure.code` 与 `report.checks`。`process_exited_without_report`
+只说明记录的 PID 已不存在且未产生最终报告；部分 artifact 仅供诊断，不能作为成功结果，
+也不能据此归因外部宿主为何终止了进程。
+
+状态读取器还会把通过报告绑定到固定 schema、stage、事件数、观察者数与请求时长，并要求
+完整的标准成功检查集和所有已报告的 `checks` 都严格为 true。格式错误、跨运行错绑、
+缺少标准 checks 或 `passed:true` 与 checks 矛盾的报告都会返回失败和
+`report_validation_error`，不能作为通过证据。
+
+`peak_rss_bytes` 保留为兼容字段，且由 `peak_rss_bytes_scope` 明确标记为根进程的
+OS 峰值。`memory.root_process_peak_rss_bytes` 也是该局部诊断；完整实验的资源门是
+`memory.runtime_tree_sampled_peak_rss_bytes`，它在运行中采样本次 CLI 及其递归子进程的
+sum-RSS。只有 `checks.runtime_tree_memory_under_512mb` 可表达本次自有 lab 的采样
+sum-RSS 门低于 512 MiB；它还要求一次干净采样至少观察到根进程和三个预期子进程。短生命周期
+进程仍可能落在采样间隔之间，所以这不是物理瞬时内存上界。采样不可用、采样错误、子进程
+观察不足或超限都会使报告不能通过；它不测量共享主机其他任务，也不是操作系统级资源硬限制。
 
 跨平台核心实验入口为：
 

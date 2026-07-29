@@ -12,13 +12,14 @@ from typing import Any
 
 from .errors import LoveEngineError
 from .jsonio import read_json, write_json
-from .pilot_soak import validate_pilot_soak_args
+from .pilot_soak import SOAK_SUCCESS_CHECK_KEYS, validate_pilot_soak_args
 
 
 STATE_FILENAME = "pilot-soak-run.json"
 STDOUT_FILENAME = "pilot-soak.stdout.jsonl"
 STDERR_FILENAME = "pilot-soak.stderr.log"
 REPORT_FILENAME = "pilot-soak-report.json"
+REPORT_SCHEMA_VERSION = "loveengine.pilot-soak-report/1"
 
 
 def _utc_now() -> str:
@@ -66,6 +67,38 @@ def _process_alive(pid: int) -> bool:
     return True
 
 
+def _passed_report_issue(
+    report: dict[str, Any], state: dict[str, Any]
+) -> str | None:
+    """Return a stable reason when a report cannot prove a completed soak."""
+
+    if report.get("schema_version") != REPORT_SCHEMA_VERSION:
+        return "schema_version"
+    if report.get("stage") != state.get("stage"):
+        return "stage_mismatch"
+    if report.get("event_count") != state.get("event_count"):
+        return "event_count_mismatch"
+    if report.get("observer_count") != state.get("observer_count"):
+        return "observer_count_mismatch"
+    requested_duration = report.get("requested_duration_seconds")
+    if (
+        isinstance(requested_duration, bool)
+        or not isinstance(requested_duration, (int, float))
+        or float(requested_duration) != float(state["duration_seconds"])
+    ):
+        return "duration_mismatch"
+    checks = report.get("checks")
+    if not isinstance(checks, dict) or not checks:
+        return "checks_missing"
+    if not SOAK_SUCCESS_CHECK_KEYS.issubset(checks):
+        return "checks_incomplete"
+    if any(value is not True for value in checks.values()):
+        return "checks_not_all_true"
+    if report.get("failure") is not None:
+        return "passed_report_has_failure"
+    return None
+
+
 def background_soak_status(state_path: Path) -> dict[str, Any]:
     state_path = Path(state_path).resolve()
     state = read_json(state_path)
@@ -75,14 +108,29 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         raise LoveEngineError("invalid_soak_state", str(state_path))
     output = Path(str(state["output"])).resolve()
     report_path = output / REPORT_FILENAME
-    report = read_json(report_path) if report_path.is_file() else None
+    report: Any = None
+    report_error: str | None = None
+    if report_path.is_file():
+        try:
+            report = read_json(report_path)
+        except LoveEngineError as error:
+            report_error = error.code
+        if report_error is None and not isinstance(report, dict):
+            report_error = "report_not_object"
     pid = int(state.get("pid") or 0)
     process_alive = _process_alive(pid)
     failure_reason: str | None = None
     if isinstance(report, dict):
-        status = "passed" if report.get("passed") is True else "failed"
+        if report.get("passed") is True:
+            report_error = _passed_report_issue(report, state)
+            status = "passed" if report_error is None else "failed"
+        else:
+            status = "failed"
         if status == "failed":
             failure_reason = "soak_report_failed"
+    elif report_error is not None:
+        status = "failed"
+        failure_reason = "soak_report_failed"
     elif process_alive:
         status = "running"
     else:
@@ -108,6 +156,8 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
     }
     if failure_reason is not None:
         result["failure_reason"] = failure_reason
+    if report_error is not None:
+        result["report_validation_error"] = report_error
     return result
 
 

@@ -521,6 +521,50 @@ async def _run_observation_phase(
     )
 
 
+def _reviews_from_receipts(
+    dispute: dict[str, Any], review_receipts: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    reviews = []
+    for receipt in review_receipts:
+        task_id = str(receipt.get("task_id", ""))
+        if receipt.get("status") != "completed":
+            result = receipt.get("result")
+            error_code = (
+                result.get("error_code", "unknown")
+                if isinstance(result, dict)
+                else "unknown"
+            )
+            raise LoveEngineError(
+                "review_receipt_rejected",
+                f"{task_id or 'unknown'}:{error_code}",
+                4,
+            )
+        result = receipt.get("result")
+        if not isinstance(result, dict):
+            raise LoveEngineError("review_receipt_invalid", task_id or "unknown", 4)
+        verdict = result.get("verdict")
+        reason_hash = result.get("reason_hash")
+        if not isinstance(verdict, str) or not isinstance(reason_hash, str):
+            raise LoveEngineError("review_receipt_invalid", task_id or "unknown", 4)
+        try:
+            reviews.append(
+                build_review(
+                    receipt["task_id"],
+                    dispute,
+                    receipt["node"],
+                    verdict,
+                    reason_hash,
+                    receipt["completed_at"],
+                    receipt["signature"],
+                )
+            )
+        except (KeyError, TypeError) as exc:
+            raise LoveEngineError(
+                "review_receipt_invalid", task_id or "unknown", 4
+            ) from exc
+    return reviews
+
+
 async def _run_evidence_phase(
     environment: PilotEnvironment,
     observation: ObservationPhase,
@@ -625,18 +669,7 @@ async def _run_evidence_phase(
         for client_result in review_clients
         for receipt in client_result["receipts"]
     ]
-    reviews = [
-        build_review(
-            receipt["task_id"],
-            dispute,
-            receipt["node"],
-            receipt["result"]["verdict"],
-            receipt["result"]["reason_hash"],
-            receipt["completed_at"],
-            receipt["signature"],
-        )
-        for receipt in review_receipts
-    ]
+    reviews = _reviews_from_receipts(dispute, review_receipts)
     resolved = aggregate_reviews(
         dispute, reviews, expected_nodes=set(environment.node_accounts)
     )

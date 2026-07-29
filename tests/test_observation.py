@@ -15,6 +15,7 @@ from loveengine_witness.m4_network import build_receipt_v2
 from loveengine_witness.m4_typed_data import build_receipt_v2_typed_data
 from loveengine_witness.observation import (
     ObservationCursorStore,
+    _read_limited,
     aggregate_observations,
     observation_timeout_seconds,
     observe_live_session,
@@ -23,6 +24,26 @@ from loveengine_witness.observation import (
 
 
 REGISTRY = "0x00000000000000000000000000000000000000aa"
+
+
+def test_limited_reader_consumes_a_complete_multi_buffer_response() -> None:
+    class ChunkedContent:
+        def __init__(self) -> None:
+            self.chunks = [b"a" * 65_536, b"b" * 65_536, b"c" * 17]
+
+        async def read(self, _: int) -> bytes:
+            return self.chunks.pop(0) if self.chunks else b""
+
+    class Response:
+        content = ChunkedContent()
+
+    body = asyncio.run(
+        _read_limited(
+            Response(), limit=200_000, error_code="response_too_large"
+        )
+    )
+
+    assert body == b"a" * 65_536 + b"b" * 65_536 + b"c" * 17
 
 
 def _signed_receipt(account: object, node_index: int) -> dict:
