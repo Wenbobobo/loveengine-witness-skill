@@ -843,6 +843,27 @@ def test_safe_tree_walk_checks_skipped_git_directory_before_ignoring_contents(
     assert error.value.code == "contract_path_symlink"
 
 
+def test_dependency_inventory_uses_posix_relative_path_order(tmp_path: Path) -> None:
+    root = tmp_path / "dependency"
+    upper = root / "README.md"
+    lower = root / "foundry.toml"
+    root.mkdir()
+    upper.write_text("upper\n", encoding="utf-8")
+    lower.write_text("lower\n", encoding="utf-8")
+
+    inventory = toolchain._inventory(
+        root,
+        [lower, upper],
+        error_code="fixture_error",
+        detail="dependency",
+    )
+
+    assert [entry["path"] for entry in inventory["files"]] == [
+        "README.md",
+        "foundry.toml",
+    ]
+
+
 def test_prepare_accepts_lock_matching_dependency_text_without_rewriting_it(
     tmp_path: Path,
 ) -> None:

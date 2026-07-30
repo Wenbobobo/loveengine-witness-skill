@@ -267,7 +267,7 @@
     "tools/refresh_manifests.py": "sha256:3a47a82bc49caa91c980e3031e4663d8e91443f824a216c541e86b848054b02a",
     "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md": "sha256:096b6f171d15810ab585daddf6f532e012de216155f96d2e850133922e9f83d5",
     "LICENSE": "sha256:a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
-    "docs/api/cli-reference.md": "sha256:764d4a7bf44511b4ee645e38da66705506c310681b8fd65abd5294185f326d19",
+    "docs/api/cli-reference.md": "sha256:dec4c7c645d673a553449287f31f6ede6484660990fddfc84cf0797a9886373e",
     "docs/reference/licenses/scc0-provenance.md": "sha256:ab012520122b39e694fdaab3f214532e89f7015a698993b854b325bc9bd83007",
     "src/loveengine_witness/pilot_soak_process.py": "sha256:a9429295efbf6a078bd4d6ad5677eb6e6e666cc35757e4c37873051b7422b10b",
     "src/loveengine_witness/ui_fixture.py": "sha256:bf9b3679f73fdf6b312d05eae63fd3dc1eb9a99ff65c96b13d38093e567fb801",
@@ -292,7 +292,7 @@
     "schemas/pilot-transcript-v2.schema.json": "sha256:b576fda40f40c76f862610ca49c88602639825a9c1f79dbdf3f5768f85cc34f2",
     "schemas/pilot-snapshot-v1.schema.json": "sha256:ff43ce35e0d5f2519df8083c0c4b09cbf01cf7cd001f4cc54a7cac36bcb11a64",
     "schemas/pilot-snapshot-checksums-v1.schema.json": "sha256:98f2291e79255bc9a8be2a1ae9ea1694a29655f61a88fe1f22907655a47e4dfc",
-    "README.md": "sha256:a4a888c379dfc25c1c7ddcbafeee6cc4ba3e6e183780ab8e2b1e3d411239610e",
+    "README.md": "sha256:8e26478c98047e020432bc70d76628c10cc3e844d12c836324da489a6c313046",
     "AGENTS.md": "sha256:ad783a1fa04a3809f1836dbb90a391774850a6b263633d11563c9169d9344509",
     "CONTRIBUTING.md": "sha256:f4214be2e7366192d1db0262af538aaab6b88ab116083a956676f21f986afda3",
     "docs/README.md": "sha256:4d5adade856dbd0c77823d30115c0a3ff00065ddb0a9000c251500b33765b757",
@@ -307,7 +307,7 @@
     "tools/loveengine_m0_self_check.py": "sha256:060f39dd3dd8e17cb677baf953b73b80d7c233e7bf20a9ae5a4374209e4d6aa4",
     "tools/validate_sources.py": "sha256:b4820c6096009ab57e4e8fe6c3a141be62f04cbeb3c4a68fbb6f9a809dc65442",
     "examples/transcripts/network-pilot.fixture.json": "sha256:c7fcf441aaa7cc642cee8c55d905f121e345e79e4cb8daf61808ded1c4dba331",
-    "README.zh-CN.md": "sha256:37165926d38847b06d7601bd2d02557165ef9168ea3160a7e8df3fd3fdc53322",
+    "README.zh-CN.md": "sha256:e5e550db73fe01f6bfbfb1c28480e5ed112b014896784fdf6083cfc6b37391c8",
     "examples/transcripts/live-review.fixture.json": "sha256:5026f7b01839d0e64e67da925c56a8325bef0d0d507ddd0a9818143590ea9648",
     "docs/kb/sources.json": "sha256:c636984fa572b03f8be1796c63903ab12f13c9c7a6fef8d321f690e4746c4db2",
     "src/loveengine_witness/pilot_config.py": "sha256:c6d0906bbc53128e5a286096a9a71974a2c018e8dfc2c53e6a535bc1337f12f7",
@@ -322,7 +322,7 @@
     "src/loveengine_witness/pilot_phases.py": "sha256:072dd2767418ad4616fc80e60fc63e8a25cd56c57e7d4fa6ff4176e0dd135761",
     "QA.md": "sha256:0f96d03f57e63fa050c6625f026547b471eaa765accbe6c22fce5590e9c2a8af",
     "docs/archive/specs/implemented/love-engine-witness-core-optimization.md": "sha256:382210a5740d5f77d8dbfb24010d919d55265f2905d3f6da226a5bad6510471d",
-    "docs/architecture/witness-core-and-data-flow.zh-CN.md": "sha256:19e41b5c42216fc7dae790dbfa71dd817ac96870b51da4fe146b161f5d4b812e",
+    "docs/architecture/witness-core-and-data-flow.zh-CN.md": "sha256:ca0d400b9b73e94a6afb7f1a3718a14d024934a90d38540a06306015c821ec1d",
     "schemas/witness-core-transcript-v1.schema.json": "sha256:89b956facc1243192f314c841be36f71fb33e6d348c0e2d363ffbc03839e66cd",
     "schemas/node-trust-policy-v1.schema.json": "sha256:2db8489247f17db97b55776771f6754cbe4ccee84277b265c09c67418f184bad",
     "src/loveengine_witness/core_transcript.py": "sha256:31e15072a3f1f369fc5cbdbde8cfa609f120aca23bd846440d65c1324417244f",
@@ -341,8 +341,8 @@
     "schemas/review-dispute-payload-v1.schema.json": "sha256:58d13f59661cfc15a99db853cbd63edbb1316e5c89e4cc1209cce48e5d81c667",
     "tools/start_shared_core.py": "sha256:39df3dcb5deccd42e06d9969a7633c4c7ce96c7e4275f0be881a93771f200670",
     "src/loveengine_witness/secrets.py": "sha256:1ab9c8a751c9c6e916aeb8a104837ae7b29d9761c02ff2e9a8c8f872c8561a35",
-    "contracts/dependency-lock.json": "sha256:0ba0c1158e3a89aa781b063b1143fac66cbcae9d4dd28ea416e721ff64cdb962",
-    "src/loveengine_witness/toolchain.py": "sha256:2ffcf4700b8e324e7374a744532500c6993cdd031817de7c771e4024569816ae"
+    "contracts/dependency-lock.json": "sha256:e6a8691ef641d09b59961a3158f44199110715cc6f741aea0b29ea4ec4927e49",
+    "src/loveengine_witness/toolchain.py": "sha256:34b4668b76adf256829f592397ada5a40bed8207147ab439622b86df4bf0fb1f"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -436,7 +436,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:d34c048ad1b552b1b3891b075d0c09bc27c2bcbd79e69bb6912666c8c18c7b85",
+  "package_hash": "sha256:3a086ce350e9ad840f9b2674416452b416fc57905b75547ddf8db08448e4fb5e",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

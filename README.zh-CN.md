@@ -69,7 +69,8 @@ uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --outpu
 核验路径、URL 和 gitlink，再初始化每个 direct submodule，出现更深层声明则失败关闭，
 随后核验最终锁定树摘要；已有目录若与锁定树摘要不符则默认失败关闭，只有显式执行
 `pilot contracts prepare --refresh-dependencies` 才会在 staging 中完成核验后切换该受管
-目录。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，只写入被忽略的
+目录。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并按区分大小写的 POSIX
+相对路径排序依赖记录，只写入被忽略的
 `contracts/lib`、`contracts/out` 和 `contracts/cache` 工作产物。
 `package build`、`quickstart`、`lan-pilot` 和 `pilot soak` 在产物缺失或 attestation
 失配时会明确失败；它们不会在计时实验中隐式编译或下载依赖。

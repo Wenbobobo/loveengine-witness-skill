@@ -693,7 +693,10 @@ def _inventory(
 ) -> dict[str, Any]:
     files: list[dict[str, Any]] = []
     raw_files: list[dict[str, Any]] = []
-    for path in sorted(paths):
+    # Path ordering is host-dependent around case.  The lock is exchanged
+    # between Windows and Linux, so sort its records by the archive-style,
+    # case-sensitive POSIX relative path rather than by Path itself.
+    for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix()):
         if _is_link_or_reparse_point(path) or not path.is_file():
             raise LoveEngineError(error_code, detail, 3)
         raw_contents, contents = _stable_file_bytes(

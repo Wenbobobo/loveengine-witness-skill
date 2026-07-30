@@ -26,7 +26,8 @@ commit 的公开合约依赖；其版本化 submodule 图会先核验路径、UR
 `pilot contracts prepare --refresh-dependencies` 才会在 staging 中重新取得固定提交、
 核验完整树后切换受管目录。随后执行 `forge build --threads 1`。成功 JSON 记录
 toolchain、合约源码、依赖树、attestation 和五份部署 artifact 的摘要；不会记录 tool
-output。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并写入忽略的
+output。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并按区分大小写的 POSIX
+相对路径排序依赖记录，再写入忽略的
 `contracts/lib`、`contracts/out`、`contracts/cache`。真实 package、
 quickstart、demo、chain init 和 soak 都要求这些已经验证且仍匹配 attestation 的 artifact；
 它们不会在主流程中隐式编译或下载。dry-run 不需要该前置步骤。

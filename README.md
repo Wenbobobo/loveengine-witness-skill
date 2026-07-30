@@ -80,7 +80,8 @@ then checked. A present but mismatching tree fails closed until an operator
 explicitly runs
 `pilot contracts prepare --refresh-dependencies`. That refresh stages and
 verifies the replacement before switching the named managed directory. The
-command canonicalizes managed UTF-8 dependency text to LF before compiling and
+command canonicalizes managed UTF-8 dependency text to LF before compiling,
+orders dependency records by case-sensitive POSIX relative path, and
 writes only ignored `contracts/lib`, `contracts/out`, and
 `contracts/cache` work products. `package build`, `quickstart`, `lan-pilot`,
 and `pilot soak` deliberately fail
