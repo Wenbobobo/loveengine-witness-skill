@@ -291,7 +291,14 @@ def build_package(root: Path, output: Path) -> PackageBuildResult:
     root = Path(root).resolve()
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    files = dict(_runtime_files(root))
+    # Manifest source hashes already define repository text in canonical LF
+    # form. Archive bytes must use that same representation, otherwise a
+    # Windows CRLF checkout and an LF checkout produce different release
+    # hashes for identical source content.
+    files = {
+        name: _source_bytes(name, data)
+        for name, data in _runtime_files(root)
+    }
     manifest = json.loads(files["skills/loveengine-witness/skill-manifest.json"])
     if manifest.get("version") != SKILL_VERSION or manifest.get(
         "protocol"

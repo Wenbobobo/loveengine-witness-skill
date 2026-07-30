@@ -167,7 +167,8 @@ Forge/Anvil `1.7.1`、版本化 dependency lock、受控 Foundry profile/remappi
 `contracts/cache/loveengine-contract-preparation.json` 保存本地 attestation；package、
 quickstart、demo、chain init 与 soak 会重新计算它，因此不在执行过程中隐式编译。这样
 计时实验的资源指标不混入下载/编译副作用。prepare 会先把受管依赖中 UTF-8 文本规范化为
-LF，避免宿主 Git 行尾策略进入编译 metadata；缺产物或 attestation 失配时也会明确 fail
+LF，避免宿主 Git 行尾策略进入编译 metadata；package build 也会以同一 LF 表示写入所有
+文本 archive 条目，避免等价 CRLF checkout 产生不同 release hash；缺产物或 attestation 失配时也会明确 fail
 closed。该本地 attestation 只能发现未经重新准备的后续改动，不单独证明上游源码来源；
 发布信任仍来自包、Registry 与外部 policy。
 

@@ -121,6 +121,30 @@ def test_deterministic_package_build_verify_install_and_self_check(
 
 
 @pytest.mark.integration
+def test_package_build_normalizes_text_line_endings_before_archiving(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first = build_package(ROOT, tmp_path / "first")
+    original_runtime_files = package_module._runtime_files
+
+    def runtime_files_with_crlf(root: Path):
+        for name, data in original_runtime_files(root):
+            if name == "README.md":
+                canonical = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+                yield name, canonical.replace(b"\n", b"\r\n")
+            else:
+                yield name, data
+
+    monkeypatch.setattr(package_module, "_runtime_files", runtime_files_with_crlf)
+    second = build_package(ROOT, tmp_path / "second")
+
+    assert first.archive.read_bytes() == second.archive.read_bytes()
+    with zipfile.ZipFile(second.archive) as archive:
+        assert b"\r" not in archive.read("README.md")
+
+
+@pytest.mark.integration
 def test_package_verify_rejects_tampering_and_unsafe_paths(tmp_path: Path) -> None:
     result = build_package(ROOT, tmp_path / "release")
     tampered = tmp_path / "tampered.zip"
