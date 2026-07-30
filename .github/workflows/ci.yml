@@ -34,7 +34,7 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Prepare pinned contract artifacts
-        run: uv run loveengine pilot contracts prepare
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Contract tests
         working-directory: contracts
         run: forge test
@@ -54,7 +54,7 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Prepare pinned contract artifacts
-        run: uv run loveengine pilot contracts prepare
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Three-node network integration
         run: uv run pytest tests/integration/test_network_demo.py
 
@@ -71,7 +71,7 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Prepare pinned contract artifacts
-        run: uv run loveengine pilot contracts prepare
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Live evidence integration
         run: uv run pytest tests/integration/test_live_evidence_demo.py
 
@@ -88,7 +88,7 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Prepare pinned contract artifacts
-        run: uv run loveengine pilot contracts prepare
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Build twice and verify deterministic package
         id: package
         shell: bash
@@ -149,7 +149,7 @@ jobs:
       - name: Sync
         run: uv sync --frozen
       - name: Prepare pinned contract artifacts
-        run: uv run loveengine pilot contracts prepare
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Persistent chain integration
         run: uv run pytest tests/integration/test_pilot_chain.py
       - name: Unified package-to-PublicSink E2E
