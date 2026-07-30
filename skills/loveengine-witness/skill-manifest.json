@@ -256,7 +256,7 @@
     "schemas/pilot-transcript-v1.schema.json": "sha256:546c34cf5e1c232e1fe683ee9e092a72fe3eb0bae8f6aad9aaa4738a71786343",
     "src/loveengine_witness/package.py": "sha256:53e1d5ab411cfdf00ad3d32c7722aff3314f6c86cead322b2534f6b66a65fb85",
     "src/loveengine_witness/pilot_server.py": "sha256:af87b1f875f36d2f3289fc412d095126451ac0aa284741b2873fd6046318669e",
-    "src/loveengine_witness/observation.py": "sha256:8de91c73cc2484d7969e42de27b4715de8e7f55f3f642db6a9bf5921423ac0da",
+    "src/loveengine_witness/observation.py": "sha256:fa52776cb1237cd6135531d391a28c35087855b5b41c97d4a2a1abe69d2eb5b5",
     "src/loveengine_witness/live_observation_node.py": "sha256:113491277b42d1b7d1a8a1d3b7320d67c1c8aa97fd13a7b104a297029515dfd1",
     "src/loveengine_witness/pilot_chain.py": "sha256:f24c9e5401edc2de53a737a87062c28b3cebddf41351edda2fa8750593903c7e",
     "src/loveengine_witness/witness_vote.py": "sha256:cc02d791a247f76f28ba3e5e4b8a1482d9cbbce73a4c5ea669d6e6dca33673e7",
@@ -322,7 +322,7 @@
     "src/loveengine_witness/pilot_phases.py": "sha256:072dd2767418ad4616fc80e60fc63e8a25cd56c57e7d4fa6ff4176e0dd135761",
     "QA.md": "sha256:0f96d03f57e63fa050c6625f026547b471eaa765accbe6c22fce5590e9c2a8af",
     "docs/archive/specs/implemented/love-engine-witness-core-optimization.md": "sha256:382210a5740d5f77d8dbfb24010d919d55265f2905d3f6da226a5bad6510471d",
-    "docs/architecture/witness-core-and-data-flow.zh-CN.md": "sha256:ca0d400b9b73e94a6afb7f1a3718a14d024934a90d38540a06306015c821ec1d",
+    "docs/architecture/witness-core-and-data-flow.zh-CN.md": "sha256:4dd34eac014c1860030156f652ba88b6f4167b9bc7c16be16d939ca5f6cf252e",
     "schemas/witness-core-transcript-v1.schema.json": "sha256:89b956facc1243192f314c841be36f71fb33e6d348c0e2d363ffbc03839e66cd",
     "schemas/node-trust-policy-v1.schema.json": "sha256:2db8489247f17db97b55776771f6754cbe4ccee84277b265c09c67418f184bad",
     "src/loveengine_witness/core_transcript.py": "sha256:31e15072a3f1f369fc5cbdbde8cfa609f120aca23bd846440d65c1324417244f",
@@ -436,7 +436,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:3a086ce350e9ad840f9b2674416452b416fc57905b75547ddf8db08448e4fb5e",
+  "package_hash": "sha256:df832d28f9b2e347e6c91dd27aa8867fdf243c92083b63bed3646edbce880252",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

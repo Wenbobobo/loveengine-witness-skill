@@ -10,7 +10,7 @@ from eth_account.messages import encode_typed_data
 
 from loveengine_witness import observation as observation_module
 from loveengine_witness.errors import LoveEngineError
-from loveengine_witness.live_gateway import create_live_app
+from loveengine_witness.live_gateway import METADATA_KEY, create_live_app
 from loveengine_witness.m4_network import build_receipt_v2
 from loveengine_witness.m4_typed_data import build_receipt_v2_typed_data
 from loveengine_witness.observation import (
@@ -172,6 +172,18 @@ def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
             assert finalized.status == 200
 
             base = str(client.make_url("")).rstrip("/")
+            metadata = app[METADATA_KEY]
+            list_events = metadata.list_events
+            stream_cursors: list[int] = []
+
+            def stale_first_snapshot(
+                stream_session_id: str, after_sequence: int = 0
+            ) -> list[dict]:
+                stream_cursors.append(after_sequence)
+                events = list_events(stream_session_id, after_sequence)
+                return events[:1] if stream_cursors == [0] else events
+
+            monkeypatch.setattr(metadata, "list_events", stale_first_snapshot)
             payload = {
                 "schema_version": "loveengine.observe-live-text-payload/1",
                 "session_id": session_id,
@@ -191,6 +203,7 @@ def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
             assert first["event_count"] == "2"
             assert first["artifact_count"] == "2"
             assert first["recovered_from_cursor"] is False
+            assert stream_cursors[:2] == [0, 1]
 
             second = await observe_live_session(
                 payload,
@@ -234,6 +247,66 @@ def test_observer_reads_sse_validates_artifacts_and_resumes_cursor(
                     allowed_origin=base,
                 )
             assert error.value.code == "observation_event_limit_exceeded"
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
+def test_observer_rejects_cursor_ahead_of_closed_session(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_live_app(tmp_path / "live.sqlite", tmp_path / "artifacts")
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            session_id = "session-1"
+            created = await client.post(
+                "/v1/live/sessions",
+                json={
+                    "session_id": session_id,
+                    "source_type": "operator",
+                    "created_at": "1770000000",
+                },
+            )
+            assert created.status == 201
+            event = await client.post(
+                f"/v1/live/sessions/{session_id}/events",
+                json={
+                    "event_id": "event-1",
+                    "occurred_at": "1770000001",
+                    "category": "source",
+                    "source_type": "operator",
+                    "content": "first",
+                },
+            )
+            assert event.status == 202
+            closed = await client.post(
+                f"/v1/live/sessions/{session_id}/close",
+                json={"closed_at": "1770000010"},
+            )
+            assert closed.status == 200
+
+            base = str(client.make_url("")).rstrip("/")
+            payload = {
+                "schema_version": "loveengine.observe-live-text-payload/1",
+                "session_id": session_id,
+                "stream_url": f"{base}/v1/live/sessions/{session_id}/stream",
+                "session_url": f"{base}/v1/live/sessions/{session_id}",
+                "artifact_base_url": f"{base}/v1/live/artifacts",
+                "start_cursor": "0",
+                "initial_head_hash": "0x" + "00" * 32,
+            }
+            cursor = ObservationCursorStore(tmp_path / "cursor.sqlite")
+            cursor.save("node-1", session_id, 2, "0x" + "11" * 32, 2)
+
+            with pytest.raises(LoveEngineError) as error:
+                await observe_live_session(
+                    payload,
+                    cursor,
+                    "node-1",
+                    allowed_origin=base,
+                )
+            assert error.value.code == "sequence_gap"
         finally:
             await client.close()
 

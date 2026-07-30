@@ -288,10 +288,17 @@ async def observe_live_session(
                                 error_code="session_response_too_large",
                             )
                         ).decode("utf-8")
-                    )
+                )
                 validate_schema(state, "live-session-v1.schema.json")
                 if state["status"] == "closed":
-                    if int(state["next_sequence"]) - 1 != cursor:
+                    terminal_sequence = int(state["next_sequence"]) - 1
+                    if cursor < terminal_sequence:
+                        # An SSE response is a point-in-time snapshot.  A close
+                        # observed immediately afterwards can legitimately expose
+                        # an immutable suffix that this cursor must replay.
+                        await asyncio.sleep(poll_interval)
+                        continue
+                    if cursor != terminal_sequence:
                         raise LoveEngineError("sequence_gap", state["next_sequence"])
                     if state["head_event_hash"].lower() != head.lower():
                         raise LoveEngineError("hash_chain_broken", session_id)

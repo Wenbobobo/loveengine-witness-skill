@@ -205,6 +205,8 @@ closed。该本地 attestation 只能发现未经重新准备的后续改动，�
   发回前把 signed receipt 落入本地 SQLite journal。
 - 接收 ACK 延迟和任务完成延迟分别记录；长观察任务期间继续处理 heartbeat。
 - observation cursor 持久化，SSE 重连携带 Last-Event-ID 或 after。
+- 已关闭 session 的 terminal sequence 高于本地 cursor 时，观察节点会从 SSE 重放不可变尾部；
+  只有 cursor 超前、事件序号错误或补齐后的 head 不一致才拒绝。
 - receipt 必须属于当前鉴权连接和该节点已接受的 pending task；伪造、错绑或重复
   receipt 均拒绝。
 - Relay 保存 receipt 后返回 ACK，节点再回 receipt confirmation。若第一份 ACK
