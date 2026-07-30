@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import shutil
+import stat
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.canonical import canonical_json_bytes
 from loveengine_witness.toolchain import (
     CONTRACT_DEPENDENCIES,
+    CONTRACT_DEPENDENCY_SUBMODULES,
     DEPENDENCY_LOCK_FILENAME,
     PREPARATION_ATTESTATION_FILENAME,
     REQUIRED_CONTRACT_ARTIFACTS,
@@ -56,6 +59,10 @@ def _write_dependency(contracts: Path, name: str) -> None:
     root = contracts / "lib" / name
     root.mkdir(parents=True, exist_ok=True)
     (root / "LICENSE").write_text(name + "\n", encoding="utf-8")
+    if CONTRACT_DEPENDENCY_SUBMODULES[name]:
+        (root / ".gitmodules").write_bytes(
+            toolchain._expected_submodule_config_bytes(name)
+        )
     source = root / "src" / "Fixture.sol"
     source.parent.mkdir(parents=True, exist_ok=True)
     source.write_text(
@@ -115,6 +122,52 @@ def _binaries(tmp_path: Path) -> dict[str, Path]:
     return binaries
 
 
+def _simulate_dependency_git_checkout(
+    command: list[str], cwd: Path
+) -> subprocess.CompletedProcess[str] | None:
+    """Create a locked fixture tree when the controlled Git checkout completes."""
+
+    if command[0] != "git":
+        return None
+    if command[1:3] == ["init", "--quiet"]:
+        assert len(command) == 4
+        target = Path(command[3])
+        target.mkdir(parents=True)
+        (target / ".git").mkdir()
+    elif command[1:] == ["checkout", "--detach", "--force", "FETCH_HEAD"]:
+        _write_dependency(cwd.parents[1], cwd.name)
+        submodules = CONTRACT_DEPENDENCY_SUBMODULES[cwd.name]
+        if submodules:
+            (cwd / ".gitmodules").write_bytes(
+                toolchain._expected_submodule_config_bytes(cwd.name)
+            )
+    elif command[1:3] == ["ls-tree", "HEAD"]:
+        path = command[-1]
+        submodule = next(
+            item
+            for item in CONTRACT_DEPENDENCY_SUBMODULES[cwd.name]
+            if item["path"] == path
+        )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=f"160000 commit {submodule['commit']}\t{path}\n",
+        )
+    elif command[1:3] == ["submodule", "update"]:
+        nested = cwd / command[-1]
+        nested.mkdir(parents=True)
+        # Git worktrees use pointer files for initialized nested submodules.
+        (nested / ".git").write_text("gitdir: ../.git/modules/fixture\n", encoding="utf-8")
+    elif command[1:] == ["rev-parse", "HEAD"]:
+        commit = next(
+            dependency["commit"]
+            for dependency in CONTRACT_DEPENDENCIES
+            if dependency["name"] == cwd.name
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=commit + "\n")
+    return subprocess.CompletedProcess(command, 0, stdout="ok\n")
+
+
 def _prepare_fixture(tmp_path: Path) -> Path:
     contracts = _write_contract_project(tmp_path)
     for dependency in CONTRACT_DEPENDENCIES:
@@ -152,8 +205,11 @@ def test_prepare_contracts_installs_only_missing_dependencies_and_builds_once(
     calls: list[list[str]] = []
 
     def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-        assert cwd == contracts
         calls.append(command)
+        git_result = _simulate_dependency_git_checkout(command, cwd)
+        if git_result is not None:
+            return git_result
+        assert cwd == contracts
         if command[1:] == ["--version"]:
             name = Path(command[0]).name
             return subprocess.CompletedProcess(
@@ -161,11 +217,6 @@ def test_prepare_contracts_installs_only_missing_dependencies_and_builds_once(
                 0,
                 stdout=f"{name} Version: 1.7.1\nCommit SHA: fixture\n",
             )
-        if command[1] == "install":
-            package = command[2]
-            if package.startswith("OpenZeppelin/openzeppelin-contracts@"):
-                _write_dependency(contracts, "openzeppelin-contracts")
-            return subprocess.CompletedProcess(command, 0, stdout="installed\n")
         assert command[1:] == ["build", "--force", "--threads", "1"]
         _write_artifacts(contracts)
         return subprocess.CompletedProcess(command, 0, stdout="built\n")
@@ -180,11 +231,61 @@ def test_prepare_contracts_installs_only_missing_dependencies_and_builds_once(
         [str(binaries["forge"]), "--version"],
         [str(binaries["anvil"]), "--version"],
         [
-            str(binaries["forge"]),
-            "install",
-            "OpenZeppelin/openzeppelin-contracts@rev="
-            + CONTRACT_DEPENDENCIES[1]["commit"],
-            "--no-git",
+            "git",
+            "init",
+            "--quiet",
+            str(contracts / "lib" / "openzeppelin-contracts"),
+        ],
+        [
+            "git",
+            "remote",
+            "add",
+            "origin",
+            CONTRACT_DEPENDENCIES[1]["repository_url"],
+        ],
+        [
+            "git",
+            "fetch",
+            "--depth",
+            "1",
+            "--no-tags",
+            "origin",
+            CONTRACT_DEPENDENCIES[1]["commit"],
+        ],
+        ["git", "checkout", "--detach", "--force", "FETCH_HEAD"],
+        ["git", "rev-parse", "HEAD"],
+        ["git", "ls-tree", "HEAD", "--", "lib/forge-std"],
+        ["git", "ls-tree", "HEAD", "--", "lib/erc4626-tests"],
+        ["git", "ls-tree", "HEAD", "--", "lib/halmos-cheatcodes"],
+        [
+            "git",
+            "submodule",
+            "update",
+            "--init",
+            "--depth",
+            "1",
+            "--",
+            "lib/forge-std",
+        ],
+        [
+            "git",
+            "submodule",
+            "update",
+            "--init",
+            "--depth",
+            "1",
+            "--",
+            "lib/erc4626-tests",
+        ],
+        [
+            "git",
+            "submodule",
+            "update",
+            "--init",
+            "--depth",
+            "1",
+            "--",
+            "lib/halmos-cheatcodes",
         ],
         [str(binaries["forge"]), "build", "--force", "--threads", "1"],
     ]
@@ -196,6 +297,250 @@ def test_prepare_contracts_installs_only_missing_dependencies_and_builds_once(
     assert result["contract_source_sha256"].startswith("sha256:")
     assert result["artifacts"]["count"] == len(REQUIRED_CONTRACT_ARTIFACTS)
     assert result["artifacts"]["inventory_sha256"].startswith("sha256:")
+    assert not list((contracts / "lib" / "openzeppelin-contracts").rglob(".git"))
+
+
+def test_prepare_contracts_rejects_unexpected_git_head_and_cleans_partial_tree(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    for dependency in CONTRACT_DEPENDENCIES:
+        _write_dependency(contracts, dependency["name"])
+    _write_dependency_lock(contracts)
+    shutil.rmtree(contracts / "lib" / "openzeppelin-contracts")
+    binaries = _binaries(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if command[0] == "git" and command[1:] == ["rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="0000000000000000000000000000000000000000 raw-tool-secret\n",
+            )
+        git_result = _simulate_dependency_git_checkout(command, cwd)
+        if git_result is not None:
+            return git_result
+        if command[1:] == ["--version"]:
+            name = Path(command[0]).name
+            return subprocess.CompletedProcess(
+                command, 0, stdout=f"{name} Version: 1.7.1\n"
+            )
+        pytest.fail("Forge must not build after a wrong dependency HEAD")
+
+    with pytest.raises(LoveEngineError) as error:
+        prepare_contracts(
+            contracts,
+            binary_lookup=binaries.__getitem__,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert "raw-tool-secret" not in error.value.message
+    assert not (contracts / "lib" / "openzeppelin-contracts").exists()
+    assert all(command[1:] != ["build", "--force", "--threads", "1"] for command in calls)
+
+
+def test_dependency_checkout_rejects_unconfigured_source_before_invoking_git(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    calls: list[list[str]] = []
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency={
+                "name": "forge-std",
+                "package": "attacker/forge-std",
+                "commit": CONTRACT_DEPENDENCIES[0]["commit"],
+            },
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=lambda command, cwd: (
+                calls.append(command)
+                or subprocess.CompletedProcess(command, 0, stdout="unexpected\n")
+            ),
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert calls == []
+
+
+def test_git_checkout_environment_removes_host_git_controls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in (
+        "GIT_EXEC_PATH",
+        "git_replace_ref_base",
+        "GIT_NAMESPACE",
+        "GIT_ATTR_SOURCE",
+        "GIT_SSL_NO_VERIFY",
+        "GIT_TRACE_PACKET",
+        "SSH_ASKPASS",
+        "SSH_ASKPASS_REQUIRE",
+    ):
+        monkeypatch.setenv(key, "host-controlled")
+
+    environment = toolchain._git_checkout_environment()
+    lowered = {key.casefold(): value for key, value in environment.items()}
+
+    for key in (
+        "git_exec_path",
+        "git_replace_ref_base",
+        "git_namespace",
+        "git_attr_source",
+        "git_ssl_no_verify",
+        "git_trace_packet",
+        "ssh_askpass",
+        "ssh_askpass_require",
+    ):
+        assert key not in lowered
+    assert lowered["git_allow_protocol"] == "https"
+    assert lowered["git_terminal_prompt"] == "0"
+
+
+def test_dependency_checkout_rejects_unapproved_submodule_config_before_update(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        result = _simulate_dependency_git_checkout(command, cwd)
+        if result is not None:
+            if command[1:] == ["checkout", "--detach", "--force", "FETCH_HEAD"]:
+                (cwd / ".gitmodules").write_text(
+                    '[submodule "attacker"]\n\tpath = lib/attacker\n'
+                    "\turl = https://attacker.invalid/repository.git\n",
+                    encoding="utf-8",
+                )
+            return result
+        pytest.fail(f"unexpected non-Git command: {command}")
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency=CONTRACT_DEPENDENCIES[1],
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert not any(command[1:3] == ["ls-tree", "HEAD"] for command in calls)
+    assert not any(command[1:3] == ["submodule", "update"] for command in calls)
+    assert not (contracts / "lib" / "openzeppelin-contracts").exists()
+
+
+def test_dependency_checkout_rejects_wrong_submodule_gitlink_before_update(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if command[1:3] == ["ls-tree", "HEAD"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=f"160000 commit {'0' * 40}\t{command[-1]}\n",
+            )
+        result = _simulate_dependency_git_checkout(command, cwd)
+        if result is not None:
+            return result
+        pytest.fail(f"unexpected non-Git command: {command}")
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency=CONTRACT_DEPENDENCIES[1],
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert not any(command[1:3] == ["submodule", "update"] for command in calls)
+    assert not (contracts / "lib" / "openzeppelin-contracts").exists()
+
+
+def test_dependency_checkout_rejects_nested_submodule_declaration(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        result = _simulate_dependency_git_checkout(command, cwd)
+        if result is not None:
+            if command[1:3] == ["submodule", "update"]:
+                (cwd / command[-1] / ".gitmodules").write_text(
+                    '[submodule "nested"]\n\tpath = nested\n'
+                    "\turl = https://attacker.invalid/repository.git\n",
+                    encoding="utf-8",
+                )
+            return result
+        pytest.fail(f"unexpected non-Git command: {command}")
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency=CONTRACT_DEPENDENCIES[1],
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert not (contracts / "lib" / "openzeppelin-contracts").exists()
+
+
+def test_dependency_checkout_cleans_nested_link_without_touching_target(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+    sentinel = tmp_path / "sentinel"
+    sentinel.mkdir()
+    sentinel_file = sentinel / "must-survive.txt"
+    sentinel_file.write_text("sentinel", encoding="utf-8")
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        result = _simulate_dependency_git_checkout(command, cwd)
+        if result is not None:
+            if command[1:] == ["checkout", "--detach", "--force", "FETCH_HEAD"]:
+                _symlink_or_skip(cwd / "unsafe", sentinel)
+            return result
+        pytest.fail(f"unexpected non-Git command: {command}")
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency=CONTRACT_DEPENDENCIES[0],
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert not (contracts / "lib" / "forge-std").exists()
+    assert sentinel_file.read_text(encoding="utf-8") == "sentinel"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="exercises Windows read-only deletion")
+def test_remove_owned_tree_cleans_windows_read_only_git_object(tmp_path: Path) -> None:
+    root = tmp_path / "checkout"
+    object_file = root / ".git" / "objects" / "object"
+    object_file.parent.mkdir(parents=True)
+    object_file.write_text("fixture", encoding="utf-8")
+    os.chmod(object_file, stat.S_IREAD)
+
+    toolchain._remove_owned_tree(
+        root,
+        error_code="fixture_cleanup_failed",
+        detail="checkout",
+    )
+
+    assert not root.exists()
 
 
 @pytest.mark.parametrize(
@@ -574,18 +919,19 @@ def test_prepare_refreshes_only_an_explicitly_requested_mismatched_dependency(
     install_cwds: list[Path] = []
 
     def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        git_result = _simulate_dependency_git_checkout(command, cwd)
+        if git_result is not None:
+            if command[1:] == ["checkout", "--detach", "--force", "FETCH_HEAD"]:
+                install_cwds.append(cwd.parents[1])
+                (cwd / "src" / "Fixture.sol").write_bytes(
+                    b"pragma solidity 0.8.26;\r\ncontract Fixture {}\r\n"
+                )
+            return git_result
         if command[1:] == ["--version"]:
             name = Path(command[0]).name
             return subprocess.CompletedProcess(
                 command, 0, stdout=f"{name} Version: 1.7.1\n"
             )
-        if command[1] == "install":
-            install_cwds.append(cwd)
-            _write_dependency(cwd, "forge-std")
-            (cwd / "lib" / "forge-std" / "src" / "Fixture.sol").write_bytes(
-                b"pragma solidity 0.8.26;\r\ncontract Fixture {}\r\n"
-            )
-            return subprocess.CompletedProcess(command, 0, stdout="installed\n")
         assert cwd == contracts
         assert command[1:] == ["build", "--force", "--threads", "1"]
         _write_artifacts(contracts)
@@ -626,14 +972,14 @@ def test_prepare_preserves_refresh_backup_when_build_fails(
     binaries = _binaries(tmp_path)
 
     def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        git_result = _simulate_dependency_git_checkout(command, cwd)
+        if git_result is not None:
+            return git_result
         if command[1:] == ["--version"]:
             name = Path(command[0]).name
             return subprocess.CompletedProcess(
                 command, 0, stdout=f"{name} Version: 1.7.1\n"
             )
-        if command[1] == "install":
-            _write_dependency(cwd, "forge-std")
-            return subprocess.CompletedProcess(command, 0, stdout="installed\n")
         assert cwd == contracts
         return subprocess.CompletedProcess(command, 1, stderr="build failed")
 

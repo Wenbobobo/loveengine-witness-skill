@@ -61,6 +61,7 @@ FORBIDDEN_ARCHIVE_NAMES = {
     "keystore",
 }
 FORBIDDEN_ARCHIVE_SUFFIXES = {".key", ".pem", ".p12", ".pfx"}
+TRANSIENT_ARCHIVE_ROOTS = {".tmp", "tmp", "temp"}
 IGNORED_INSTALL_ROOTS = {".venv"}
 IGNORED_INSTALL_CACHE_DIRS = {
     "__pycache__",
@@ -100,6 +101,8 @@ def _safe_archive_path(name: str) -> PurePosixPath:
     ):
         raise LoveEngineError("unsafe_archive_path", name)
     lowered = [part.lower() for part in path.parts]
+    if lowered[0] in TRANSIENT_ARCHIVE_ROOTS:
+        raise LoveEngineError("unsafe_archive_path", name)
     if (
         any(part in FORBIDDEN_ARCHIVE_NAMES for part in lowered)
         or any(part.startswith(".env.") for part in lowered)

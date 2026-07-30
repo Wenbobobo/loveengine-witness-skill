@@ -37,13 +37,44 @@ CONTRACT_DEPENDENCIES = (
         "name": "forge-std",
         "package": "foundry-rs/forge-std",
         "commit": "77041d2ce690e692d6e03cc812b57d1ddaa4d505",
+        "repository_url": "https://github.com/foundry-rs/forge-std.git",
     },
     {
         "name": "openzeppelin-contracts",
         "package": "OpenZeppelin/openzeppelin-contracts",
         "commit": "e4f70216d759d8e6a64144a9e1f7bbeed78e7079",
+        "repository_url": "https://github.com/OpenZeppelin/openzeppelin-contracts.git",
     },
 )
+# A dependency's root remote is not sufficient to constrain `git submodule
+# update`: URLs and gitlinks declared by the pinned tree are another network
+# boundary.  Keep the currently required graph small and explicit.  Adding a
+# dependency with a deeper graph requires an intentional policy update rather
+# than recursive discovery at prepare time.
+CONTRACT_DEPENDENCY_SUBMODULES: dict[str, tuple[dict[str, str], ...]] = {
+    "forge-std": (),
+    "openzeppelin-contracts": (
+        {
+            "name": "lib/forge-std",
+            "path": "lib/forge-std",
+            "repository_url": "https://github.com/foundry-rs/forge-std",
+            "commit": "1eea5bae12ae557d589f9f0f0edae2faa47cb262",
+            "branch": "v1",
+        },
+        {
+            "name": "lib/erc4626-tests",
+            "path": "lib/erc4626-tests",
+            "repository_url": "https://github.com/a16z/erc4626-tests.git",
+            "commit": "8b1d7c2ac248c33c3506b1bff8321758943c5e11",
+        },
+        {
+            "name": "lib/halmos-cheatcodes",
+            "path": "lib/halmos-cheatcodes",
+            "repository_url": "https://github.com/a16z/halmos-cheatcodes",
+            "commit": "c0d865508c0fee0a11b97732c5e90f9cad6b65a5",
+        },
+    ),
+}
 REQUIRED_CONTRACT_SOURCES = {
     name: f"src/{name}.sol" for name in REQUIRED_CONTRACT_ARTIFACTS
 }
@@ -152,11 +183,23 @@ def _git_checkout_environment() -> dict[str, str]:
     """Prevent a host Git autocrlf policy from changing pinned source bytes."""
 
     environment = os.environ.copy()
+    for key in tuple(environment):
+        lowered = key.casefold()
+        if lowered.startswith("git_") or lowered.startswith("ssh_askpass"):
+            environment.pop(key)
     environment.update(
         {
-            "GIT_CONFIG_COUNT": "1",
+            # Do not inherit a host URL rewrite, template, hook, or line-ending
+            # policy while materializing a pinned public dependency.
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_COUNT": "2",
             "GIT_CONFIG_KEY_0": "core.autocrlf",
             "GIT_CONFIG_VALUE_0": "false",
+            "GIT_CONFIG_KEY_1": "core.hooksPath",
+            "GIT_CONFIG_VALUE_1": os.devnull,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ALLOW_PROTOCOL": "https",
         }
     )
     return environment
@@ -328,6 +371,164 @@ def _reject_link_or_reparse_tree(path: Path) -> None:
     )
 
 
+def _remove_owned_tree(path: Path, *, error_code: str, detail: str) -> None:
+    """Remove a module-owned regular tree, including read-only Git objects."""
+
+    if _is_link_or_reparse_point(path) or not path.is_dir():
+        raise LoveEngineError(error_code, detail, 3)
+    _reject_link_or_reparse_tree(path)
+
+    def make_writable(operation: Any, raw_path: str, exc_info: Any) -> None:
+        try:
+            os.chmod(raw_path, stat.S_IREAD | stat.S_IWRITE)
+            operation(raw_path)
+        except OSError:
+            raise exc_info[1]
+
+    try:
+        shutil.rmtree(path, onerror=make_writable)
+    except OSError as exc:
+        raise LoveEngineError(error_code, detail, 3) from exc
+    if path.exists():
+        raise LoveEngineError(error_code, detail, 3)
+
+
+def _remove_link_or_reparse_entry(
+    path: Path,
+    *,
+    error_code: str,
+    detail: str,
+) -> None:
+    """Unlink a nested link/reparse entry without dereferencing it."""
+
+    last_error: OSError | None = None
+    for operation in (os.unlink, os.rmdir):
+        try:
+            operation(path)
+            return
+        except (IsADirectoryError, NotADirectoryError, PermissionError) as exc:
+            last_error = exc
+        except OSError as exc:
+            last_error = exc
+    raise LoveEngineError(error_code, detail, 3) from last_error
+
+
+def _remove_fresh_checkout_tree(
+    path: Path,
+    *,
+    error_code: str,
+    detail: str,
+) -> None:
+    """Delete a newly owned checkout without traversing nested links."""
+
+    if _is_link_or_reparse_point(path) or not path.is_dir():
+        raise LoveEngineError(error_code, detail, 3)
+
+    def remove_directory(directory: Path) -> None:
+        try:
+            entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
+        except OSError as exc:
+            raise LoveEngineError(error_code, detail, 3) from exc
+        for entry in entries:
+            child = Path(entry.path)
+            if _is_link_or_reparse_point(child):
+                _remove_link_or_reparse_entry(
+                    child,
+                    error_code=error_code,
+                    detail=detail,
+                )
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    remove_directory(child)
+                elif entry.is_file(follow_symlinks=False):
+                    _remove_owned_file(
+                        child,
+                        error_code=error_code,
+                        detail=detail,
+                    )
+                else:
+                    raise LoveEngineError(error_code, detail, 3)
+            except OSError as exc:
+                raise LoveEngineError(error_code, detail, 3) from exc
+        try:
+            os.rmdir(directory)
+        except PermissionError:
+            try:
+                os.chmod(directory, stat.S_IREAD | stat.S_IWRITE)
+                os.rmdir(directory)
+            except OSError as exc:
+                raise LoveEngineError(error_code, detail, 3) from exc
+        except OSError as exc:
+            raise LoveEngineError(error_code, detail, 3) from exc
+
+    remove_directory(path)
+    if path.exists() or _is_link_or_reparse_point(path):
+        raise LoveEngineError(error_code, detail, 3)
+
+
+def _remove_owned_file(path: Path, *, error_code: str, detail: str) -> None:
+    """Remove a module-owned regular file even when Git marked it read-only."""
+
+    if _is_link_or_reparse_point(path) or not path.is_file():
+        raise LoveEngineError(error_code, detail, 3)
+    try:
+        path.unlink()
+    except PermissionError:
+        try:
+            os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+            path.unlink()
+        except OSError as exc:
+            raise LoveEngineError(error_code, detail, 3) from exc
+    except OSError as exc:
+        raise LoveEngineError(error_code, detail, 3) from exc
+    if path.exists():
+        raise LoveEngineError(error_code, detail, 3)
+
+
+def _strip_dependency_git_metadata(
+    root: Path,
+    *,
+    error_code: str,
+    detail: str,
+) -> None:
+    """Remove root and submodule Git metadata before the tree becomes usable."""
+
+    if _is_link_or_reparse_point(root) or not root.is_dir():
+        raise LoveEngineError(error_code, detail, 3)
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = sorted(os.scandir(directory), key=lambda entry: entry.name)
+        except OSError as exc:
+            raise LoveEngineError(error_code, detail, 3) from exc
+        for entry in entries:
+            path = Path(entry.path)
+            if _is_link_or_reparse_point(path):
+                raise LoveEngineError(error_code, detail, 3)
+            if entry.name == ".git":
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        _remove_owned_tree(path, error_code=error_code, detail=detail)
+                    elif entry.is_file(follow_symlinks=False):
+                        _remove_owned_file(path, error_code=error_code, detail=detail)
+                    else:
+                        raise LoveEngineError(error_code, detail, 3)
+                except OSError as exc:
+                    raise LoveEngineError(error_code, detail, 3) from exc
+                continue
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+                elif not entry.is_file(follow_symlinks=False):
+                    raise LoveEngineError(error_code, detail, 3)
+            except OSError as exc:
+                raise LoveEngineError(error_code, detail, 3) from exc
+    if (root / ".git").exists() or _is_link_or_reparse_point(root / ".git"):
+        raise LoveEngineError(error_code, detail, 3)
+
+
 def _refresh_backup_name(name: str, dependency: str) -> bool:
     """Recognize only backups created by this module's staged replacement."""
 
@@ -453,12 +654,11 @@ def _recover_interrupted_dependency_refresh(
             raise LoveEngineError(
                 "contract_dependency_refresh_recovery_required", name, 3
             )
-        try:
-            shutil.rmtree(backup)
-        except OSError as exc:
-            raise LoveEngineError(
-                "contract_dependency_refresh_cleanup_failed", name, 3
-            ) from exc
+        _remove_owned_tree(
+            backup,
+            error_code="contract_dependency_refresh_cleanup_failed",
+            detail=name,
+        )
 
 
 def _stable_file_bytes(
@@ -898,28 +1098,241 @@ def _dependency_matches_lock(
     return inventory["inventory_sha256"] == expected_tree_sha256
 
 
+def _configured_dependency(dependency: dict[str, str]) -> dict[str, str]:
+    """Return the fixed source definition; never derive a remote URL from input."""
+
+    for configured in CONTRACT_DEPENDENCIES:
+        if all(
+            dependency.get(key) == configured[key]
+            for key in ("name", "package", "commit")
+        ):
+            return configured
+    raise LoveEngineError("contract_dependency_install_failed", "dependency", 3)
+
+
+def _expected_submodule_config_bytes(name: str) -> bytes:
+    """Render the exact .gitmodules file allowed for one pinned dependency."""
+
+    try:
+        submodules = CONTRACT_DEPENDENCY_SUBMODULES[name]
+    except KeyError as exc:
+        raise LoveEngineError("contract_dependency_install_failed", name, 3) from exc
+    lines: list[str] = []
+    for submodule in submodules:
+        lines.append(f'[submodule "{submodule["name"]}"]')
+        if "branch" in submodule:
+            lines.append(f'\tbranch = {submodule["branch"]}')
+        lines.append(f'\tpath = {submodule["path"]}')
+        lines.append(f'\turl = {submodule["repository_url"]}')
+    return ("\n".join(lines) + ("\n" if lines else "")).encode("utf-8")
+
+
+def _validated_dependency_submodules(
+    target: Path,
+    *,
+    name: str,
+    command_runner: CommandRunner | None,
+    environment: dict[str, str],
+) -> tuple[dict[str, str], ...]:
+    """Check allowed paths, URLs, and gitlinks before submodule network I/O."""
+
+    try:
+        submodules = CONTRACT_DEPENDENCY_SUBMODULES[name]
+    except KeyError as exc:
+        raise LoveEngineError("contract_dependency_install_failed", name, 3) from exc
+    config = target / ".gitmodules"
+    if not submodules:
+        if config.exists() or _is_link_or_reparse_point(config):
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+        return submodules
+    if _is_link_or_reparse_point(config) or not config.is_file():
+        raise LoveEngineError("contract_dependency_install_failed", name, 3)
+    try:
+        actual_config = config.read_bytes()
+    except OSError as exc:
+        raise LoveEngineError("contract_dependency_install_failed", name, 3) from exc
+    if actual_config != _expected_submodule_config_bytes(name):
+        raise LoveEngineError("contract_dependency_install_failed", name, 3)
+    for submodule in submodules:
+        gitlink = _run_command(
+            ["git", "ls-tree", "HEAD", "--", submodule["path"]],
+            cwd=target,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        expected_gitlink = (
+            f"160000 commit {submodule['commit']}\t{submodule['path']}"
+        )
+        if gitlink.strip() != expected_gitlink:
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+    return submodules
+
+
+def _reject_nested_submodule_declarations(target: Path, *, name: str) -> None:
+    """Make a deeper source graph an explicit policy change, not a download."""
+
+    for path in _safe_tree_files(
+        target,
+        error_code="contract_dependency_install_failed",
+        detail=name,
+        skipped_names=frozenset({".git"}),
+    ):
+        if (
+            path.name == ".gitmodules"
+            and path.relative_to(target).as_posix() != ".gitmodules"
+        ):
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+
+
 def _install_dependency(
-    forge: Path,
     *,
     cwd: Path,
     dependency: dict[str, str],
+    expected_tree_sha256: str,
     command_runner: CommandRunner | None,
 ) -> None:
-    package = f"{dependency['package']}@rev={dependency['commit']}"
-    _run_command(
-        [str(forge), "install", package, "--no-git"],
-        cwd=cwd,
-        error_code="contract_dependency_install_failed",
-        error_message=f"could not install {dependency['name']}",
-        command_runner=command_runner,
-        environment=_forge_project_environment(),
-    )
+    """Materialize one exact public Git commit and verify it before use.
+
+    A clean Linux CI checkout materialized a tree that did not match the
+    versioned lock through Forge's installer. This path fetches the locked
+    object by its full SHA from a fixed root URL, then permits only the
+    versioned submodule graph declared above before accepting the source tree.
+    """
+
+    configured = _configured_dependency(dependency)
+    name = configured["name"]
+    lib_root = _contract_path(cwd, "lib")
+    target = _contract_path(cwd, "lib", name)
+    created = False
+    installed = False
+    try:
+        if lib_root.exists() and (
+            _is_link_or_reparse_point(lib_root) or not lib_root.is_dir()
+        ):
+            raise LoveEngineError("contract_dependency_missing", "lib", 3)
+        lib_root.mkdir(parents=True, exist_ok=True)
+        if _is_link_or_reparse_point(lib_root) or not lib_root.is_dir():
+            raise LoveEngineError("contract_dependency_missing", "lib", 3)
+        if target.exists() or _is_link_or_reparse_point(target):
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+
+        # The target was absent and is now owned by this installation attempt,
+        # including the case where Git creates it before reporting an error.
+        created = True
+        environment = _git_checkout_environment()
+        _run_command(
+            ["git", "init", "--quiet", str(target)],
+            cwd=cwd,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        if _is_link_or_reparse_point(target) or not target.is_dir():
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+        _run_command(
+            ["git", "remote", "add", "origin", configured["repository_url"]],
+            cwd=target,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        _run_command(
+            [
+                "git",
+                "fetch",
+                "--depth",
+                "1",
+                "--no-tags",
+                "origin",
+                configured["commit"],
+            ],
+            cwd=target,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        _run_command(
+            ["git", "checkout", "--detach", "--force", "FETCH_HEAD"],
+            cwd=target,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        head = _run_command(
+            ["git", "rev-parse", "HEAD"],
+            cwd=target,
+            error_code="contract_dependency_install_failed",
+            error_message=f"could not install {name}",
+            command_runner=command_runner,
+            environment=environment,
+        )
+        if head.strip().lower() != configured["commit"]:
+            raise LoveEngineError("contract_dependency_install_failed", name, 3)
+        submodules = _validated_dependency_submodules(
+            target,
+            name=name,
+            command_runner=command_runner,
+            environment=environment,
+        )
+        for submodule in submodules:
+            _run_command(
+                [
+                    "git",
+                    "submodule",
+                    "update",
+                    "--init",
+                    "--depth",
+                    "1",
+                    "--",
+                    submodule["path"],
+                ],
+                cwd=target,
+                error_code="contract_dependency_install_failed",
+                error_message=f"could not install {name}",
+                command_runner=command_runner,
+                environment=environment,
+            )
+        _reject_nested_submodule_declarations(target, name=name)
+        _strip_dependency_git_metadata(
+            target,
+            error_code="contract_dependency_install_failed",
+            detail=name,
+        )
+        _normalize_dependency_tree_to_lf(target, dependency=name)
+        inventory = _tree_inventory(
+            target,
+            error_code="contract_dependency_install_failed",
+            detail=name,
+        )
+        if inventory["inventory_sha256"] != expected_tree_sha256:
+            raise LoveEngineError(
+                "contract_dependency_lock_mismatch",
+                f"{name}: dependency does not match dependency-lock.json",
+                3,
+            )
+        installed = True
+    finally:
+        # A failed fresh checkout must not leave a partial dependency that a
+        # later prepare run could mistake for an operator-provided tree.
+        if created and not installed and (
+            target.exists() or _is_link_or_reparse_point(target)
+        ):
+            _remove_fresh_checkout_tree(
+                target,
+                error_code="contract_dependency_install_failed",
+                detail=name,
+            )
 
 
 def _refresh_dependency(
     contracts_root: Path,
     *,
-    forge: Path,
     dependency: dict[str, str],
     expected_tree_sha256: str,
     command_runner: CommandRunner | None,
@@ -941,27 +1354,14 @@ def _refresh_dependency(
                 dir=contracts_root,
             )
         )
-        (stage / "foundry.toml").write_bytes(b"[profile.default]\n")
         _install_dependency(
-            forge,
             cwd=stage,
             dependency=dependency,
+            expected_tree_sha256=expected_tree_sha256,
             command_runner=command_runner,
         )
         staged = stage / "lib" / name
         _reject_symlink_ancestors(staged)
-        _normalize_dependency_tree_to_lf(staged, dependency=name)
-        staged_inventory = _tree_inventory(
-            staged,
-            error_code="contract_dependency_install_failed",
-            detail=name,
-        )
-        if staged_inventory["inventory_sha256"] != expected_tree_sha256:
-            raise LoveEngineError(
-                "contract_dependency_lock_mismatch",
-                f"{name}: refreshed dependency does not match dependency-lock.json",
-                3,
-            )
         backup = lib_root / f".loveengine-{name}-backup-{uuid.uuid4().hex}"
         if backup.exists() or _is_link_or_reparse_point(backup):
             raise LoveEngineError("contract_dependency_refresh_failed", name, 3)
@@ -982,7 +1382,11 @@ def _refresh_dependency(
         if not replaced and backup is not None and backup.exists() and not target.exists():
             os.replace(backup, target)
         if stage is not None and stage.exists():
-            shutil.rmtree(stage, ignore_errors=True)
+            _remove_owned_tree(
+                stage,
+                error_code="contract_dependency_refresh_failed",
+                detail=name,
+            )
     return target, backup
 
 
@@ -1166,9 +1570,9 @@ def prepare_contracts(
             raise LoveEngineError("contract_dependency_missing", name, 3)
         if not path.is_dir():
             _install_dependency(
-                forge,
                 cwd=root,
                 dependency=dependency,
+                expected_tree_sha256=dependency_lock[name]["tree_sha256"],
                 command_runner=command_runner,
             )
             installed[name] = True
@@ -1185,7 +1589,6 @@ def prepare_contracts(
                 )
             _, backup = _refresh_dependency(
                 root,
-                forge=forge,
                 dependency=dependency,
                 expected_tree_sha256=dependency_lock[name]["tree_sha256"],
                 command_runner=command_runner,
@@ -1216,12 +1619,12 @@ def prepare_contracts(
         command_runner=command_runner,
         environment=_forge_project_environment(),
     )
-    try:
-        for backup in refreshed_backups:
-            _reject_link_or_reparse_tree(backup)
-            shutil.rmtree(backup)
-    except OSError as exc:
-        raise LoveEngineError("contract_dependency_refresh_cleanup_failed", "lib", 3) from exc
+    for backup in refreshed_backups:
+        _remove_owned_tree(
+            backup,
+            error_code="contract_dependency_refresh_cleanup_failed",
+            detail="lib",
+        )
     attestation = _current_attestation(root)
     attestation_metadata = _write_attestation(root, attestation)
     result = {

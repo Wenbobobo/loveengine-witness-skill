@@ -65,7 +65,9 @@ uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --outpu
 `pilot contracts prepare` 是真实本机 Pilot 的显式前置步骤。它确认 Forge 和 Anvil
 均精确为 `1.7.1`，核验版本化的 `contracts/dependency-lock.json`，执行
 `forge build --threads 1`，并输出 artifact、源码和依赖 attestation。公开依赖缺少时
-才按固定 commit 获取；已有目录若与锁定树摘要不符则默认失败关闭，只有显式执行
+才从允许的 HTTPS 仓库受控检出完整固定 commit；其小型、版本化 submodule 图会先逐项
+核验路径、URL 和 gitlink，再初始化每个 direct submodule，出现更深层声明则失败关闭，
+随后核验最终锁定树摘要；已有目录若与锁定树摘要不符则默认失败关闭，只有显式执行
 `pilot contracts prepare --refresh-dependencies` 才会在 staging 中完成核验后切换该受管
 目录。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，只写入被忽略的
 `contracts/lib`、`contracts/out` 和 `contracts/cache` 工作产物。

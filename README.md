@@ -72,8 +72,12 @@ uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --outpu
 work. It verifies both Forge and Anvil are exactly `1.7.1`, verifies the
 versioned `contracts/dependency-lock.json`, runs `forge build --threads 1`,
 and emits an artifact/source/dependency attestation. A missing public
-dependency is installed only at its pinned commit; a present but mismatching
-tree fails closed until an operator explicitly runs
+dependency is materialized only by a controlled Git checkout of its full
+pinned commit from an allowlisted HTTPS repository. Its small, versioned
+submodule graph is checked for path, URL, and gitlink before each direct
+checkout; deeper declarations fail closed. The final locked tree digest is
+then checked. A present but mismatching tree fails closed until an operator
+explicitly runs
 `pilot contracts prepare --refresh-dependencies`. That refresh stages and
 verifies the replacement before switching the named managed directory. The
 command canonicalizes managed UTF-8 dependency text to LF before compiling and

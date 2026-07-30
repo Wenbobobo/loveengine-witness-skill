@@ -52,6 +52,19 @@ def test_skill_entry_is_codex_discoverable_and_thin() -> None:
     assert (skill_path.parent / "agents" / "openai.yaml").is_file()
 
 
+@pytest.mark.parametrize(
+    "name",
+    ("tmp/payload.txt", ".tmp/payload.txt", "temp/payload.txt", "TMP/payload.txt"),
+)
+def test_package_rejects_top_level_transient_output_paths(name: str) -> None:
+    with pytest.raises(LoveEngineError) as error:
+        package_module._safe_archive_path(name)
+    assert error.value.code == "unsafe_archive_path"
+    assert package_module._safe_archive_path("src/tmp/payload.txt").as_posix() == (
+        "src/tmp/payload.txt"
+    )
+
+
 @pytest.mark.integration
 def test_deterministic_package_build_verify_install_and_self_check(
     tmp_path: Path,

@@ -19,8 +19,10 @@ uv run loveengine pilot contracts prepare
 `~/.codex/tools/foundry-v1.7.1/`。
 
 `pilot contracts prepare` 严格验证 `forge` 和 `anvil` 都报告 Foundry `1.7.1`，并核验
-版本化 `contracts/dependency-lock.json`。仅缺少时获取固定 commit 的公开合约依赖；已有
-目录与锁定规范树摘要不符时默认失败关闭。使用
+版本化 `contracts/dependency-lock.json`。仅缺少时才从允许的 HTTPS 仓库受控检出完整固定
+commit 的公开合约依赖；其版本化 submodule 图会先核验路径、URL 和 gitlink，再初始化
+每个 direct submodule，更深层声明会失败关闭，最后核验最终规范树摘要；已有目录与锁定
+规范树摘要不符时默认失败关闭。使用
 `pilot contracts prepare --refresh-dependencies` 才会在 staging 中重新取得固定提交、
 核验完整树后切换受管目录。随后执行 `forge build --threads 1`。成功 JSON 记录
 toolchain、合约源码、依赖树、attestation 和五份部署 artifact 的摘要；不会记录 tool

@@ -162,7 +162,9 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 
 所有真实 Pilot 路径都先要求 `loveengine pilot contracts prepare`。它严格检查
 Forge/Anvil `1.7.1`、版本化 dependency lock、受控 Foundry profile/remapping，并以
-单线程构建。缺失依赖可按固定 commit 安装；已有依赖的规范树摘要失配则失败关闭，只有
+单线程构建。缺失依赖只可从允许的 HTTPS 仓库受控检出完整固定 commit；版本化
+submodule 图会先核验路径、URL 和 gitlink，再初始化每个 direct submodule，更深层声明
+会失败关闭，最后核验最终规范树摘要；已有依赖的规范树摘要失配则失败关闭，只有
 显式 `--refresh-dependencies` 才会在 staging 核验后切换。成功后在
 `contracts/cache/loveengine-contract-preparation.json` 保存本地 attestation；package、
 quickstart、demo、chain init 与 soak 会重新计算它，因此不在执行过程中隐式编译。这样
