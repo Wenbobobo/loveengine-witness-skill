@@ -39,6 +39,7 @@ def test_cli_exposes_m5_command_tree() -> None:
         "quickstart",
         "serve",
         "status",
+        "contracts",
         "chain",
         "transcript",
         "snapshot",

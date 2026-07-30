@@ -27,6 +27,7 @@ from .pilot_snapshot import (
 from .pilot_soak import run_pilot_soak
 from .pilot_soak_process import background_soak_status, start_background_soak
 from .pilot_transcript import verify_pilot_transcript
+from .toolchain import prepare_contracts
 
 
 def add_pilot_parser(commands: Any) -> None:
@@ -44,6 +45,11 @@ def add_pilot_parser(commands: Any) -> None:
     serve.add_argument("--config", type=Path, required=True)
     status = pilot_commands.add_parser("status")
     status.add_argument("--url", required=True)
+
+    contracts = pilot_commands.add_parser("contracts")
+    contracts_commands = contracts.add_subparsers(dest="pilot_contracts_command")
+    contracts_prepare = contracts_commands.add_parser("prepare")
+    contracts_prepare.add_argument("--refresh-dependencies", action="store_true")
 
     chain = pilot_commands.add_parser("chain")
     chain_commands = chain.add_subparsers(dest="pilot_chain_command")
@@ -114,6 +120,13 @@ def handle_pilot(args: argparse.Namespace) -> dict[str, Any]:
         return {"stopped": True}
     if args.pilot_command == "status":
         return asyncio.run(pilot_status(args.url))
+    if (
+        args.pilot_command == "contracts"
+        and args.pilot_contracts_command == "prepare"
+    ):
+        return prepare_contracts(
+            refresh_dependencies=args.refresh_dependencies,
+        )
     if args.pilot_command == "chain":
         if args.pilot_chain_command == "init":
             return initialize_chain(args.root, port=args.port)

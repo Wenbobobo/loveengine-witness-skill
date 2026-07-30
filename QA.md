@@ -199,6 +199,13 @@ candidate baseline `2fd3a29` 已完成该短验收；其机器报告 SHA-256 为
 evidence-verified receipt，并证明 Relay 已记录 3 个 ACK 和 3 个 receipt
 confirmation，而不只记录单个 stored ACK。
 
+从干净 checkout 开始时，开发者先运行 `uv run loveengine pilot contracts prepare`；
+它验证 Forge/Anvil 1.7.1、dependency lock、五份部署 artifact 和本地 attestation。
+已有受管依赖若与锁定树摘要不符会失败关闭，只有显式
+`pilot contracts prepare --refresh-dependencies` 才会在 staging 核验后替换。真实 package、
+quickstart、demo 和 soak 故意不在计时或后台流程中隐式下载/编译，缺产物或 attestation
+失配会明确失败并给出该命令。
+
 **当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；
 `0.6.1-contract-public-pilot` 仍是 candidate，不是已发布版本。一次共享主机
 短验收不等于公网、公共测试网、TLS、生产身份、HA 或长期 soak 已通过。

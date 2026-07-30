@@ -33,11 +33,8 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare
       - name: Contract tests
         working-directory: contracts
         run: forge test
@@ -56,11 +53,8 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare
       - name: Three-node network integration
         run: uv run pytest tests/integration/test_network_demo.py
 
@@ -76,11 +70,8 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare
       - name: Live evidence integration
         run: uv run pytest tests/integration/test_live_evidence_demo.py
 
@@ -96,12 +87,8 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
-          forge build
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare
       - name: Build twice and verify deterministic package
         id: package
         shell: bash
@@ -161,11 +148,8 @@ jobs:
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare
       - name: Persistent chain integration
         run: uv run pytest tests/integration/test_pilot_chain.py
       - name: Unified package-to-PublicSink E2E

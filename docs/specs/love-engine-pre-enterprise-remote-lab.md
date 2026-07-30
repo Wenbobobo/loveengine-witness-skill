@@ -60,8 +60,10 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 远端调用同一个 `tools/run_core_experiments.py`：
 
 - `uv sync --frozen`；
-- 缺少本地合约依赖时，以单线程安装精确 commit 固定的 forge-std/OpenZeppelin，
-  并执行 `forge build`；
+- 显式运行 `loveengine pilot contracts prepare`：严格核对 forge/anvil 1.7.1 和
+  dependency lock；缺少合约依赖时按固定 commit 安装，已有不匹配目录则失败关闭（仅在
+  明确需要修复时使用 `--refresh-dependencies`），并执行 `forge build --threads 1`；报告
+  保留实际 artifact、源码、依赖树和 attestation 摘要。归档不携带本机 `contracts/out`；
 - 12 个事件、3 个模拟观察者的 core stage；
 - offline/RPC/policy 三种验证等级；
 - trust policy 与 transcript 篡改测试；

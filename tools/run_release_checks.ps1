@@ -15,28 +15,6 @@ function Invoke-CheckedNative {
 }
 
 $root = Split-Path -Parent $PSScriptRoot
-$forgeCandidates = @()
-if ($env:FOUNDRY_BIN) {
-    $forgeCandidates += Join-Path $env:FOUNDRY_BIN "forge.exe"
-}
-$forgeCandidates += Join-Path $HOME ".codex\tools\foundry-v1.7.1\forge.exe"
-$forgeCandidates += Join-Path $HOME ".foundry\bin\forge.exe"
-$forge = $forgeCandidates | Where-Object { Test-Path -LiteralPath $_ } |
-    Select-Object -First 1
-if (-not $forge) {
-    $forgeCommand = Get-Command forge -ErrorAction SilentlyContinue
-    if ($forgeCommand) {
-        $forge = $forgeCommand.Source
-    }
-}
-if (-not $forge) {
-    throw "Foundry 1.7.1 forge binary not found; set FOUNDRY_BIN."
-}
-$forgeVersion = & $forge --version
-if ($LASTEXITCODE -ne 0 -or $forgeVersion[0] -notmatch '^forge Version: 1\.7\.1$') {
-    throw "Foundry version mismatch; expected forge 1.7.1."
-}
-
 $buildCheckRoot = Join-Path ([System.IO.Path]::GetTempPath()) (
     "loveengine-release-check-" + [guid]::NewGuid().ToString("N")
 )
@@ -44,6 +22,18 @@ New-Item -ItemType Directory -Path $buildCheckRoot | Out-Null
 Push-Location -LiteralPath $root
 try {
     Invoke-CheckedNative "uv sync" { uv sync --frozen }
+    $contractPreparation = Invoke-CheckedNative "contract preparation" {
+        uv run loveengine pilot contracts prepare
+    } | ConvertFrom-Json
+    $forge = [string]$contractPreparation.toolchain.forge.path
+    if (
+        $contractPreparation.prepared -ne $true -or
+        [string]::IsNullOrWhiteSpace($forge) -or
+        -not (Test-Path -LiteralPath $forge)
+    ) {
+        throw "Contract preparation did not return usable Forge provenance."
+    }
+
     Invoke-CheckedNative "repository checks" { uv run python .\tools\check.py }
     Invoke-CheckedNative "non-integration tests" { uv run pytest -m "not integration" -q }
 

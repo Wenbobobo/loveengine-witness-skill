@@ -64,8 +64,24 @@ Requirements: Python 3.11+, uv, and pinned Foundry 1.7.1.
 ```powershell
 uv sync --frozen
 uv run loveengine manifest verify
+uv run loveengine pilot contracts prepare
 uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\pilot-output
 ```
+
+`pilot contracts prepare` is an explicit prerequisite for real local Pilot
+work. It verifies both Forge and Anvil are exactly `1.7.1`, verifies the
+versioned `contracts/dependency-lock.json`, runs `forge build --threads 1`,
+and emits an artifact/source/dependency attestation. A missing public
+dependency is installed only at its pinned commit; a present but mismatching
+tree fails closed until an operator explicitly runs
+`pilot contracts prepare --refresh-dependencies`. That refresh stages and
+verifies the replacement before switching the named managed directory. The
+command canonicalizes managed UTF-8 dependency text to LF before compiling and
+writes only ignored `contracts/lib`, `contracts/out`, and
+`contracts/cache` work products. `package build`, `quickstart`, `lan-pilot`,
+and `pilot soak` deliberately fail
+closed with this command when those artifacts are absent; they do not compile
+or download dependencies during a timed experiment.
 
 The core experiment builds and anchors a real ZIP, starts a local Anvil and
 Relay, uses the public node CLI, verifies artifacts, resolves a fixed dispute,
@@ -76,6 +92,14 @@ The review nodes do not sign a verdict from a lookup table alone. Before
 signing, each node retrieves the finalized bundle, event list, and
 content-addressed artifacts from the invite-bound HTTP origin and independently
 recomputes the event chain and bundle references.
+
+The cross-platform core runner performs the same explicit preparation as its
+first recorded stage and includes the resulting provenance in its machine
+report:
+
+```powershell
+uv run python .\tools\run_core_experiments.py
+```
 
 Run the optional governance extension separately:
 

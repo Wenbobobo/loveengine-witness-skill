@@ -59,7 +59,9 @@ uv run python .\tools\run_remote_lab.py run `
 1. 再次执行只读 preflight；
 2. 将当前 commit 打成 tar；
 3. 在远端 home 下创建唯一、权限收紧的实验目录；
-4. 以 nice +15、最多两核和低构建并发执行 core/recovery 测试；
+4. 在唯一远端目录中先显式执行 `pilot contracts prepare`，从干净源码和 dependency lock
+   重建忽略的合约产物；若已有受管依赖与锁失配则停止，不在共享主机上自动刷新。随后以
+   nice +15、最多两核和低构建并发执行 core/recovery 测试；
 5. 下载 report 和 transcript，并在本机重新离线验证；
 6. 再次执行资源门，启动一个受限的 loopback Quickstart；
 7. 建立本机 SSH tunnel，启动 3 个公开 `loveengine node connect` 进程；

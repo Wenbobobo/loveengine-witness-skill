@@ -14,7 +14,19 @@
 uv sync --frozen
 uv run loveengine version
 uv run python .\tools\check.py
+uv run loveengine pilot contracts prepare
 ```
+
+`pilot contracts prepare` 是所有会创建真实 package、Anvil 或 Pilot runtime 的命令
+的显式前置步骤。它严格检查 Forge/Anvil `1.7.1` 和版本化的
+`contracts/dependency-lock.json`，使用单线程构建并返回可记录的 artifact、源码、依赖
+和 attestation 摘要。仅缺少的 forge-std/OpenZeppelin 才会按固定 commit 安装；已有
+目录的规范树摘要不符会失败关闭，需显式使用
+`pilot contracts prepare --refresh-dependencies`，在 staging 核验后才替换受管目录。
+它在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并会改变被忽略的
+`contracts/lib`、`contracts/out`、`contracts/cache`；因此不要把它
+混进一次已有计时的 soak。原始 `package build`、quickstart、demo 和 soak 均不会
+隐式执行该步骤，并会重新核验 attestation。
 
 依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
 [CLI 参考](../api/cli-reference.md)和
@@ -122,7 +134,8 @@ uv run python .\tools\run_core_experiments.py
 
 runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证等级和篡改检查。
 报告必须写明 environment: local_anvil、actors_simulated: true，以及每项实验
-“证明/不证明”的边界。
+“证明/不证明”的边界。它把 `contracts prepare` 作为首个已记录阶段，因此来自干净
+源码 checkout 的构建 provenance 也保留在报告中。
 
 默认 soak 也停在 core；治理 soak 必须显式指定：
 

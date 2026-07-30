@@ -7,10 +7,8 @@ import argparse
 import json
 import os
 import platform
-import re
 import shutil
 import subprocess
-import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -22,9 +20,6 @@ from remote_host_preflight import CapacityThresholds, run_preflight
 
 ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
-FOUNDRY_VERSION = "1.7.1"
-FORGE_STD_COMMIT = "77041d2ce690e692d6e03cc812b57d1ddaa4d505"
-OPENZEPPELIN_COMMIT = "e4f70216d759d8e6a64144a9e1f7bbeed78e7079"
 MAX_SHARED_HOST_CPUS = 2
 MIN_SHARED_HOST_NICE_INCREMENT = 15
 
@@ -41,35 +36,6 @@ def _last_json_object(text: str) -> dict[str, Any]:
             if isinstance(value, dict):
                 return value
     raise RuntimeError("command did not emit a JSON object")
-
-
-def _foundry_binary(name: str) -> Path | None:
-    executable = name + (".exe" if os.name == "nt" else "")
-    configured = os.environ.get("FOUNDRY_BIN")
-    candidates = [
-        Path(configured) / executable if configured else None,
-        Path.home()
-        / ".codex"
-        / "tools"
-        / f"foundry-v{FOUNDRY_VERSION}"
-        / executable,
-        Path.home() / ".foundry" / "bin" / executable,
-    ]
-    discovered = shutil.which(name)
-    if discovered:
-        candidates.append(Path(discovered))
-    return next(
-        (candidate.resolve() for candidate in candidates if candidate and candidate.is_file()),
-        None,
-    )
-
-
-def is_exact_forge_version(output: str) -> bool:
-    lines = [line.strip() for line in output.splitlines() if line.strip()]
-    return bool(
-        lines
-        and re.fullmatch(r"forge Version: 1\.7\.1", lines[0]) is not None
-    )
 
 
 def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, Any]:
@@ -157,44 +123,11 @@ class Experiment:
         )
 
 
-def _prepare_contracts(experiment: Experiment) -> None:
-    contracts = ROOT / "contracts"
-    forge = _foundry_binary("forge")
-    if forge is None:
-        raise RuntimeError("forge is required")
-    version = experiment.run("forge-version", [str(forge), "--version"])
-    if not is_exact_forge_version(version):
-        raise RuntimeError("Foundry 1.7.1 is required")
-    dependencies = (
-        (
-            contracts / "lib" / "forge-std",
-            f"foundry-rs/forge-std@{FORGE_STD_COMMIT}",
-        ),
-        (
-            contracts / "lib" / "openzeppelin-contracts",
-            f"OpenZeppelin/openzeppelin-contracts@{OPENZEPPELIN_COMMIT}",
-        ),
-    )
-    for path, package in dependencies:
-        if not path.is_dir():
-            experiment.run(
-                "forge-install-" + path.name,
-                [str(forge), "install", package, "--no-git"],
-                cwd=contracts,
-            )
-    experiment.run(
-        "forge-build",
-        [str(forge), "build", "--threads", "1"],
-        cwd=contracts,
-    )
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path)
     parser.add_argument("--events", type=int, default=12)
     parser.add_argument("--observers", type=int, default=10)
-    parser.add_argument("--prepare-contracts", action="store_true")
     parser.add_argument("--include-recovery-tests", action="store_true")
     parser.add_argument("--shared-host", action="store_true")
     parser.add_argument("--max-cpus", type=int, default=2)
@@ -232,10 +165,6 @@ def main() -> int:
             "PYTHONUNBUFFERED": "1",
         }
     )
-    forge = _foundry_binary("forge")
-    anvil = _foundry_binary("anvil")
-    if forge and anvil and forge.parent == anvil.parent:
-        environment["FOUNDRY_BIN"] = str(forge.parent)
     if args.shared_host:
         validate_shared_host_limits(args.max_cpus, args.nice_increment)
         thresholds = CapacityThresholds(
@@ -274,8 +203,19 @@ def main() -> int:
         if uv is None:
             raise RuntimeError("uv is required")
         experiment.run("uv-sync", [uv, "sync", "--frozen"])
-        if args.prepare_contracts:
-            _prepare_contracts(experiment)
+        preparation_output = experiment.run(
+            "contracts-prepare",
+            [uv, "run", "loveengine", "pilot", "contracts", "prepare"],
+        )
+        preparation = _last_json_object(preparation_output)
+        if (
+            preparation.get("schema_version")
+            != "loveengine.contract-preparation/1"
+            or preparation.get("prepared") is not True
+            or not isinstance(preparation.get("artifacts"), dict)
+        ):
+            raise RuntimeError("contracts prepare did not emit verified provenance")
+        report["contract_preparation"] = preparation
         demo_output = experiment.run(
             "core-e2e",
             [

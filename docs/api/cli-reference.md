@@ -11,11 +11,23 @@
 uv sync --frozen
 uv run loveengine version
 uv run loveengine manifest verify
+uv run loveengine pilot contracts prepare
 ```
 
 合约和本机 pilot 固定使用 Foundry `1.7.1`。将包含 `forge`、`anvil` 和
 `cast` 的目录设为 `FOUNDRY_BIN`，或安装到
 `~/.codex/tools/foundry-v1.7.1/`。
+
+`pilot contracts prepare` 严格验证 `forge` 和 `anvil` 都报告 Foundry `1.7.1`，并核验
+版本化 `contracts/dependency-lock.json`。仅缺少时获取固定 commit 的公开合约依赖；已有
+目录与锁定规范树摘要不符时默认失败关闭。使用
+`pilot contracts prepare --refresh-dependencies` 才会在 staging 中重新取得固定提交、
+核验完整树后切换受管目录。随后执行 `forge build --threads 1`。成功 JSON 记录
+toolchain、合约源码、依赖树、attestation 和五份部署 artifact 的摘要；不会记录 tool
+output。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并写入忽略的
+`contracts/lib`、`contracts/out`、`contracts/cache`。真实 package、
+quickstart、demo、chain init 和 soak 都要求这些已经验证且仍匹配 attestation 的 artifact；
+它们不会在主流程中隐式编译或下载。dry-run 不需要该前置步骤。
 
 ## 2. Loopback quickstart
 
@@ -181,7 +193,8 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 脚本覆盖仓库/hash、非集成 pytest、Foundry、M2-M6 E2E、确定性双构建、
 core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak 可用
 `--stage governance` 单独运行；四小时墙钟 soak 需单独运行
-并保存报告。
+并保存报告。发布门与跨平台 core runner 都把 `pilot contracts prepare` 作为其显式、
+已记录的第一个合约阶段；不再依赖早先 `forge test` 偶然留下的 `contracts/out`。
 
 后台运行时使用：
 

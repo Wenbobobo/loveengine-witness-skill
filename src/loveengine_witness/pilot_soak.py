@@ -124,6 +124,7 @@ class _RuntimeTreeSampler:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._peak_rss_bytes: int | None = None
+        self._peak_processes: list[dict[str, int | str | None]] | None = None
         self._sample_count = 0
         self._max_process_count = 0
         self._sample_error_count = 0
@@ -149,9 +150,15 @@ class _RuntimeTreeSampler:
             available = (
                 self._sample_count > 0 and self._peak_rss_bytes is not None
             )
+            peak_processes = (
+                None
+                if self._peak_processes is None
+                else [dict(process) for process in self._peak_processes]
+            )
             return {
                 "available": available,
                 "sampled_peak_rss_bytes": self._peak_rss_bytes,
+                "sampled_peak_processes": peak_processes,
                 "sample_count": self._sample_count,
                 "max_process_count": self._max_process_count,
                 "sample_interval_seconds": self._interval_seconds,
@@ -177,12 +184,14 @@ class _RuntimeTreeSampler:
         total_rss = 0
         process_count = 0
         errors = 0
+        sampled_processes: list[dict[str, int | str | None]] = []
         for process in processes:
             if process.pid in seen_pids:
                 continue
             seen_pids.add(process.pid)
             try:
-                total_rss += int(process.memory_info().rss)
+                rss_bytes = int(process.memory_info().rss)
+                total_rss += rss_bytes
                 process_count += 1
             except psutil.NoSuchProcess:
                 # A process that disappeared before this sample has no current
@@ -190,6 +199,14 @@ class _RuntimeTreeSampler:
                 continue
             except (OSError, psutil.Error):
                 errors += 1
+                continue
+            sampled_processes.append(
+                {
+                    "pid": int(process.pid),
+                    "name": _safe_process_name(process),
+                    "rss_bytes": rss_bytes,
+                }
+            )
         with self._lock:
             self._sample_error_count += errors
             if process_count == 0:
@@ -199,10 +216,28 @@ class _RuntimeTreeSampler:
             self._max_process_count = max(
                 self._max_process_count, process_count
             )
-            if self._peak_rss_bytes is None:
+            if (
+                self._peak_rss_bytes is None
+                or total_rss > self._peak_rss_bytes
+            ):
                 self._peak_rss_bytes = total_rss
-            else:
-                self._peak_rss_bytes = max(self._peak_rss_bytes, total_rss)
+                self._peak_processes = sorted(
+                    sampled_processes,
+                    key=lambda process: (
+                        -int(process["rss_bytes"]),
+                        int(process["pid"]),
+                    ),
+                )
+
+
+def _safe_process_name(process: psutil.Process) -> str | None:
+    """Return diagnostic names without reading potentially sensitive argv."""
+
+    try:
+        name = process.name()
+    except Exception:
+        return None
+    return name if isinstance(name, str) and name else None
 
 
 def _runtime_tree_metrics(root_pid: int) -> _RuntimeTreeSampler:
@@ -237,6 +272,9 @@ def _memory_report(
         ),
         "runtime_tree_sampled_peak_rss_bytes": runtime_tree[
             "sampled_peak_rss_bytes"
+        ],
+        "runtime_tree_peak_processes": runtime_tree[
+            "sampled_peak_processes"
         ],
         "runtime_tree_sample_count": runtime_tree["sample_count"],
         "runtime_tree_max_process_count": runtime_tree["max_process_count"],
@@ -306,6 +344,7 @@ def _unavailable_runtime_tree_metrics() -> dict[str, Any]:
     return {
         "available": False,
         "sampled_peak_rss_bytes": None,
+        "sampled_peak_processes": None,
         "sample_count": 0,
         "max_process_count": 0,
         "sample_interval_seconds": RUNTIME_TREE_SAMPLE_INTERVAL_SECONDS,

@@ -55,7 +55,6 @@ def start_core(
         sys.executable,
         str(ROOT / "tools" / "run_core_experiments.py"),
         "--shared-host",
-        "--prepare-contracts",
         "--include-recovery-tests",
         "--max-load-per-cpu",
         str(max_load_per_cpu),

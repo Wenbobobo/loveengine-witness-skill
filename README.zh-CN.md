@@ -58,8 +58,19 @@ issuer。节点不会把 invite、Relay 或任务自报的值当信任根。
 ```powershell
 uv sync --frozen
 uv run loveengine manifest verify
+uv run loveengine pilot contracts prepare
 uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\pilot-output
 ```
+
+`pilot contracts prepare` 是真实本机 Pilot 的显式前置步骤。它确认 Forge 和 Anvil
+均精确为 `1.7.1`，核验版本化的 `contracts/dependency-lock.json`，执行
+`forge build --threads 1`，并输出 artifact、源码和依赖 attestation。公开依赖缺少时
+才按固定 commit 获取；已有目录若与锁定树摘要不符则默认失败关闭，只有显式执行
+`pilot contracts prepare --refresh-dependencies` 才会在 staging 中完成核验后切换该受管
+目录。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，只写入被忽略的
+`contracts/lib`、`contracts/out` 和 `contracts/cache` 工作产物。
+`package build`、`quickstart`、`lan-pilot` 和 `pilot soak` 在产物缺失或 attestation
+失配时会明确失败；它们不会在计时实验中隐式编译或下载依赖。
 
 核心实验构建并锚定真实 ZIP，启动本机 Anvil 和 Relay，使用公开 node CLI，校验
 artifact、复核固定争议、执行 ProposalGate，并写出 WitnessCoreTranscriptV1。
@@ -68,6 +79,13 @@ artifact、复核固定争议、执行 ProposalGate，并写出 WitnessCoreTrans
 复核节点不是只从本地 verdict 表取一个结论就签名。签名前，每个节点都会从 invite
 绑定的 HTTP origin 取回 finalized bundle、事件列表和内容寻址 artifact，独立复算
 事件链、artifact bytes 和 bundle 引用。
+
+跨平台 core runner 将同一准备命令作为第一个可记录阶段运行，并将其 provenance
+写入机器报告：
+
+```powershell
+uv run python .\tools\run_core_experiments.py
+```
 
 可选治理扩展单独执行：
 

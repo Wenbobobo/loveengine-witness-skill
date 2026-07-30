@@ -66,6 +66,8 @@ def test_current_spec_and_preserved_release_assets_exist() -> None:
 def test_release_gate_runs_accelerated_soak_in_temporary_output() -> None:
     script = (ROOT / "tools/run_release_checks.ps1").read_text(encoding="utf-8")
 
+    assert 'Invoke-CheckedNative "contract preparation"' in script
+    assert "loveengine pilot contracts prepare" in script
     assert 'Invoke-CheckedNative "accelerated soak"' in script
     assert "loveengine pilot soak" in script
     assert "--duration-seconds 1" in script

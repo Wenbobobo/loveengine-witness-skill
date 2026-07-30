@@ -148,6 +148,7 @@ sequenceDiagram
 | 文字原文 bytes | artifacts/sha256/[prefix]/[digest] | 内容寻址；存在性仍依赖单机磁盘 |
 | 关键写入和拒绝 | audit.jsonl | hash-linked append log |
 | Anvil deployment/state、交易和 code hash | Pilot chain root | 本机实验链；不是公共测试网 |
+| Foundry dependency/cache 与 deployment artifacts | `contracts/lib`、`contracts/cache`、`contracts/out` | 被 Git 忽略的显式准备产物；报告保留摘要，不是发布信任根 |
 | ZIP/manifest hash 和 release 状态 | SkillRegistry | 链上 hash/状态，不存 ZIP bytes |
 | proposal、vote、UTO 会计 | 四个治理实验合约 | 可选层，只存结构化值和 hash |
 | 原文、token、私钥 | 不上链 | token 只从受限文件读取；私钥只在外部 signer |
@@ -158,6 +159,20 @@ snapshot 对数据库、artifact、audit 与链状态做完整 checksum 覆盖�
 Unix-like 系统会检查 token 文件的 group/other 权限；当前 Windows quickstart 只把
 token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此它是 loopback 实验
 边界，不是已完成的多用户主机凭据隔离方案。
+
+所有真实 Pilot 路径都先要求 `loveengine pilot contracts prepare`。它严格检查
+Forge/Anvil `1.7.1`、版本化 dependency lock、受控 Foundry profile/remapping，并以
+单线程构建。缺失依赖可按固定 commit 安装；已有依赖的规范树摘要失配则失败关闭，只有
+显式 `--refresh-dependencies` 才会在 staging 核验后切换。成功后在
+`contracts/cache/loveengine-contract-preparation.json` 保存本地 attestation；package、
+quickstart、demo、chain init 与 soak 会重新计算它，因此不在执行过程中隐式编译。这样
+计时实验的资源指标不混入下载/编译副作用。prepare 会先把受管依赖中 UTF-8 文本规范化为
+LF，避免宿主 Git 行尾策略进入编译 metadata；缺产物或 attestation 失配时也会明确 fail
+closed。该本地 attestation 只能发现未经重新准备的后续改动，不单独证明上游源码来源；
+发布信任仍来自包、Registry 与外部 policy。
+
+每份部署 artifact 的 compiler metadata 还必须只列出 `src/` 或两棵锁定的 `lib/` 依赖树；
+因此相对 import 不能把 `test/`、`script/` 或工作区外文件悄悄带入部署字节码。
 
 ## Hash 语义
 

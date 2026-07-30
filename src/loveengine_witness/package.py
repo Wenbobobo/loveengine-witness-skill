@@ -20,6 +20,7 @@ from .errors import LoveEngineError
 from .hashes import TEXT_SOURCE_SUFFIXES, keccak256_hex, sha256_prefixed
 from .release_identity import PROTOCOL_VERSION, SKILL_VERSION
 from .schema import validate_schema
+from .toolchain import verify_prepared_contract_artifacts
 
 
 # Kept as a public compatibility alias for existing adapters.
@@ -110,6 +111,9 @@ def _safe_archive_path(name: str) -> PurePosixPath:
 
 
 def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
+    # Do not let the standalone packaging route bypass the same attested
+    # source/dependency/artifact boundary used by active Pilot paths.
+    verify_prepared_contract_artifacts(root / "contracts")
     manifest_path = root / "skills/loveengine-witness/skill-manifest.json"
     try:
         manifest = _load_json_bytes(
@@ -132,6 +136,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "QA.md",
         "contracts/foundry.toml",
         "contracts/remappings.txt",
+        "contracts/dependency-lock.json",
         "skills/loveengine-witness/SKILL.md",
         "skills/loveengine-witness/agents/openai.yaml",
         "skills/loveengine-witness/skill-manifest.json",
@@ -189,7 +194,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         if not artifact_path.is_file():
             raise LoveEngineError(
                 "contract_artifact_missing",
-                f"{name}: run pinned Foundry build before packaging",
+                f"{name}: run loveengine pilot contracts prepare before packaging",
                 3,
             )
         if artifact_path.is_symlink():

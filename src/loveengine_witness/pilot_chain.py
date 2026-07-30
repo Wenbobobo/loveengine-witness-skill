@@ -16,7 +16,7 @@ from .demo import CONTRACTS, RATE_PER_USER, deploy, wait_for_anvil
 from .errors import LoveEngineError
 from .hashes import sha256_prefixed
 from .jsonio import read_json, write_json
-from .toolchain import foundry_binary
+from .toolchain import foundry_binary, verify_prepared_contract_artifacts
 
 
 CHAIN_ID = 31337
@@ -72,17 +72,9 @@ def _verify_state(path: Path) -> dict[str, str]:
 def initialize_chain(root: Path, *, port: int) -> dict[str, Any]:
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    build = subprocess.run(
-        [str(foundry_binary("forge")), "build"],
-        cwd=CONTRACTS,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if build.returncode:
-        raise LoveEngineError("forge_build_failed", build.stderr, 4)
+    # Compilation is deliberate: active Pilot paths only consume artifacts
+    # produced by ``loveengine pilot contracts prepare``.
+    verify_prepared_contract_artifacts(CONTRACTS)
     process = _spawn(port)
     w3 = Web3(HTTPProvider(f"http://127.0.0.1:{port}"))
     try:

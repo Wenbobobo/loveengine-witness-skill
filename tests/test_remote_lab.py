@@ -11,6 +11,7 @@ sys.path.insert(0, str(TOOLS))
 
 import run_remote_lab  # noqa: E402
 import run_core_experiments  # noqa: E402
+from loveengine_witness.toolchain import is_exact_foundry_version
 from remote_host_preflight import (  # noqa: E402
     CapacityThresholds,
     _parse_process_snapshot,
@@ -98,17 +99,25 @@ def test_remote_preflight_rejects_missing_or_unpinned_toolchain() -> None:
     assert "forge is not pinned Foundry 1.7.1" in reasons
 
 
-def test_core_runner_accepts_only_exact_multiline_foundry_version() -> None:
-    assert run_core_experiments.is_exact_forge_version(
+def test_contract_preparation_accepts_only_exact_multiline_foundry_version() -> None:
+    assert is_exact_foundry_version(
+        "forge",
         "forge Version: 1.7.1\n"
         "Commit SHA: 4072e48705af9d93e3c0f6e29e93b5e9a40caed8\n"
     )
-    assert not run_core_experiments.is_exact_forge_version(
+    assert not is_exact_foundry_version(
+        "forge",
         "forge Version: 11.7.10\n"
     )
-    assert not run_core_experiments.is_exact_forge_version(
+    assert not is_exact_foundry_version(
+        "forge",
         "wrapper output\nforge Version: 1.7.1\n"
     )
+
+
+def test_core_runner_does_not_offer_contract_prepare_bypass() -> None:
+    with pytest.raises(SystemExit):
+        run_core_experiments.build_parser().parse_args(["--prepare-contracts"])
 
 
 def test_remote_preflight_fails_closed_when_process_inspection_fails() -> None:

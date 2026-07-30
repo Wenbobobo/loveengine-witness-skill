@@ -203,6 +203,7 @@ loveengine package build --output <dir>
 loveengine package verify <archive> --expected-package-hash <registry-keccak>
 loveengine package install <archive> --target <dir> --expected-package-hash <registry-keccak>
 loveengine package self-check --root <dir> --expected-package-hash <registry-keccak>
+loveengine pilot contracts prepare
 loveengine pilot quickstart --root <dir> [--headless]
 loveengine pilot serve --config <path>
 loveengine pilot status --url <url>

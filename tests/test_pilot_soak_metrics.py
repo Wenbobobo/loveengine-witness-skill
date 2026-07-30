@@ -29,6 +29,9 @@ def _runtime_tree_metrics() -> dict[str, object]:
     return {
         "available": True,
         "sampled_peak_rss_bytes": 456,
+        "sampled_peak_processes": [
+            {"pid": 101, "name": "python", "rss_bytes": 456}
+        ],
         "sample_count": 4,
         "max_process_count": 5,
         "sample_interval_seconds": 0.5,
@@ -98,6 +101,9 @@ def test_pilot_soak_reports_runtime_tree_metrics(
         if pilot_soak.os.name == "nt"
         else "vm_hwm",
         "runtime_tree_sampled_peak_rss_bytes": 456,
+        "runtime_tree_peak_processes": [
+            {"pid": 101, "name": "python", "rss_bytes": 456}
+        ],
         "runtime_tree_sample_count": 4,
         "runtime_tree_max_process_count": 5,
         "runtime_tree_required_min_process_count": 4,
@@ -236,9 +242,18 @@ class _FakeNoSuchProcess(_FakePsutilError):
 
 
 class _FakeProcess:
-    def __init__(self, pid: int, rss_values: list[int]) -> None:
+    def __init__(
+        self,
+        pid: int,
+        rss_values: list[int],
+        *,
+        name: str | None = None,
+        name_error: BaseException | None = None,
+    ) -> None:
         self.pid = pid
         self._rss_values = iter(rss_values)
+        self._name = name
+        self._name_error = name_error
         self._children: list[_FakeProcess] = []
 
     def children(self, *, recursive: bool) -> list[_FakeProcess]:
@@ -248,12 +263,17 @@ class _FakeProcess:
     def memory_info(self) -> SimpleNamespace:
         return SimpleNamespace(rss=next(self._rss_values))
 
+    def name(self) -> str | None:
+        if self._name_error is not None:
+            raise self._name_error
+        return self._name
+
 
 def test_runtime_tree_sampler_peaks_current_tree_total(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    root = _FakeProcess(1, [100, 400])
-    child = _FakeProcess(2, [200, 100])
+    root = _FakeProcess(1, [100, 400], name="loveengine")
+    child = _FakeProcess(2, [200, 100], name="anvil")
     # The duplicate models a process API returning the same descendant twice.
     root._children = [child, child]
     monkeypatch.setattr(
@@ -273,6 +293,10 @@ def test_runtime_tree_sampler_peaks_current_tree_total(
     metrics = sampler.metrics()
     assert metrics["available"] is True
     assert metrics["sampled_peak_rss_bytes"] == 500
+    assert metrics["sampled_peak_processes"] == [
+        {"pid": 1, "name": "loveengine", "rss_bytes": 400},
+        {"pid": 2, "name": "anvil", "rss_bytes": 100},
+    ]
     assert metrics["sample_count"] == 2
     assert metrics["max_process_count"] == 2
     assert metrics["sample_error_count"] == 0
@@ -280,6 +304,41 @@ def test_runtime_tree_sampler_peaks_current_tree_total(
     assert pilot_soak._memory_checks(memory)[
         "runtime_tree_sampling_observed"
     ] is False
+
+
+def test_runtime_tree_sampler_keeps_first_peak_composition_and_handles_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _FakeProcess(1, [100, 50], name=None)
+    child = _FakeProcess(
+        2,
+        [300, 350],
+        name_error=RuntimeError("name unavailable"),
+    )
+    root._children = [child]
+    monkeypatch.setattr(
+        pilot_soak,
+        "psutil",
+        SimpleNamespace(
+            Process=lambda pid: root,
+            Error=_FakePsutilError,
+            NoSuchProcess=_FakeNoSuchProcess,
+        ),
+    )
+    sampler = pilot_soak._RuntimeTreeSampler(1, interval_seconds=0.5)
+
+    sampler._sample()
+    sampler._sample()
+
+    metrics = sampler.metrics()
+    assert metrics["sampled_peak_rss_bytes"] == 400
+    assert metrics["sampled_peak_processes"] == [
+        {"pid": 2, "name": None, "rss_bytes": 300},
+        {"pid": 1, "name": None, "rss_bytes": 100},
+    ]
+    # Name lookup is diagnostic only; the existing fail-closed RSS sampling
+    # behavior is unchanged when the capacity measurement succeeded.
+    assert metrics["sample_error_count"] == 0
 
 
 def test_runtime_tree_memory_check_fails_closed_when_sampling_unavailable(
@@ -304,6 +363,7 @@ def test_runtime_tree_memory_check_fails_closed_when_sampling_unavailable(
     memory = pilot_soak._memory_report(sampler.metrics(), 123)
     assert memory["runtime_tree_available"] is False
     assert memory["runtime_tree_sampled_peak_rss_bytes"] is None
+    assert memory["runtime_tree_peak_processes"] is None
     assert memory["runtime_tree_sample_error_count"] == 1
     checks = pilot_soak._memory_checks(memory)
     assert checks["memory_under_512mb"] is True
