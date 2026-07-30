@@ -111,3 +111,4 @@ def test_ci_refreshes_pinned_contract_dependencies() -> None:
     assert workflow.count(
         "uv run loveengine pilot contracts prepare --refresh-dependencies"
     ) == 5
+    assert workflow.count("cache: false") == 5
