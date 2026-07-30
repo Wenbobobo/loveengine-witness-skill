@@ -204,9 +204,17 @@ closed。该本地 attestation 只能发现未经重新准备的后续改动，�
 - Relay 使用 at-least-once 语义。节点以 taskId 和 issuer+nonce 双重去重，并在
   发回前把 signed receipt 落入本地 SQLite journal。
 - 接收 ACK 延迟和任务完成延迟分别记录；长观察任务期间继续处理 heartbeat。
+- 本机 core harness 为避免把 Windows 的进程开销误当作 Witness 能力，两个节点在
+  live stream 期间保持连接；第三个节点先确认 Relay 已持久化 task ACK 后受控中断，
+  并在 session finalize 后以相同 profile、cursor 和 task journal 重连重放。每次
+  故障断开都须先有 ACK 和认证连接，并在 transcript 的 fault proof 中记录 node、task
+  与连接关闭；三份 receipt 仍独立签名。这证明 at-least-once/replay，而不声称三份
+  本机进程等于三个现实组织。
 - observation cursor 持久化，SSE 重连携带 Last-Event-ID 或 after。
 - 已关闭 session 的 terminal sequence 高于本地 cursor 时，观察节点会从 SSE 重放不可变尾部；
   只有 cursor 超前、事件序号错误或补齐后的 head 不一致才拒绝。
+- harness 的只读 SSE 观察者在读取到 terminal session 后也会以同一 cursor 对持久
+  events 端点做一次最终补读，避免服务重启恰好截断 SSE 响应前缀时把部分事件误判为完整。
 - receipt 必须属于当前鉴权连接和该节点已接受的 pending task；伪造、错绑或重复
   receipt 均拒绝。
 - Relay 保存 receipt 后返回 ACK，节点再回 receipt confirmation。若第一份 ACK

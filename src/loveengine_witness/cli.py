@@ -126,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     live_evidence.add_argument("--input", type=Path, default=DEFAULT_LIVE_FIXTURE)
     live_evidence.add_argument("--output", type=Path, required=True)
     lan_pilot = demo_commands.add_parser("lan-pilot")
+    lan_pilot.add_argument("--run-id")
     lan_pilot.add_argument("--events", type=int, default=12)
     lan_pilot.add_argument("--observers", type=int, default=10)
     lan_pilot.add_argument("--event-interval", type=float, default=0.01)
@@ -318,6 +319,7 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.command == "demo" and args.demo_command == "lan-pilot":
         return run_pilot_demo(
             args.output,
+            run_id=args.run_id,
             event_count=args.events,
             observer_count=args.observers,
             event_interval=args.event_interval,

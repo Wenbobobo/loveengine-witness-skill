@@ -75,10 +75,14 @@ def test_release_gate_runs_accelerated_soak_in_temporary_output() -> None:
 
     assert 'Invoke-CheckedNative "contract preparation"' in script
     assert "loveengine pilot contracts prepare" in script
-    assert 'Invoke-CheckedNative "accelerated soak"' in script
+    assert 'Write-Host "==> accelerated soak"' in script
     assert "loveengine pilot soak" in script
     assert "--duration-seconds 1" in script
     assert '--output (Join-Path $buildCheckRoot "accelerated-soak")' in script
+    assert "Task exception was never retrieved" in script
+    assert "Exception in callback" in script
+    assert "BaseProactorEventLoop" in script
+    assert "AssertionError" in script
 
 
 def test_documentation_allows_only_declared_generated_contract_runtime_paths(
@@ -110,5 +114,9 @@ def test_ci_refreshes_pinned_contract_dependencies() -> None:
 
     assert workflow.count(
         "uv run loveengine pilot contracts prepare --refresh-dependencies"
-    ) == 5
-    assert workflow.count("cache: false") == 5
+    ) == 6
+    assert workflow.count("cache: false") == 6
+    assert "windows-pilot-restart:" in workflow
+    assert "runs-on: windows-latest" in workflow
+    assert "Pilot restart smoke emitted an unhandled asynchronous runtime diagnostic." in workflow
+    assert "BaseProactorEventLoop" in workflow

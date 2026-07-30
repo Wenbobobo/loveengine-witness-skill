@@ -7,13 +7,16 @@ import subprocess
 import sys
 import time
 import uuid
+from math import isfinite
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from .core_transcript import verify_core_transcript
 from .errors import LoveEngineError
 from .jsonio import read_json, write_json
 from .pilot_soak import SOAK_SUCCESS_CHECK_KEYS, validate_pilot_soak_args
+from .pilot_transcript import verify_pilot_transcript
 
 
 STATE_FILENAME = "pilot-soak-run.json"
@@ -21,6 +24,7 @@ STDOUT_FILENAME = "pilot-soak.stdout.jsonl"
 STDERR_FILENAME = "pilot-soak.stderr.log"
 REPORT_FILENAME = "pilot-soak-report.json"
 REPORT_SCHEMA_VERSION = "loveengine.pilot-soak-report/1"
+REPORT_DURATION_TOLERANCE_SECONDS = 1.0
 
 
 def _utc_now() -> str:
@@ -68,13 +72,74 @@ def _process_alive(pid: int) -> bool:
     return True
 
 
+def _verified_report_transcript(
+    report: dict[str, Any], state: dict[str, Any], output: Path
+) -> str | None:
+    """Verify the report-owned transcript without using RPC or a trust policy."""
+
+    raw_path = report.get("transcript_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return "transcript_path_missing"
+    try:
+        transcript_path = Path(raw_path)
+        if not transcript_path.is_absolute():
+            return "transcript_path_not_absolute"
+        transcript_path = transcript_path.resolve()
+        transcript_path.relative_to(output)
+    except (OSError, RuntimeError, ValueError):
+        return "transcript_path_outside_output"
+    if not transcript_path.is_file():
+        return "transcript_missing"
+    try:
+        transcript = read_json(transcript_path)
+        if not isinstance(transcript, dict):
+            return "transcript_not_object"
+        verification = (
+            verify_core_transcript(transcript)
+            if state.get("stage") == "core"
+            else verify_pilot_transcript(transcript)
+        )
+    except (
+        KeyError,
+        LoveEngineError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+    ):
+        return "transcript_invalid"
+    if not isinstance(verification, dict):
+        return "transcript_not_offline_valid"
+    if (
+        verification.get("valid") is not True
+        or verification.get("verification_level") != "offline_integrity"
+        or verification.get("chain_verified") is not False
+        or verification.get("trust_bound") is not False
+    ):
+        return "transcript_not_offline_valid"
+    if verification.get("run_id") != report.get("run_id"):
+        return "transcript_run_id_mismatch"
+    if verification.get("event_count") != report.get("event_count"):
+        return "transcript_event_count_mismatch"
+    if state.get("stage") == "core" and (
+        verification.get("observation_receipts") != 3
+        or verification.get("review_receipts") != 3
+        or verification.get("gate_ready") is not True
+    ):
+        return "transcript_core_evidence_incomplete"
+    return None
+
+
 def _passed_report_issue(
-    report: dict[str, Any], state: dict[str, Any]
+    report: dict[str, Any], state: dict[str, Any], output: Path
 ) -> str | None:
     """Return a stable reason when a report cannot prove a completed soak."""
 
     if report.get("schema_version") != REPORT_SCHEMA_VERSION:
         return "schema_version"
+    if state.get("stage") not in {"core", "governance"}:
+        return "stage_invalid"
     if report.get("stage") != state.get("stage"):
         return "stage_mismatch"
     if report.get("event_count") != state.get("event_count"):
@@ -82,7 +147,12 @@ def _passed_report_issue(
     if report.get("observer_count") != state.get("observer_count"):
         return "observer_count_mismatch"
     run_id = state.get("run_id")
-    if isinstance(run_id, str) and run_id and report.get("run_id") != run_id:
+    if not isinstance(run_id, str) or not run_id.strip():
+        return "state_run_id_invalid"
+    report_run_id = report.get("run_id")
+    if not isinstance(report_run_id, str) or not report_run_id.strip():
+        return "report_run_id_invalid"
+    if report_run_id != run_id:
         return "run_id_mismatch"
     requested_duration = report.get("requested_duration_seconds")
     if (
@@ -100,7 +170,31 @@ def _passed_report_issue(
         return "checks_not_all_true"
     if report.get("failure") is not None:
         return "passed_report_has_failure"
-    return None
+    secret_leaks = report.get("secret_leaks")
+    if not isinstance(secret_leaks, list):
+        return "secret_leaks_missing"
+    if secret_leaks:
+        return "secret_leaks_detected"
+    reported_elapsed = report.get("elapsed_seconds")
+    requested_duration = float(state["duration_seconds"])
+    if (
+        isinstance(reported_elapsed, bool)
+        or not isinstance(reported_elapsed, (int, float))
+        or not isfinite(float(reported_elapsed))
+        or float(reported_elapsed)
+        < requested_duration - REPORT_DURATION_TOLERANCE_SECONDS
+    ):
+        return "elapsed_duration_too_short"
+    planned_end = state.get("planned_end_epoch")
+    if (
+        isinstance(planned_end, bool)
+        or not isinstance(planned_end, (int, float))
+        or not isfinite(float(planned_end))
+    ):
+        return "planned_end_missing"
+    if time.time() < float(planned_end) - REPORT_DURATION_TOLERANCE_SECONDS:
+        return "wall_clock_duration_too_short"
+    return _verified_report_transcript(report, state, output)
 
 
 def background_soak_status(state_path: Path) -> dict[str, Any]:
@@ -126,15 +220,13 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
     failure_reason: str | None = None
     if isinstance(report, dict):
         if report.get("passed") is True:
-            report_error = _passed_report_issue(report, state)
-            if report_error is not None:
-                status = "failed"
-            elif process_alive:
+            if process_alive:
                 # A child can write its report just before its process exits.
                 # Do not accept it until the recorded process has actually ended.
                 status = "running"
             else:
-                status = "passed"
+                report_error = _passed_report_issue(report, state, output)
+                status = "failed" if report_error is not None else "passed"
         else:
             status = "failed"
         if status == "failed":
@@ -204,6 +296,7 @@ def start_background_soak(
     stdout_path = output / STDOUT_FILENAME
     stderr_path = output / STDERR_FILENAME
     started_at_epoch = time.time()
+    run_id = uuid.uuid4().hex
     command = [
         sys.executable,
         "-m",
@@ -220,8 +313,9 @@ def start_background_soak(
         stage,
         "--output",
         str(output),
+        "--worker-run-id",
+        run_id,
     ]
-    run_id = uuid.uuid4().hex
     state: dict[str, Any] = {
         "schema_version": "loveengine.pilot-soak-run/1",
         "status": "starting",
@@ -257,10 +351,6 @@ def start_background_soak(
     else:
         process_kwargs["start_new_session"] = True
     try:
-        process_kwargs["env"] = {
-            **os.environ,
-            "LOVEENGINE_PILOT_SOAK_RUN_ID": run_id,
-        }
         with (
             stdout_path.open("ab", buffering=0) as stdout,
             stderr_path.open("ab", buffering=0) as stderr,

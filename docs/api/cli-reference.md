@@ -145,6 +145,9 @@ uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 -
 uv run loveengine pilot transcript verify .\governance-output\pilot.fixture.json
 ```
 
+自动化 runner 可以传入非敏感的 `--run-id`，使其报告、Pilot runtime 和生成的
+transcript 绑定到同一次运行；普通本机 demo 不指定时保留固定的演示 ID。
+
 两个 demo 都会在临时 Anvil 仍运行时完成 RPC 和 policy 验证，并把三种
 verification level 写入机器输出，随后关闭该链。链关闭后只能使用上面的离线命令；
 手工传 `--rpc-url` 时必须保证它仍是 transcript 记录的同一条链。
@@ -199,7 +202,9 @@ core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak �
 并保存报告。发布门与跨平台 core runner 都把 `pilot contracts prepare` 作为其显式、
 已记录的第一个合约阶段；不再依赖早先 `forge test` 偶然留下的 `contracts/out`。
 
-后台运行时使用：
+后台运行时使用：在新的、干净的 worktree 中，必须先显式执行 `uv sync --frozen`
+和 `uv run loveengine pilot contracts prepare`，并确认后者返回 `prepared: true`。准备阶段不计入
+soak 时长；`pilot soak` 只复验已 attested 的产物，缺失时会失败关闭。
 
 ```powershell
 uv run loveengine pilot soak --stage core --duration-seconds 1800 --events 30 --observers 10 --output .\pilot-soak --background
@@ -213,11 +218,17 @@ uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 只说明记录的 PID 已不存在且未产生最终报告；部分 artifact 仅供诊断，不能作为成功结果，
 也不能据此归因外部宿主为何终止了进程。
 
-每次后台启动还会生成非敏感 `run_id`，并拒绝已有而无 state 的 report。状态读取器仅在
-该 ID 与 report 匹配、记录的子进程已退出后，才会把通过报告绑定到固定 schema、stage、
-事件数、观察者数与请求时长；它同时要求完整的标准成功检查集和所有已报告的 `checks`
-都严格为 true。格式错误、stale/cross-run 错绑、缺少标准 checks 或 `passed:true` 与
-checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
+每次 soak（前台或后台）都会生成非敏感 `run_id`；后台启动会预先把它写入 state，
+再同时传入 Pilot runtime、transcript 和 report，并拒绝已有而无 state 的 report。
+状态读取器仅在该 ID 在 state、report、离线重验的 transcript 和 verifier 回传值中一致、
+记录的子进程已退出、report 的实测 `elapsed_seconds` 达到请求时长（仅允许 1 秒计时
+舍入余量），且本机状态检查已跨过 `planned_end_epoch` 后，才会把通过报告绑定到固定 schema、
+stage、事件数与观察者数；它同时要求完整的标准成功检查集和所有已报告的
+`checks` 都严格为 true、`secret_leaks` 为一个空列表，以及 transcript 路径在本次输出
+目录内。状态读取器会重新读取该 transcript，不传 RPC 或 trust policy 地复验完整性；core
+还必须确有 3 个 observation receipt、3 个 review receipt 和 ready Gate。格式错误、
+stale/cross-run 错绑、缺少标准 checks、secret finding、不可复验 transcript 或
+`passed:true` 与 checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
 
 `peak_rss_bytes` 保留为兼容字段，且由 `peak_rss_bytes_scope` 明确标记为根进程的
 OS 峰值。`memory.root_process_peak_rss_bytes` 也是该局部诊断；完整实验的资源门是
@@ -246,7 +257,10 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 ```
 
 run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
-最多两核和低并发。它先运行 core/recovery，再建立本机 SSH tunnel，使用公开
+低并发，并始终预留一颗 CPU 给既有任务（2 vCPU 时 lab 仅绑定 1 核，否则最多
+2 核）。每个受控 core/Quickstart 组都有身份绑定、带期限的 watchdog；runner
+在继续 core 等待或任务入队前核验其存活，清理后核验其退出。它先运行
+core/recovery，再建立本机 SSH tunnel，使用公开
 `loveengine node connect` 连接远端 Quickstart，并通过鉴权任务入口证明连接后任务
 和绑定 receipt。runner 先同时连接 3 个公开 node 进程，再分别提交 3 个 tunnel
 review task。每个任务指向刚创建的 finalized evidence；节点实际取回 bundle、

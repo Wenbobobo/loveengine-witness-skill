@@ -130,8 +130,9 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 
 The pre-enterprise remote lab keeps Pilot and Anvil on the remote loopback
 interface. It pins the SSH host key, requires public-key authentication, runs a
-read-only resource gate, deploys one clean commit to a unique directory, limits
-the experiment to two CPUs with lower scheduling priority, and downloads the
+read-only resource gate, deploys one clean commit to a unique directory, keeps
+one CPU reserved for existing work (one lab CPU on a two-vCPU host; otherwise
+at most two), applies lower scheduling priority, and downloads the
 report/transcript for another local offline verification. Run mode also maps
 the remote loopback through an SSH tunnel and proves that the public node CLI
 starts three authenticated processes before task submission; each receives its
@@ -144,9 +145,16 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 ```
 
 The remote runner deliberately has no password option and does not use sudo,
-systemd, public binds, or automatic cleanup. See the
+systemd, or public binds. Its owned core and Quickstart groups have bounded,
+identity-checked watchdogs. The detached Quickstart supervisor creates its
+watchdog before its Pilot child and writes its ready record only after both
+exist; the runner verifies watchdog liveness before core waiting or task
+submission and verifies exit after cleanup. See the
 [shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
-Success and failure both produce a machine-readable report. The final
+Startup-failure cleanup follows the same rule: without the expected PID start
+tick, private session/group identity, canonical launcher path, and mode, it
+does not signal a process group. Success and failure both produce a
+machine-readable report. The final
 postflight records whether process inspection succeeded and no lab process
 remained; one-minute load can still reflect the experiment that just ended.
 
@@ -158,9 +166,11 @@ the tunnel started three public node CLI processes, each received a
 post-connection evidence-verified task and returned its own bound receipt.
 Relay recorded `acked:3` and `receipt_confirmed:3`, and the post-run read-only
 gate found no related process left behind. These are simulated profiles and
-processes, not proof of socially independent witnesses. A foreground 30-minute
-local core soak has passed; remote 30-minute and all four-hour soak evidence
-remain deferred.
+processes, not proof of socially independent witnesses. The historical
+foreground 30-minute local core soak predates the current run-ID and fault
+evidence fixes, so it is baseline evidence only, not acceptance evidence for
+the current candidate. Remote 30-minute and current-candidate four-hour soak
+evidence remain deferred.
 
 ## Roles
 

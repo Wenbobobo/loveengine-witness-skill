@@ -47,13 +47,33 @@ try {
 
     Invoke-CheckedNative "M2-M6 integration tests" { uv run pytest -m integration -q }
 
-    Invoke-CheckedNative "accelerated soak" {
-        uv run loveengine pilot soak `
-            --stage core `
-            --duration-seconds 1 `
-            --events 12 `
-            --observers 10 `
-            --output (Join-Path $buildCheckRoot "accelerated-soak")
+    $acceleratedSoakLog = Join-Path $buildCheckRoot "accelerated-soak-console.log"
+    Write-Host "==> accelerated soak"
+    & uv run loveengine pilot soak `
+        --stage core `
+        --duration-seconds 1 `
+        --events 12 `
+        --observers 10 `
+        --output (Join-Path $buildCheckRoot "accelerated-soak") `
+        *> $acceleratedSoakLog
+    $acceleratedSoakExitCode = $LASTEXITCODE
+    Get-Content -LiteralPath $acceleratedSoakLog
+    if ($acceleratedSoakExitCode -ne 0) {
+        throw "accelerated soak failed with exit code $acceleratedSoakExitCode."
+    }
+    $asyncFailure = Select-String -LiteralPath $acceleratedSoakLog `
+        -SimpleMatch `
+        "Task exception was never retrieved", `
+        "Unhandled exception in client_connected_cb", `
+        "Exception in callback", `
+        "BaseProactorEventLoop", `
+        "AssertionError", `
+        "Task was destroyed but it is pending!", `
+        "Unclosed client session", `
+        "Unclosed connector" `
+        -Quiet
+    if ($asyncFailure) {
+        throw "accelerated soak emitted an unhandled asynchronous runtime diagnostic."
     }
 
     $first = Invoke-CheckedNative "first deterministic build" {

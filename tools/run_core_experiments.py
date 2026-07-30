@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from remote_host_preflight import CapacityThresholds, run_preflight
+from start_shared_quickstart import select_shared_host_cpus
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,8 +49,9 @@ def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, A
         os.nice(nice_increment)
         result["nice_increment"] = nice_increment
         if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
-            available = sorted(os.sched_getaffinity(0))
-            selected = available[: max(1, min(max_cpus, len(available)))]
+            selected = select_shared_host_cpus(
+                os.sched_getaffinity(0), max_cpus
+            )
             os.sched_setaffinity(0, selected)
             result["cpu_affinity"] = selected
     return result
@@ -167,6 +169,10 @@ def main() -> int:
     )
     if args.shared_host:
         validate_shared_host_limits(args.max_cpus, args.nice_increment)
+        if not hasattr(os, "sched_getaffinity") or not hasattr(
+            os, "sched_setaffinity"
+        ):
+            raise RuntimeError("shared-host CPU affinity enforcement is required")
         thresholds = CapacityThresholds(
             max_load_per_cpu=args.max_load_per_cpu,
             min_available_memory_bytes=int(args.min_memory_gib * GIB),
@@ -224,6 +230,8 @@ def main() -> int:
                 "loveengine",
                 "demo",
                 "lan-pilot",
+                "--run-id",
+                run_id,
                 "--stage",
                 "core",
                 "--events",
@@ -262,10 +270,13 @@ def main() -> int:
         )
         offline = _last_json_object(offline_output)
         if (
-            offline.get("verification_level") != "offline_integrity"
+            offline.get("valid") is not True
+            or offline.get("verification_level") != "offline_integrity"
             or offline.get("trust_bound") is not False
+            or offline.get("chain_verified") is not False
+            or offline.get("run_id") != run_id
         ):
-            raise RuntimeError("offline transcript verification overstated trust")
+            raise RuntimeError("offline transcript verification or run binding failed")
 
         experiment.run(
             "tamper-and-policy-tests",

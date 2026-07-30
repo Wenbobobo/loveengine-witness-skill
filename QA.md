@@ -234,7 +234,10 @@ tunnel，不能外推为公共测试网或企业部署。
 
 **当前已证明：** 仓库提供只读 shared-host preflight、跨平台 core runner 和
 key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净 commit，
-限制为 nice +15 和最多两核，并保持远端 Pilot/Anvil loopback。短实验还覆盖
+限制为 nice +15，并始终预留一颗 CPU 给既有任务（2 vCPU 时 lab 只能绑定 1 核，
+否则最多 2 核），同时保持远端 Pilot/Anvil loopback。受控 core 与 Quickstart
+组有独立、身份绑定的 watchdog；runner 会在继续等待或入队前检查其存活，并在
+清理后验证其退出。短实验还覆盖
 持久 Anvil 重启、Quickstart Relay、snapshot 恢复，以及公开 node CLI 经 SSH
 tunnel 收到连接后任务并返回绑定 receipt。2026-07-29 的合并 commit
 `76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短时跨主机门：3 个
@@ -244,7 +247,8 @@ evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation，owne
 清理验证与独立 postflight 均通过。
 
 **当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；远端
-30 分钟和全部 4 小时 soak 尚未执行（本机前台 30 分钟 core soak 已通过）。它仍
+30 分钟和全部 4 小时 soak 尚未执行；此前本机前台 30 分钟 core soak 早于当前 run ID
+与故障证据修复，因此只保留为历史 baseline，不能接受当前 candidate。它仍
 不证明生产 signer、TLS、HA、公共测试网、现实见证者独立性、事实真实性或企业
 系统已经接入。三个本机进程和三个实验 profile 也不能替代三个现实组织。
 

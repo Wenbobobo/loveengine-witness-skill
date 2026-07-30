@@ -18,6 +18,8 @@ from typing import Any
 
 GIB = 1024**3
 SCHEMA_VERSION = "loveengine.remote-host-preflight/1"
+MIN_RESERVED_SHARED_HOST_CPUS = 1
+MAX_LAB_CPU_ASSIGNMENT = 2
 REQUIRED_TOOLS = (
     "python3",
     "uv",
@@ -45,6 +47,27 @@ class CapacityThresholds:
     min_available_memory_bytes: int = 3 * GIB
     min_free_disk_bytes: int = 5 * GIB
     min_cpu_count: int = 2
+
+
+def max_lab_cpu_assignment(
+    available_cpu_count: int,
+    requested_max_cpus: int = MAX_LAB_CPU_ASSIGNMENT,
+) -> int:
+    """Return the bounded lab affinity while retaining one shared-host CPU."""
+
+    if (
+        isinstance(available_cpu_count, bool)
+        or not isinstance(available_cpu_count, int)
+        or available_cpu_count < 0
+    ):
+        raise ValueError("available CPU count must be a non-negative integer")
+    if (
+        isinstance(requested_max_cpus, bool)
+        or not isinstance(requested_max_cpus, int)
+        or not 1 <= requested_max_cpus <= MAX_LAB_CPU_ASSIGNMENT
+    ):
+        raise ValueError("requested lab CPUs must be between 1 and 2")
+    return min(requested_max_cpus, max(0, available_cpu_count - MIN_RESERVED_SHARED_HOST_CPUS))
 
 
 def _existing_path(path: Path) -> Path:
@@ -229,6 +252,8 @@ def collect_host_snapshot(workspace: Path) -> dict[str, Any]:
         "architecture": platform.machine(),
         "host_cpu_count": host_cpu_count,
         "cpu_count": cpu_count,
+        "reserved_cpu_count": MIN_RESERVED_SHARED_HOST_CPUS,
+        "max_lab_cpu_assignment": max_lab_cpu_assignment(cpu_count),
         "load_1m": load[0],
         "load_5m": load[1],
         "load_15m": load[2],
@@ -267,6 +292,8 @@ def evaluate_capacity(
         reasons.append("could not verify existing shared-host processes")
     if int(snapshot.get("cpu_count") or 0) < thresholds.min_cpu_count:
         reasons.append("insufficient CPU count")
+    if max_lab_cpu_assignment(int(snapshot.get("cpu_count") or 0)) < 1:
+        reasons.append("CPU reserve leaves no CPU for the lab")
     if float(snapshot.get("load_per_cpu_1m") or 0.0) > thresholds.max_load_per_cpu:
         reasons.append("one-minute load per CPU exceeds the shared-host limit")
     available = snapshot.get("memory_available_bytes")

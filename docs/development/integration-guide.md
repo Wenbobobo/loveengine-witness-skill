@@ -137,6 +137,15 @@ runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证�
 “证明/不证明”的边界。它把 `contracts prepare` 作为首个已记录阶段，因此来自干净
 源码 checkout 的构建 provenance 也保留在报告中。
 
+为控制 Windows 本机 soak 的实际进程资源，Pilot 在 live stream 期间保持两个公开
+node CLI；第三个节点先确认 Relay 的 durable ACK，随后受控中断，并在 evidence
+finalize 后以同一 profile、cursor SQLite 和 task journal 重连完成回放。该调度仍
+要求三个节点在故障前均已完成 durable ACK 和认证 Relay 连接；每次受控断开都把
+node、task ID、ACK 与连接关闭 proof 写入 transcript。只读 SSE 观察者在 session
+关闭后还会按自己的 cursor 从持久 events 端点补读一次，因此服务器重启不能把 SSE
+响应前缀误当成完整观察。该调度仍要求三份独立签名 receipt、完整事件链和 Gate ready，
+专门验证 at-least-once 恢复；它不把同机进程数包装为现实社会独立性。
+
 默认 soak 也停在 core；治理 soak 必须显式指定：
 
 ```powershell
@@ -154,14 +163,17 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 ```
 
 preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
-+15、最多两核和低构建并发运行 core/recovery。Pilot 与 Anvil 不绑定 Tailscale
++15、低构建并发运行 core/recovery，并始终为既有任务留一颗 CPU（2 vCPU 时 lab
+只绑定 1 核，否则最多 2 核）。Pilot 与 Anvil 不绑定 Tailscale
 地址，报告/transcript 下载后由本机再次离线验证。随后 runner 建立 SSH tunnel，
 启动 3 个公开 node CLI 进程连接远端 Quickstart，等三者全部连接后才分别提交
 签名任务并验收 3 个绑定 receipt。每个 review task 指向辅助程序刚创建并
 finalize 的真实 evidence，节点会通过 tunnel 读取并复算；报告要求三份
 `evidence_verified:true`，Relay 还必须精确记录 `acked:3` 和
-`receipt_confirmed:3`。它只停止自己创建的进程组；成功或失败都写 report，
-postflight 另验无相关残留。详细门槛见
+`receipt_confirmed:3`。它只停止自己创建的进程组；core 和 Quickstart 都有受
+PID/start tick/PGID/SID/命令约束的 watchdog，runner 在 core 等待和任务入队前
+验证其存活，清理后验证其退出。成功或失败都写 report，postflight 另验无相关
+残留。详细门槛见
 [共享主机 runbook](runbooks/remote-lab-flow.zh-CN.md)。
 
 证明：相同 commit 能否在受约束 Linux 主机上复跑核心/恢复测试，以及公开节点
@@ -176,8 +188,9 @@ transcript 为 `offline_integrity` / `trust_bound:false`；3 个公开 node 分�
 evidence-verified 绑定 receipt，Relay 精确记录 `acked:3` 和
 `receipt_confirmed:3`，postflight 未发现相关残留进程。增强后的 runner 仍必须以
 每次报告中的精确 source_commit、三节点/三回执、`evidence_verified`、
-`relay_receipt_confirmed` 和 postflight 字段逐次验收。本机前台 30 分钟 core soak
-已通过；远端 30 分钟和全部 4 小时 soak 仍延期。
+`relay_receipt_confirmed` 和 postflight 字段逐次验收。此前本机前台 30 分钟 core
+soak 是早于当前证据绑定修复的历史 baseline，不能用于接受当前 candidate；远端 30 分钟
+和当前 candidate 的全部 4 小时 soak 仍延期。
 
 ## 变更验收
 

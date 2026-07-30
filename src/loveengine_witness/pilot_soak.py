@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,9 @@ SOAK_SUCCESS_CHECK_KEYS = frozenset(
         "runtime_tree_sampling_observed",
         "runtime_tree_memory_under_512mb",
         "secret_scan_zero",
+        "offline_transcript_valid",
+        "transcript_run_id_bound",
+        "workflow_evidence_complete",
     }
 )
 
@@ -62,6 +66,35 @@ def validate_pilot_soak_args(
         raise LoveEngineError(
             "formal_soak_event_count", "at least 240 events required"
         )
+
+
+def _has_verified_disconnect_proofs(faults: object) -> bool:
+    """Require one durable Relay-backed proof for every injected disconnect."""
+
+    if not isinstance(faults, dict) or faults.get("agent_disconnects") != 3:
+        return False
+    proofs = faults.get("agent_disconnect_proofs")
+    if not isinstance(proofs, list) or len(proofs) != 3:
+        return False
+    task_ids: set[str] = set()
+    nodes: set[str] = set()
+    for proof in proofs:
+        if not isinstance(proof, dict):
+            return False
+        task_id = proof.get("task_id")
+        node = proof.get("node")
+        if (
+            not isinstance(task_id, str)
+            or not task_id
+            or not isinstance(node, str)
+            or not node
+            or proof.get("accepted") is not True
+            or proof.get("connection_closed") is not True
+        ):
+            return False
+        task_ids.add(task_id)
+        nodes.add(node.lower())
+    return len(task_ids) == 3 and len(nodes) == 3
 
 
 def _disk_bytes(root: Path) -> int:
@@ -431,6 +464,7 @@ def run_pilot_soak(
     event_count: int,
     observers: int = 10,
     stage: str = "core",
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     validate_pilot_soak_args(
         duration_seconds, event_count, observers, stage
@@ -438,13 +472,21 @@ def run_pilot_soak(
     formal = duration_seconds >= 4 * 3600
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    run_id = os.environ.get("LOVEENGINE_PILOT_SOAK_RUN_ID")
+    # Background workers receive a pre-recorded ID from their launcher. Every
+    # direct/foreground invocation gets a fresh ID independent of its shell.
+    if run_id is None:
+        run_id = uuid.uuid4().hex
+    elif not isinstance(run_id, str) or not run_id.strip():
+        raise LoveEngineError("invalid_pilot_soak_run_id", "run ID is invalid")
+    else:
+        run_id = run_id.strip()
     started = time.monotonic()
     sampler = _runtime_tree_metrics(os.getpid())
     try:
         sampler.start()
         result = run_pilot_demo(
             output,
+            run_id=run_id,
             stage=stage,
             event_count=event_count,
             observer_count=observers,
@@ -452,10 +494,16 @@ def run_pilot_soak(
             simulate_faults=True,
         )
         transcript = result["transcript"]
-        if stage == "core":
+        verification = (
             verify_core_transcript(transcript)
-        else:
-            verify_pilot_transcript(transcript)
+            if stage == "core"
+            else verify_pilot_transcript(transcript)
+        )
+        if (
+            transcript.get("run_id") != run_id
+            or verification.get("run_id") != run_id
+        ):
+            raise LoveEngineError("pilot_soak_run_id_mismatch", run_id)
     except BaseException as error:
         elapsed = time.monotonic() - started
         report = _minimal_failure_report(
@@ -496,19 +544,38 @@ def run_pilot_soak(
     latency = relay["latency_ms"]
     disk = _disk_bytes(output)
     leaks = _scan_token_leak(output, output / "operator.token")
+    workflow_evidence_complete = (
+        result["review_receipts"] == 3 and result["gate_ready"] is True
+        if stage == "core"
+        else result["vote_approvals"] == 5
+        and result["proposal_executed"] is True
+    )
     checks = {
         "zero_event_loss": len(transcript["events"]) == event_count,
         "three_agents": result["observation_receipts"] == 3,
         "ten_observers": result["read_only_observers"] == observers,
         "server_restart": result["faults"]["server_restarts"] == 1,
         "anvil_restart": result["faults"]["anvil_restarts"] == 1,
-        "three_agent_disconnects": result["faults"]["agent_disconnects"] == 3,
+        "three_agent_disconnects": _has_verified_disconnect_proofs(
+            result["faults"]
+        ),
         "recovery_under_30s": result["faults"]["recovery_seconds"] < 30,
         "ack_p95_under_2s": latency["p95"] < 2000,
         "ack_max_under_5s": latency["max"] < 5000,
         "disk_under_250mb": disk < 250 * 1024 * 1024,
         **_memory_checks(memory),
         "secret_scan_zero": not leaks,
+        "offline_transcript_valid": (
+            verification.get("valid") is True
+            and verification.get("verification_level") == "offline_integrity"
+            and verification.get("chain_verified") is False
+            and verification.get("trust_bound") is False
+        ),
+        "transcript_run_id_bound": (
+            transcript.get("run_id") == run_id
+            and verification.get("run_id") == run_id
+        ),
+        "workflow_evidence_complete": workflow_evidence_complete,
     }
     passed = all(checks.values())
     report = {

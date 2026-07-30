@@ -13,7 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Awaitable, Callable
 
-from aiohttp import ClientError, ClientSession, web
+from aiohttp import ClientError, ClientSession, TCPConnector, web
 from hexbytes import HexBytes
 from web3 import Web3
 
@@ -77,6 +77,7 @@ class ObservationPhase:
     observation_set: dict[str, Any]
     observer_results: list[dict[str, int]]
     fault_recovery_seconds: float
+    fault_disconnect_proofs: tuple[dict[str, object], ...]
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,12 @@ def _spawn_node(arguments: list[str]) -> subprocess.Popen[str]:
     )
 
 
+def _new_pilot_client_session() -> ClientSession:
+    """Avoid retaining HTTP connections across the deliberate server restart."""
+
+    return ClientSession(connector=TCPConnector(force_close=True))
+
+
 async def _collect(
     processes: list[tuple[subprocess.Popen[str], Path]], label: str
 ) -> list[dict[str, Any]]:
@@ -164,7 +171,7 @@ async def _read_only_observer(base: str, session_id: str) -> dict[str, int]:
     cursor = 0
     connections = 0
     recoveries = 0
-    async with ClientSession() as client:
+    async with _new_pilot_client_session() as client:
         while True:
             try:
                 async with client.get(
@@ -186,6 +193,20 @@ async def _read_only_observer(base: str, session_id: str) -> dict[str, int]:
                 await asyncio.sleep(0.05)
                 continue
             if session["status"] == "closed":
+                # A restart can end an SSE response after it has delivered a
+                # prefix.  Session closure is terminal, so one cursor-based
+                # history read closes that race without trusting a live stream.
+                async with client.get(
+                    base + f"/v1/live/sessions/{session_id}/events",
+                    params={"after": str(cursor)},
+                ) as response:
+                    if response.status != 200:
+                        raise LoveEngineError(
+                            "observer_history_unavailable", str(response.status), 4
+                        )
+                    history = await response.json()
+                for event in history.get("events", []):
+                    cursor = max(cursor, int(event["sequence"]))
                 return {
                     "events": cursor,
                     "connections": connections,
@@ -352,16 +373,79 @@ async def _enqueue_task_through_operator_api(
     client: ClientSession,
     task: dict[str, Any],
 ) -> None:
-    response = await client.post(
+    async with client.post(
         environment.runtime.invite["server_url"] + "/v1/relay/tasks",
         json=task,
         headers=environment.headers,
-    )
-    if response.status != 202:
-        raise LoveEngineError(
-            "pilot_task_enqueue_failed",
-            f"{task['task_id']}: {await response.text()}",
-        )
+    ) as response:
+        if response.status != 202:
+            raise LoveEngineError(
+                "pilot_task_enqueue_failed",
+                f"{task['task_id']}: {await response.text()}",
+            )
+
+
+async def _wait_for_relay_task_acceptance(
+    hub: Any,
+    *,
+    node: str,
+    task_id: str,
+    timeout_seconds: float = 10.0,
+) -> None:
+    """Wait until the Relay durably records this connection's task ACK."""
+
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    while True:
+        state = hub.store.task_state(node, task_id)
+        if state is not None and state["accepted"]:
+            return
+        if asyncio.get_running_loop().time() >= deadline:
+            raise LoveEngineError("pilot_task_acceptance_timeout", task_id, 4)
+        await asyncio.sleep(0.05)
+
+
+async def _wait_for_relay_node_connections(
+    hub: Any,
+    *,
+    nodes: list[str],
+    connected: bool,
+    timeout_seconds: float = 10.0,
+) -> None:
+    """Wait for authenticated Relay membership to reach the requested state."""
+
+    expected = {node.lower() for node in nodes}
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    while True:
+        current = {
+            str(node).lower() for node in getattr(hub, "connected", set())
+        }
+        reached = expected <= current if connected else expected.isdisjoint(current)
+        if reached:
+            return
+        if asyncio.get_running_loop().time() >= deadline:
+            state = "connection" if connected else "disconnect"
+            raise LoveEngineError(
+                f"pilot_relay_{state}_timeout", ",".join(sorted(expected)), 4
+            )
+        await asyncio.sleep(0.05)
+
+
+async def _stop_processes(
+    processes: list[tuple[subprocess.Popen[str], Path]],
+) -> None:
+    for process, _ in processes:
+        if process.poll() is None:
+            process.kill()
+    for process, _ in processes:
+        try:
+            # ``wait`` leaves PIPE handles open. Draining them prevents the
+            # Windows Proactor from closing a reset transport after asyncio's
+            # managed resources have already been torn down.
+            await asyncio.to_thread(process.communicate, timeout=10)
+        except subprocess.TimeoutExpired as exc:
+            raise LoveEngineError(
+                "pilot_node_stop_timeout", str(process.pid), 4
+            ) from exc
 
 
 async def _run_observation_phase(
@@ -375,7 +459,7 @@ async def _run_observation_phase(
     simulate_faults: bool,
 ) -> ObservationPhase:
     base = environment.runtime.invite["server_url"]
-    response = await client.post(
+    async with client.post(
         base + "/v1/live/sessions",
         json={
             "session_id": environment.session_id,
@@ -383,9 +467,11 @@ async def _run_observation_phase(
             "created_at": str(int(time.time())),
         },
         headers=environment.headers,
-    )
-    if response.status != 201:
-        raise LoveEngineError("pilot_session_create_failed", await response.text())
+    ) as response:
+        if response.status != 201:
+            raise LoveEngineError(
+                "pilot_session_create_failed", await response.text()
+            )
     observer_tasks = [
         asyncio.create_task(_read_only_observer(base, environment.session_id))
         for _ in range(observer_count)
@@ -431,13 +517,51 @@ async def _run_observation_phase(
         result_path.parent.mkdir(parents=True, exist_ok=True)
         observation_specs.append((index, node, result_path))
 
-    observation_processes = _start_observation_processes(
-        environment, observation_specs
+    # The third logical witness is delayed until evidence finalization, so only
+    # two observation CLI processes remain resident during the live stream.
+    # A fault scenario first proves task-journal replay by interrupting its
+    # accepted task before any events are published.
+    delayed_spec = observation_specs[-1]
+    delayed_task = tasks[-1]
+    fault_disconnect_proofs: list[dict[str, object]] = []
+    if simulate_faults:
+        delayed_processes = _start_observation_processes(
+            environment, [delayed_spec]
+        )
+        await _wait_for_relay_task_acceptance(
+            hub,
+            node=delayed_spec[1],
+            task_id=delayed_task["task_id"],
+        )
+        await _wait_for_relay_node_connections(
+            hub, nodes=[delayed_spec[1]], connected=True
+        )
+        await _stop_processes(delayed_processes)
+        await _wait_for_relay_node_connections(
+            hub, nodes=[delayed_spec[1]], connected=False
+        )
+        fault_disconnect_proofs.append(
+            {
+                "node": delayed_spec[1],
+                "task_id": delayed_task["task_id"],
+                "accepted": True,
+                "connection_closed": True,
+            }
+        )
+
+    active_specs = observation_specs[:-1]
+    observation_processes = _start_observation_processes(environment, active_specs)
+    for task, spec in zip(tasks[:-1], active_specs, strict=True):
+        await _wait_for_relay_task_acceptance(
+            hub, node=spec[1], task_id=task["task_id"]
+        )
+    await _wait_for_relay_node_connections(
+        hub, nodes=[spec[1] for spec in active_specs], connected=True
     )
     fault_recovery_seconds = 0.0
     await asyncio.sleep(0.4)
     for index in range(1, event_count + 1):
-        response = await client.post(
+        async with client.post(
             base + f"/v1/live/sessions/{environment.session_id}/events",
             json={
                 "event_id": f"lan-event-{index:04d}",
@@ -447,15 +571,28 @@ async def _run_observation_phase(
                 "content": f"LAN pilot live message {index}",
             },
             headers=environment.headers,
-        )
-        if response.status != 202:
-            raise LoveEngineError("pilot_event_publish_failed", await response.text())
+        ) as response:
+            if response.status != 202:
+                raise LoveEngineError(
+                    "pilot_event_publish_failed", await response.text()
+                )
         await asyncio.sleep(event_interval)
         if simulate_faults and index == max(1, event_count // 2):
             fault_started = perf_counter()
-            for process, _ in observation_processes:
-                process.kill()
-                process.wait(timeout=10)
+            await _stop_processes(observation_processes)
+            active_nodes = [spec[1] for spec in active_specs]
+            await _wait_for_relay_node_connections(
+                hub, nodes=active_nodes, connected=False
+            )
+            fault_disconnect_proofs.extend(
+                {
+                    "node": spec[1],
+                    "task_id": task["task_id"],
+                    "accepted": True,
+                    "connection_closed": True,
+                }
+                for task, spec in zip(tasks[:-1], active_specs, strict=True)
+            )
             await environment.runner.cleanup()
             await restart_chain()
             package = environment.runtime.package
@@ -477,33 +614,41 @@ async def _run_observation_phase(
             ).start()
             hub = environment.app[RELAY_KEY]
             observation_processes = _start_observation_processes(
-                environment, observation_specs
+                environment, active_specs
             )
             await asyncio.sleep(0.4)
             fault_recovery_seconds = perf_counter() - fault_started
 
-    response = await client.post(
+    async with client.post(
         base + f"/v1/live/sessions/{environment.session_id}/close",
         json={"closed_at": str(int(time.time()))},
         headers=environment.headers,
-    )
-    if response.status != 200:
-        raise LoveEngineError("pilot_session_close_failed", await response.text())
-    response = await client.post(
+    ) as response:
+        if response.status != 200:
+            raise LoveEngineError(
+                "pilot_session_close_failed", await response.text()
+            )
+    async with client.post(
         base + f"/v1/live/sessions/{environment.session_id}/evidence/finalize",
         json={"revision": "1", "finalized_at": str(int(time.time()))},
         headers=environment.headers,
-    )
-    if response.status != 200:
-        raise LoveEngineError("pilot_evidence_finalize_failed", await response.text())
+    ) as response:
+        if response.status != 200:
+            raise LoveEngineError(
+                "pilot_evidence_finalize_failed", await response.text()
+            )
     observer_results = await asyncio.gather(*observer_tasks)
     if any(item["events"] != event_count for item in observer_results):
         raise LoveEngineError("observer_event_loss", json.dumps(observer_results))
 
     observation_clients = await _collect(observation_processes, "observation")
+    delayed_clients = await _collect(
+        _start_observation_processes(environment, [delayed_spec]),
+        "delayed_observation",
+    )
     observation_receipts = [
         receipt
-        for client_result in observation_clients
+        for client_result in [*observation_clients, *delayed_clients]
         for receipt in client_result["receipts"]
     ]
     observation_set = aggregate_observations(
@@ -519,6 +664,7 @@ async def _run_observation_phase(
         observation_set=observation_set,
         observer_results=observer_results,
         fault_recovery_seconds=fault_recovery_seconds,
+        fault_disconnect_proofs=tuple(fault_disconnect_proofs),
     )
 
 
@@ -600,7 +746,7 @@ async def _run_evidence_phase(
         keccak256_hex(b"LAN pilot completeness review"),
         environment.deadline,
     )
-    review_processes: list[tuple[subprocess.Popen[str], Path]] = []
+    review_clients: list[dict[str, Any]] = []
     verdicts = ("dismiss", "dismiss", "uphold")
     for index, (node, verdict) in enumerate(
         zip(environment.node_accounts, verdicts, strict=True), start=1
@@ -670,9 +816,10 @@ async def _run_evidence_phase(
             ]
         )
         environment.all_processes.append(process)
-        review_processes.append((process, result_path))
+        review_clients.extend(
+            await _collect([(process, result_path)], "review")
+        )
 
-    review_clients = await _collect(review_processes, "review")
     review_receipts = [
         receipt
         for client_result in review_clients
@@ -884,7 +1031,8 @@ def _run_acceptance_phase(
     faults = {
         "server_restarts": int(simulate_faults),
         "anvil_restarts": int(simulate_faults),
-        "agent_disconnects": 3 if simulate_faults else 0,
+        "agent_disconnects": len(observation.fault_disconnect_proofs),
+        "agent_disconnect_proofs": list(observation.fault_disconnect_proofs),
         "recovery_seconds": round(observation.fault_recovery_seconds, 3),
     }
     artifacts = [
@@ -1080,7 +1228,7 @@ async def run_pilot_phases(
         output, w3, deployment, runtime, stage=stage
     )
     try:
-        async with ClientSession() as client:
+        async with _new_pilot_client_session() as client:
             observation = await _run_observation_phase(
                 environment,
                 client,
@@ -1107,7 +1255,13 @@ async def run_pilot_phases(
                 simulate_faults=simulate_faults,
             )
     finally:
-        for process in environment.all_processes:
-            if process.poll() is None:
-                process.kill()
-        await environment.runner.cleanup()
+        try:
+            await _stop_processes(
+                [
+                    (process, environment.output)
+                    for process in environment.all_processes
+                    if process.poll() is None
+                ]
+            )
+        finally:
+            await environment.runner.cleanup()

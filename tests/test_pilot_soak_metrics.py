@@ -52,10 +52,12 @@ def _install_memory_stubs(
     return sampler
 
 
-def _successful_demo(output: Path, **_: object) -> dict[str, object]:
+def _successful_demo(output: Path, **kwargs: object) -> dict[str, object]:
     (output / "operator.token").write_text("test-write-token", encoding="utf-8")
+    run_id = str(kwargs.get("run_id") or "lan-pilot-e2e-001")
     return {
         "transcript": {
+            "run_id": run_id,
             "events": [{"sequence": 1}],
             "metrics": {
                 "latency_ms": {"p95": 10, "max": 20},
@@ -64,13 +66,38 @@ def _successful_demo(output: Path, **_: object) -> dict[str, object]:
         },
         "transcript_path": str(output / "witness-core.fixture.json"),
         "observation_receipts": 3,
+        "review_receipts": 3,
+        "gate_ready": True,
         "read_only_observers": 10,
         "faults": {
             "server_restarts": 1,
             "anvil_restarts": 1,
             "agent_disconnects": 3,
+            "agent_disconnect_proofs": [
+                {
+                    "node": f"0x{index:040x}",
+                    "task_id": f"observe:pilot:{index}",
+                    "accepted": True,
+                    "connection_closed": True,
+                }
+                for index in range(1, 4)
+            ],
             "recovery_seconds": 1.0,
         },
+    }
+
+
+def _valid_core_verification(transcript: dict[str, object]) -> dict[str, object]:
+    return {
+        "valid": True,
+        "verification_level": "offline_integrity",
+        "chain_verified": False,
+        "trust_bound": False,
+        "run_id": transcript["run_id"],
+        "event_count": len(transcript["events"]),
+        "observation_receipts": 3,
+        "review_receipts": 3,
+        "gate_ready": True,
     }
 
 
@@ -80,12 +107,14 @@ def test_pilot_soak_reports_runtime_tree_metrics(
     sampler = _install_memory_stubs(monkeypatch)
     monkeypatch.setattr(pilot_soak, "run_pilot_demo", _successful_demo)
     monkeypatch.setattr(
-        pilot_soak, "verify_core_transcript", lambda transcript: {"valid": True}
+        pilot_soak, "verify_core_transcript", _valid_core_verification
     )
-    monkeypatch.setenv("LOVEENGINE_PILOT_SOAK_RUN_ID", "background-run-123")
-
     report = pilot_soak.run_pilot_soak(
-        tmp_path, duration_seconds=1, event_count=1, observers=10
+        tmp_path,
+        duration_seconds=1,
+        event_count=1,
+        observers=10,
+        run_id="background-run-123",
     )
 
     assert sampler.started is True
@@ -115,6 +144,9 @@ def test_pilot_soak_reports_runtime_tree_metrics(
     assert report["checks"]["memory_under_512mb"] is True
     assert report["checks"]["runtime_tree_memory_under_512mb"] is True
     assert report["checks"]["runtime_tree_sampling_observed"] is True
+    assert report["checks"]["offline_transcript_valid"] is True
+    assert report["checks"]["transcript_run_id_bound"] is True
+    assert report["checks"]["workflow_evidence_complete"] is True
     written = json.loads(
         (tmp_path / "pilot-soak-report.json").read_text(encoding="utf-8")
     )
@@ -163,7 +195,7 @@ def test_completed_but_failed_gate_has_a_stable_failure_code(
     sampler._metrics["sampled_peak_rss_bytes"] = 512 * 1024 * 1024
     monkeypatch.setattr(pilot_soak, "run_pilot_demo", _successful_demo)
     monkeypatch.setattr(
-        pilot_soak, "verify_core_transcript", lambda transcript: {"valid": True}
+        pilot_soak, "verify_core_transcript", _valid_core_verification
     )
 
     with pytest.raises(LoveEngineError) as error:
@@ -181,6 +213,85 @@ def test_completed_but_failed_gate_has_a_stable_failure_code(
         "exception_type": "LoveEngineError",
     }
     assert report["checks"]["runtime_tree_memory_under_512mb"] is False
+
+
+def test_pilot_soak_rejects_transcript_from_another_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_memory_stubs(monkeypatch)
+
+    def wrong_run_demo(output: Path, **kwargs: object) -> dict[str, object]:
+        result = _successful_demo(output, **kwargs)
+        result["transcript"]["run_id"] = "different-run"
+        return result
+
+    monkeypatch.setattr(pilot_soak, "run_pilot_demo", wrong_run_demo)
+    monkeypatch.setattr(
+        pilot_soak, "verify_core_transcript", _valid_core_verification
+    )
+    with pytest.raises(LoveEngineError) as error:
+        pilot_soak.run_pilot_soak(
+            tmp_path,
+            duration_seconds=1,
+            event_count=1,
+            observers=10,
+            run_id="background-run-123",
+        )
+
+    assert error.value.code == "pilot_soak_run_id_mismatch"
+
+
+def test_pilot_soak_rejects_verifier_run_id_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_memory_stubs(monkeypatch)
+    monkeypatch.setattr(pilot_soak, "run_pilot_demo", _successful_demo)
+    def wrong_verification(transcript: dict[str, object]) -> dict[str, object]:
+        value = _valid_core_verification(transcript)
+        value["run_id"] = "different-run"
+        return value
+
+    monkeypatch.setattr(
+        pilot_soak, "verify_core_transcript", wrong_verification
+    )
+
+    with pytest.raises(LoveEngineError) as error:
+        pilot_soak.run_pilot_soak(
+            tmp_path,
+            duration_seconds=1,
+            event_count=1,
+            observers=10,
+            run_id="background-run-123",
+        )
+
+    assert error.value.code == "pilot_soak_run_id_mismatch"
+
+
+def test_foreground_soak_generates_and_binds_a_unique_run_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_memory_stubs(monkeypatch)
+    captured: dict[str, object] = {}
+
+    def capture_demo(output: Path, **kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return _successful_demo(output, **kwargs)
+
+    monkeypatch.setenv("LOVEENGINE_PILOT_SOAK_RUN_ID", "stale-shell-run")
+    monkeypatch.setattr(pilot_soak, "run_pilot_demo", capture_demo)
+    monkeypatch.setattr(
+        pilot_soak, "verify_core_transcript", _valid_core_verification
+    )
+
+    report = pilot_soak.run_pilot_soak(
+        tmp_path, duration_seconds=1, event_count=1, observers=10
+    )
+
+    assert isinstance(report["run_id"], str)
+    assert report["run_id"]
+    assert report["run_id"] != "stale-shell-run"
+    assert captured["run_id"] == report["run_id"]
+    assert report["checks"]["transcript_run_id_bound"] is True
 
 
 def test_failure_report_survives_diagnostic_errors(

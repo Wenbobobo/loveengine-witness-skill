@@ -163,3 +163,41 @@ jobs:
         run: uv run pytest tests/integration/test_pilot_quickstart.py
       - name: Accelerated faults and ten-observer soak
         run: uv run pytest tests/integration/test_pilot_soak.py
+
+  windows-pilot-restart:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+          cache: false
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync --frozen
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
+      - name: Pilot restart smoke
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "pilot-restart-smoke.log"
+          & uv run pytest tests/test_pilot_event_loop.py tests/integration/test_pilot_demo.py *> $log
+          $exitCode = $LASTEXITCODE
+          Get-Content -LiteralPath $log
+          if ($exitCode -ne 0) {
+            exit $exitCode
+          }
+          $diagnostics = Select-String -LiteralPath $log -SimpleMatch `
+            "Task exception was never retrieved", `
+            "Unhandled exception in client_connected_cb", `
+            "Exception in callback", `
+            "BaseProactorEventLoop", `
+            "AssertionError", `
+            "Task was destroyed but it is pending!", `
+            "Unclosed client session", `
+            "Unclosed connector"
+          if ($diagnostics) {
+            throw "Pilot restart smoke emitted an unhandled asynchronous runtime diagnostic."
+          }

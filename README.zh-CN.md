@@ -113,7 +113,8 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 
 企业衔接前的 remote lab 让 Pilot 和 Anvil 继续只监听远端 loopback。它固定 SSH
 host key，只接受 public-key 认证，先执行只读资源门，再把一个干净 commit 部署到
-唯一目录；实验最多使用两个 CPU、降低调度优先级，最后下载报告和 transcript，
+唯一目录；实验始终为既有任务保留一颗 CPU（2 vCPU 主机只绑定 1 核，否则最多
+绑定 2 核），并降低调度优先级，最后下载报告和 transcript，
 在本机再次离线验证。run 模式还会建立本机 SSH tunnel，使用公开 node CLI 连接
 远端 loopback Quickstart。runner 先启动 3 个独立鉴权进程，三者全部连接后才
 分别提交任务；每个节点取回并复算各自的 finalized evidence，再返回与
@@ -124,9 +125,13 @@ uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
 ```
 
-远程 runner 故意不提供 password 参数，也不使用 sudo、systemd、公开端口绑定或
-自动清理。完整步骤见[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
-成功和失败都会产生机器可读报告。最终 postflight 明确记录进程检查是否成功、是否
+远程 runner 故意不提供 password 参数，也不使用 sudo、systemd 或公开端口绑定。
+它为自己创建的 core 与 Quickstart 进程组设置有上限、身份绑定的 watchdog；脱离 SSH 的
+Quickstart supervisor 会先创建 watchdog、再启动 Pilot child，并且只在二者都已存在后写出
+ready record。在等待 core 或提交任务前检查 watchdog 存活，清理后还要验证其退出。完整步骤见
+[共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
+启动失败时也遵守同一边界：没有预期 PID start tick、私有 session/group 身份、canonical
+启动脚本和 mode 的完整匹配，就不得向进程组发送信号。成功和失败都会产生机器可读报告。最终 postflight 明确记录进程检查是否成功、是否
 无本次实验残留；一分钟负载仍可能包含刚结束实验的影响。
 
 最新一次已验收的短时跨主机实验使用合并后的 commit
@@ -135,8 +140,9 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 `trust_bound:false`。tunnel 启动 3 个公开 node CLI 进程，三者各自在连接后收到
 一份 evidence-verified 任务并返回自己的绑定回执；Relay 记录 `acked:3` 和
 `receipt_confirmed:3`，实验后的只读门禁未发现相关残留进程。三个 profile/进程
-仍是模拟 actor，不代表现实社会独立性。本机前台 30 分钟 core soak 已通过；远端
-30 分钟和全部 4 小时 soak 证据仍待独立空闲窗口执行。
+仍是模拟 actor，不代表现实社会独立性。此前本机前台 30 分钟 core soak 早于当前
+run ID 与故障证据修复，只是历史 baseline，不能接受当前 candidate；远端 30 分钟和
+当前 candidate 的全部 4 小时 soak 证据仍待独立空闲窗口执行。
 
 ## 角色
 

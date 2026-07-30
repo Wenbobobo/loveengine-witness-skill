@@ -20,6 +20,8 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from remote_host_preflight import max_lab_cpu_assignment
+
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
@@ -27,6 +29,12 @@ USER_PATTERN = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 REMOTE_ROOT_PATTERN = re.compile(r"^[A-Za-z0-9._/-]+$")
 REMOTE_FILE_PATTERN = re.compile(r"^/[A-Za-z0-9._/-]+$")
 TUNNEL_NODE_COUNT = 3
+CORE_RECEIPT_COUNT = 3
+CORE_EVENT_COUNT = 12
+REMOTE_QUICKSTART_WATCHDOG_SECONDS = 600
+ADDRESS_PATTERN = re.compile(r"^0x[0-9a-fA-F]{40}$")
+QUICKSTART_WATCHDOG_MODE = "--watchdog"
+CORE_WATCHDOG_MODE = "--core-watchdog"
 
 
 def _utc_now() -> str:
@@ -140,6 +148,8 @@ def _ssh_options(args: argparse.Namespace) -> list[str]:
         "-o",
         f"UserKnownHostsFile={known_hosts}",
         "-o",
+        "GlobalKnownHostsFile=none",
+        "-o",
         "ConnectTimeout=10",
         "-o",
         "ServerAliveInterval=15",
@@ -160,7 +170,9 @@ def _no_forwarding_options() -> list[str]:
 
 
 def _remote_bash(script: str) -> str:
-    return "bash -lc " + shlex.quote(script)
+    # All required tool locations are supplied explicitly. A login shell could
+    # execute user profile code on a shared host, so never load one here.
+    return _remote_nonlogin_bash(script)
 
 
 def _remote_nonlogin_bash(script: str) -> str:
@@ -212,11 +224,97 @@ def _wait_http_json_or_none(
         return None
 
 
+def _reap_local_process(
+    process: Any,
+    *,
+    label: str,
+    timeout_seconds: float = 5,
+) -> dict[str, Any]:
+    """Best-effort reap for a process handle created by this runner.
+
+    A local SSH tunnel or node client failing during teardown must not prevent
+    the independently-owned remote process group from being stopped.  Keep the
+    failure machine-readable for the final report, but never raise here.
+    """
+
+    outcome: dict[str, Any] = {
+        "label": label,
+        "verified": False,
+        "action": "reap_failed",
+        "returncode": None,
+    }
+    errors: list[str] = []
+
+    def record_error(exc: Exception) -> None:
+        errors.append(type(exc).__name__)
+
+    try:
+        initial_returncode = process.poll()
+    except (AttributeError, OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+        record_error(exc)
+        initial_returncode = None
+    if initial_returncode is not None:
+        outcome.update(
+            {
+                "verified": True,
+                "action": "already_exited",
+                "returncode": initial_returncode,
+            }
+        )
+        return outcome
+
+    terminated = False
+    try:
+        process.terminate()
+        terminated = True
+    except (AttributeError, OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+        record_error(exc)
+
+    if terminated:
+        try:
+            returncode = process.wait(timeout=timeout_seconds)
+            outcome.update({"action": "terminated", "returncode": returncode})
+        except subprocess.TimeoutExpired as exc:
+            record_error(exc)
+            try:
+                process.kill()
+            except (AttributeError, OSError, TypeError, ValueError, subprocess.SubprocessError) as kill_exc:
+                record_error(kill_exc)
+            else:
+                try:
+                    returncode = process.wait(timeout=timeout_seconds)
+                    outcome.update(
+                        {
+                            "action": "killed_after_timeout",
+                            "returncode": returncode,
+                        }
+                    )
+                except (OSError, TypeError, ValueError, subprocess.SubprocessError) as wait_exc:
+                    record_error(wait_exc)
+        except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+            record_error(exc)
+
+    try:
+        final_returncode = process.poll()
+    except (AttributeError, OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+        record_error(exc)
+        final_returncode = None
+    if final_returncode is not None:
+        outcome["verified"] = True
+        outcome["returncode"] = final_returncode
+        if outcome["action"] == "reap_failed":
+            outcome["action"] = "exited_during_reap"
+    if errors:
+        outcome["error_types"] = errors
+    return outcome
+
+
 def _validated_review_receipt(
     node_result: dict[str, Any],
     *,
     task_id: str,
     dispute_id: str,
+    expected_node: str,
 ) -> dict[str, Any]:
     receipts = node_result.get("receipts")
     receipt = (
@@ -227,8 +325,10 @@ def _validated_review_receipt(
     result = receipt.get("result") if isinstance(receipt, dict) else None
     if (
         node_result.get("rejected") != 0
+        or not _same_address(node_result.get("node"), expected_node)
         or not isinstance(receipt, dict)
         or receipt.get("task_id") != task_id
+        or not _same_address(receipt.get("node"), expected_node)
         or receipt.get("status") != "completed"
         or not isinstance(result, dict)
         or result.get("evidence_verified") is not True
@@ -238,6 +338,217 @@ def _validated_review_receipt(
             "tunneled node did not return an evidence-verified bound receipt"
         )
     return receipt
+
+
+def _same_address(value: object, expected: str) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(ADDRESS_PATTERN.fullmatch(value))
+        and bool(ADDRESS_PATTERN.fullmatch(expected))
+        and value.lower() == expected.lower()
+    )
+
+
+def _validated_queued_submission(
+    submission: dict[str, Any],
+    *,
+    task_id: str,
+    recipient: str,
+) -> dict[str, Any]:
+    task = submission.get("task")
+    if (
+        submission.get("queued") is not True
+        or submission.get("task_id") != task_id
+        or not _same_address(submission.get("recipient"), recipient)
+        or not isinstance(task, dict)
+        or task.get("task_id") != task_id
+        or task.get("task_type") != "review_dispute"
+        or not _same_address(task.get("recipient"), recipient)
+    ):
+        raise RuntimeError(
+            "tunneled task submission did not queue for its expected recipient"
+        )
+    return {
+        "queued": True,
+        "task_id": task_id,
+        "recipient": recipient,
+        "task_type": "review_dispute",
+    }
+
+
+def _validated_quickstart_watchdog(start_info: dict[str, Any]) -> dict[str, int | str]:
+    return _validated_owned_watchdog(
+        start_info,
+        label="Quickstart",
+        process_kind="quickstart_supervisor",
+        scope="owned_quickstart_process_group",
+        expected_timeout_seconds=REMOTE_QUICKSTART_WATCHDOG_SECONDS,
+    )
+
+
+def _validated_core_watchdog(
+    start_info: dict[str, Any],
+    *,
+    timeout_seconds: int,
+) -> dict[str, int | str]:
+    return _validated_owned_watchdog(
+        start_info,
+        label="core",
+        process_kind="core_supervisor",
+        scope="owned_core_process_group",
+        expected_timeout_seconds=timeout_seconds,
+    )
+
+
+def _validated_owned_watchdog(
+    start_info: dict[str, Any],
+    *,
+    label: str,
+    process_kind: str,
+    scope: str,
+    expected_timeout_seconds: int,
+) -> dict[str, int | str]:
+    watchdog = start_info.get("watchdog")
+    if not isinstance(watchdog, dict):
+        raise RuntimeError(f"remote {label} did not start an owned watchdog")
+    try:
+        pid = int(watchdog["pid"])
+        process_start_ticks = int(watchdog["process_start_ticks"])
+        reported_timeout_seconds = int(watchdog["timeout_seconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError(f"remote {label} watchdog identity is invalid") from exc
+    if (
+        pid <= 1
+        or process_start_ticks <= 0
+        or reported_timeout_seconds != expected_timeout_seconds
+        or start_info.get("process_kind") != process_kind
+        or watchdog.get("scope") != scope
+    ):
+        raise RuntimeError(f"remote {label} watchdog is not bounded to its group")
+    return {
+        "pid": pid,
+        "process_start_ticks": process_start_ticks,
+        "timeout_seconds": reported_timeout_seconds,
+        "scope": scope,
+    }
+
+
+def _validate_remote_core_acceptance(
+    remote_report: dict[str, Any],
+    offline_transcript: dict[str, Any],
+) -> dict[str, Any]:
+    """Fail closed unless the downloaded core report and transcript agree."""
+
+    required_report = {
+        "schema_version": "loveengine.core-experiment-report/2",
+        "status": "passed",
+        "environment": "local_anvil",
+        "actors_simulated": True,
+        "resource_profile": "shared_host",
+        "gate_ready": True,
+        "recovery_tests": True,
+        "observation_receipts": CORE_RECEIPT_COUNT,
+        "review_receipts": CORE_RECEIPT_COUNT,
+    }
+    for field, expected in required_report.items():
+        if remote_report.get(field) != expected:
+            raise RuntimeError(
+                f"remote core report has unexpected {field}: "
+                f"{remote_report.get(field)!r}"
+            )
+    verification = remote_report.get("verification")
+    if not isinstance(verification, dict) or verification != {
+        "offline": "offline_integrity",
+        "rpc": "chain_consistency",
+        "rpc_with_policy": "chain_verified",
+    }:
+        raise RuntimeError("remote core report has incomplete verification levels")
+    preparation = remote_report.get("contract_preparation")
+    if (
+        not isinstance(preparation, dict)
+        or preparation.get("schema_version")
+        != "loveengine.contract-preparation/1"
+        or preparation.get("prepared") is not True
+        or not isinstance(preparation.get("artifacts"), dict)
+        or not preparation["artifacts"]
+    ):
+        raise RuntimeError("remote core report lacks verified contract preparation")
+    resource_preflight = remote_report.get("resource_preflight")
+    if (
+        not isinstance(resource_preflight, dict)
+        or resource_preflight.get("schema_version")
+        != "loveengine.remote-host-preflight/1"
+        or resource_preflight.get("safe_to_run") is not True
+        or resource_preflight.get("mutated_host") is not False
+    ):
+        raise RuntimeError("remote core report lacks a passing resource preflight")
+    resource_host = resource_preflight.get("host")
+    resource_limits = remote_report.get("resource_limits")
+    host_cpu_count = (
+        resource_host.get("cpu_count") if isinstance(resource_host, dict) else None
+    )
+    expected_cpu_cap: int | None = None
+    if (
+        isinstance(host_cpu_count, int)
+        and not isinstance(host_cpu_count, bool)
+        and host_cpu_count >= 0
+    ):
+        expected_cpu_cap = max_lab_cpu_assignment(host_cpu_count)
+    if (
+        not isinstance(resource_host, dict)
+        or isinstance(host_cpu_count, bool)
+        or not isinstance(host_cpu_count, int)
+        or resource_host.get("reserved_cpu_count") != 1
+        or isinstance(resource_host.get("max_lab_cpu_assignment"), bool)
+        or resource_host.get("max_lab_cpu_assignment") != expected_cpu_cap
+        or expected_cpu_cap not in {1, 2}
+        or not isinstance(resource_limits, dict)
+        or isinstance(resource_limits.get("nice_increment"), bool)
+        or resource_limits.get("nice_increment") != 15
+        or not isinstance(resource_limits.get("cpu_affinity"), list)
+        or not resource_limits["cpu_affinity"]
+        or len(resource_limits["cpu_affinity"])
+        > expected_cpu_cap
+        or any(
+            isinstance(cpu, bool) or not isinstance(cpu, int)
+            for cpu in resource_limits["cpu_affinity"]
+        )
+        or len(set(resource_limits["cpu_affinity"]))
+        != len(resource_limits["cpu_affinity"])
+    ):
+        raise RuntimeError("remote core report lacks enforced shared-host limits")
+
+    required_offline = {
+        "valid": True,
+        "verification_level": "offline_integrity",
+        "chain_verified": False,
+        "trust_bound": False,
+        "environment": "local_anvil",
+        "actors_simulated": True,
+        "event_count": CORE_EVENT_COUNT,
+        "observation_receipts": CORE_RECEIPT_COUNT,
+        "review_receipts": CORE_RECEIPT_COUNT,
+        "gate_ready": True,
+    }
+    for field, expected in required_offline.items():
+        if offline_transcript.get(field) != expected:
+            raise RuntimeError(
+                f"offline transcript has unexpected {field}: "
+                f"{offline_transcript.get(field)!r}"
+            )
+    if (
+        not isinstance(remote_report.get("run_id"), str)
+        or offline_transcript.get("run_id") != remote_report["run_id"]
+    ):
+        raise RuntimeError("remote core report and offline transcript run IDs differ")
+    return {
+        "accepted": True,
+        "run_id": remote_report["run_id"],
+        "event_count": CORE_EVENT_COUNT,
+        "observation_receipts": CORE_RECEIPT_COUNT,
+        "review_receipts": CORE_RECEIPT_COUNT,
+        "verification_level": offline_transcript["verification_level"],
+    }
 
 
 def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
@@ -250,6 +561,203 @@ def _validate_remote_artifact(value: str, deployment_rel: str) -> str:
     return value
 
 
+REMOTE_LISTENER_INSPECTION_SOURCE = r'''import argparse
+import ipaddress
+import json
+import os
+from pathlib import Path
+
+
+def process_stat(pid):
+    stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+    closing = stat.rfind(")")
+    if closing < 0:
+        raise ValueError("invalid process stat")
+    fields = stat[closing + 1:].split()
+    if len(fields) <= 19:
+        raise ValueError("incomplete process stat")
+    return fields[0], int(fields[2]), int(fields[3]), int(fields[19])
+
+
+def group_members(leader):
+    members = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            state, group, session, _ = process_stat(int(entry.name))
+        except (OSError, ValueError):
+            continue
+        if group == leader and session == leader and state != "Z":
+            members.append(int(entry.name))
+    return sorted(members)
+
+
+def socket_inodes(pids):
+    found = set()
+    for pid in pids:
+        fd_root = Path(f"/proc/{pid}/fd")
+        try:
+            fds = list(fd_root.iterdir())
+        except OSError:
+            continue
+        for fd in fds:
+            try:
+                target = os.readlink(fd)
+            except OSError:
+                continue
+            if target.startswith("socket:[") and target.endswith("]"):
+                found.add(target[8:-1])
+    return found
+
+
+def decode_address(raw, family):
+    address_hex, port_hex = raw.split(":", 1)
+    if family == "ipv4":
+        address = str(ipaddress.IPv4Address(bytes.fromhex(address_hex)[::-1]))
+    else:
+        address = str(ipaddress.IPv6Address(bytes.fromhex(address_hex)))
+    return address, int(port_hex, 16)
+
+
+def listeners(path, family, inodes):
+    result = []
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()[1:]
+    except OSError:
+        return result
+    for line in lines:
+        columns = line.split()
+        if len(columns) < 10 or columns[3] != "0A":
+            continue
+        if columns[9] not in inodes:
+            continue
+        try:
+            address, port = decode_address(columns[1], family)
+        except (ValueError, ipaddress.AddressValueError):
+            continue
+        result.append({"address": address, "family": family, "port": port})
+    return result
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--pid", type=int, required=True)
+parser.add_argument("--start-ticks", type=int, required=True)
+parser.add_argument("--expected-port", action="append", type=int, required=True)
+args = parser.parse_args()
+expected_ports = sorted(set(args.expected_port))
+result = {
+    "schema_version": "loveengine.remote-listener-inspection/1",
+    "pid": args.pid,
+    "process_start_ticks": args.start_ticks,
+    "expected_ports": expected_ports,
+    "available": False,
+    "loopback_only": False,
+    "expected_ports_listening": False,
+    "owned_group_process_count": 0,
+    "listener_count": 0,
+    "non_loopback_listener_count": 0,
+    "unexpected_listener_count": 0,
+    "listeners": [],
+}
+try:
+    state, group, session, start_ticks = process_stat(args.pid)
+    command = Path(f"/proc/{args.pid}/cmdline").read_bytes().replace(b"\x00", b" ")
+except (OSError, ValueError):
+    result["reason"] = "process_unavailable"
+else:
+    if (
+        state == "Z"
+        or group != args.pid
+        or session != args.pid
+        or start_ticks != args.start_ticks
+        or b"start_shared_quickstart.py --supervisor" not in command
+    ):
+        result["reason"] = "process_identity_mismatch"
+    else:
+        members = group_members(args.pid)
+        found = listeners(Path("/proc/net/tcp"), "ipv4", socket_inodes(members))
+        found += listeners(Path("/proc/net/tcp6"), "ipv6", socket_inodes(members))
+        found.sort(key=lambda item: (item["port"], item["family"], item["address"]))
+        observed_ports = {item["port"] for item in found}
+        non_loopback = [
+            item for item in found
+            if not ipaddress.ip_address(item["address"]).is_loopback
+        ]
+        unexpected = [item for item in found if item["port"] not in expected_ports]
+        result.update(
+            {
+                "available": True,
+                "owned_group_process_count": len(members),
+                "listener_count": len(found),
+                "non_loopback_listener_count": len(non_loopback),
+                "unexpected_listener_count": len(unexpected),
+                "listeners": found,
+                "loopback_only": not non_loopback,
+                "expected_ports_listening": set(expected_ports).issubset(observed_ports),
+            }
+        )
+print(json.dumps(result, sort_keys=True))
+'''
+
+
+def _remote_listener_inspection_command(
+    pid: int,
+    process_start_ticks: int,
+    expected_ports: tuple[int, int],
+) -> str:
+    if pid <= 1 or process_start_ticks <= 0:
+        raise ValueError("owned process identity must be positive")
+    if (
+        len(expected_ports) != 2
+        or len(set(expected_ports)) != 2
+        or any(not 1 <= port <= 65535 for port in expected_ports)
+    ):
+        raise ValueError("listener inspection requires two distinct valid ports")
+    ports = " ".join(f"--expected-port {port}" for port in expected_ports)
+    return _remote_nonlogin_bash(
+        "python3 - "
+        f"--pid {pid} --start-ticks {process_start_ticks} {ports}"
+    )
+
+
+def _validated_remote_listener_inspection(
+    inspection: dict[str, Any],
+    *,
+    pid: int,
+    process_start_ticks: int,
+    expected_ports: tuple[int, int],
+) -> dict[str, Any]:
+    expected = sorted(expected_ports)
+    if (
+        inspection.get("schema_version")
+        != "loveengine.remote-listener-inspection/1"
+        or inspection.get("pid") != pid
+        or inspection.get("process_start_ticks") != process_start_ticks
+        or inspection.get("expected_ports") != expected
+        or inspection.get("available") is not True
+        or inspection.get("loopback_only") is not True
+        or inspection.get("expected_ports_listening") is not True
+        or inspection.get("non_loopback_listener_count") != 0
+        or inspection.get("unexpected_listener_count") != 0
+        or not isinstance(inspection.get("listeners"), list)
+        or int(inspection.get("owned_group_process_count") or 0) < 1
+        or int(inspection.get("listener_count") or 0) < len(expected)
+    ):
+        raise RuntimeError(
+            "remote Quickstart listener inspection did not prove loopback-only "
+            "expected listeners"
+        )
+    observed_ports = {
+        item.get("port")
+        for item in inspection["listeners"]
+        if isinstance(item, dict)
+    }
+    if not set(expected).issubset(observed_ports):
+        raise RuntimeError("remote listener inspection missed an expected port")
+    return inspection
+
+
 def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
     if pid <= 1 or process_start_ticks <= 0:
         raise ValueError("owned process identity must be positive")
@@ -258,9 +766,9 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
         f"pid={pid}; "
         f"expected_start={process_start_ticks}; "
         "group_has_live_members() { "
-        "snapshot=$(ps -eo pgid=,stat=) || return 0; "
-        "while read -r pgid state; do "
-        "if [ \"$pgid\" = \"$pid\" ]; then "
+        "snapshot=$(ps -eo pgid=,sid=,stat=) || return 2; "
+        "while read -r pgid sid state; do "
+        "if [ \"$pgid\" = \"$pid\" ] && [ \"$sid\" = \"$pid\" ]; then "
         "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
         "fi; "
         "done <<< \"$snapshot\"; "
@@ -268,33 +776,50 @@ def _owned_group_stop_command(pid: int, process_start_ticks: int) -> str:
         "}; "
         "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
         "if [ -z \"$stat\" ]; then "
-        "if group_has_live_members; then exit 10; fi; "
-        "exit 0; "
-        "fi; "
+        "if [ -e \"/proc/$pid/stat\" ]; then exit 9; fi; "
+        "else "
         "tail=${stat##*) }; "
         "set -- $tail; "
         "state=$1; "
+        "eval \"current_pgrp=\\${3}\"; "
+        "eval \"current_session=\\${4}\"; "
         "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_pgrp\" != \"$pid\" ] || [ \"$current_session\" != \"$pid\" ]; then exit 9; fi; "
         "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
         "if [ \"$state\" != \"Z\" ]; then "
         "command=$(tr '\\000' ' ' < \"/proc/$pid/cmdline\" 2>/dev/null "
         "|| true); "
         "case \"$command\" in "
-        "\"\") ;; "
+        "\"\") exit 9 ;; "
         "*\"loveengine pilot quickstart\"*) ;; "
+        "*\"start_shared_quickstart.py --supervisor\"*) ;; "
+        "*\"start_shared_core.py --supervisor\"*) ;; "
         "*\"run_core_experiments.py\"*) ;; "
         "*) exit 9 ;; "
         "esac; "
         "fi; "
-        "if ! group_has_live_members; then exit 0; fi; "
+        "fi; "
+        "if group_has_live_members; then :; else "
+        "group_status=$?; "
+        "if [ \"$group_status\" -eq 1 ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
         "kill -TERM -- \"-$pid\" 2>/dev/null || true; "
         "for _ in {1..20}; do "
-        "if ! group_has_live_members; then exit 0; fi; "
+        "if group_has_live_members; then :; else "
+        "group_status=$?; "
+        "if [ \"$group_status\" -eq 1 ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
         "sleep 0.25; "
         "done; "
         "kill -KILL -- \"-$pid\" 2>/dev/null || true; "
         "for _ in {1..8}; do "
-        "if ! group_has_live_members; then exit 0; fi; "
+        "if group_has_live_members; then :; else "
+        "group_status=$?; "
+        "if [ \"$group_status\" -eq 1 ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
         "sleep 0.25; "
         "done; "
         "exit 10"
@@ -316,9 +841,9 @@ def _owned_group_absence_command(
         f"pid={pid}; "
         f"expected_start={process_start_ticks}; "
         "group_has_live_members() { "
-        "snapshot=$(ps -eo pgid=,stat=) || return 0; "
-        "while read -r pgid state; do "
-        "if [ \"$pgid\" = \"$pid\" ]; then "
+        "snapshot=$(ps -eo pgid=,sid=,stat=) || return 2; "
+        "while read -r pgid sid state; do "
+        "if [ \"$pgid\" = \"$pid\" ] && [ \"$sid\" = \"$pid\" ]; then "
         "case \"$state\" in Z*) ;; *) return 0 ;; esac; "
         "fi; "
         "done <<< \"$snapshot\"; "
@@ -326,14 +851,212 @@ def _owned_group_absence_command(
         "}; "
         f"for _ in {{1..{attempts}}}; do "
         "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
-        "if [ -n \"$stat\" ]; then "
+        "if [ -z \"$stat\" ]; then "
+        "if [ -e \"/proc/$pid/stat\" ]; then exit 9; fi; "
+        "else "
         "tail=${stat##*) }; "
         "set -- $tail; "
+        "eval \"current_pgrp=\\${3}\"; "
+        "eval \"current_session=\\${4}\"; "
         "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_pgrp\" != \"$pid\" ] || [ \"$current_session\" != \"$pid\" ]; then exit 9; fi; "
         "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
         "fi; "
-        "if ! group_has_live_members; then exit 0; fi; "
+        "if group_has_live_members; then :; else "
+        "group_status=$?; "
+        "if [ \"$group_status\" -eq 1 ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
         "sleep 0.25; "
+        "done; "
+        "exit 10"
+    )
+
+
+def _validate_watchdog_mode(mode: str) -> str:
+    if mode not in {QUICKSTART_WATCHDOG_MODE, CORE_WATCHDOG_MODE}:
+        raise ValueError("unsupported owned watchdog mode")
+    return mode
+
+
+def _validate_watchdog_script_relative(value: str) -> str:
+    path = PurePosixPath(value)
+    if (
+        path.is_absolute()
+        or not REMOTE_ROOT_PATTERN.fullmatch(value)
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
+        raise ValueError("expected watchdog script must be below remote $HOME")
+    return path.as_posix()
+
+
+def _owned_watchdog_argument_check(
+    *,
+    target_pid: int,
+    target_process_start_ticks: int,
+    timeout_seconds: int,
+    expected_script_relative: str,
+    mode: str,
+) -> str:
+    """Return Bash which checks the watchdog's exact NUL-delimited argv.
+
+    Looking for text in a flattened command line allows an extra, malicious
+    option to imitate the expected target.  The watchdog is a trust boundary,
+    so require exactly one deployment-local script, mode, PID, start-tick, and
+    timeout option.
+    """
+
+    expected_mode = _validate_watchdog_mode(mode)
+    expected_script_relative = _validate_watchdog_script_relative(
+        expected_script_relative
+    )
+    return (
+        "argv=(); "
+        "while IFS= read -r -d '' argument; do argv+=(\"$argument\"); done "
+        "< \"/proc/$pid/cmdline\"; "
+        "if [ \"${#argv[@]}\" -eq 0 ]; then exit 9; fi; "
+        "script_count=0; mode_count=0; target_pid_count=0; "
+        "target_start_count=0; timeout_count=0; "
+        f"expected_script_relative={shlex.quote(expected_script_relative)}; "
+        "if ! expected_script_dir=$(cd \"$HOME/$expected_script_relative/tools\" "
+        "&& pwd -P); then exit 9; fi; "
+        "expected_script=\"$expected_script_dir/start_shared_quickstart.py\"; "
+        f"expected_mode={shlex.quote(expected_mode)}; "
+        f"expected_target_pid={target_pid}; "
+        f"expected_target_start={target_process_start_ticks}; "
+        f"expected_timeout={timeout_seconds}; "
+        "for ((index=0; index<${#argv[@]}; index++)); do "
+        "argument=${argv[index]}; "
+        "case \"$argument\" in "
+        "\"$expected_script\") "
+        "script_count=$((script_count + 1));; "
+        "--watchdog|--core-watchdog) "
+        "if [ \"$argument\" != \"$expected_mode\" ]; then exit 9; fi; "
+        "mode_count=$((mode_count + 1));; "
+        "--watchdog-pid) "
+        "index=$((index + 1)); "
+        "if [ \"$index\" -ge \"${#argv[@]}\" ] || "
+        "[ \"${argv[index]}\" != \"$expected_target_pid\" ]; then exit 9; fi; "
+        "target_pid_count=$((target_pid_count + 1));; "
+        "--watchdog-start-ticks) "
+        "index=$((index + 1)); "
+        "if [ \"$index\" -ge \"${#argv[@]}\" ] || "
+        "[ \"${argv[index]}\" != \"$expected_target_start\" ]; then exit 9; fi; "
+        "target_start_count=$((target_start_count + 1));; "
+        "--watchdog-seconds) "
+        "index=$((index + 1)); "
+        "if [ \"$index\" -ge \"${#argv[@]}\" ] || "
+        "[ \"${argv[index]}\" != \"$expected_timeout\" ]; then exit 9; fi; "
+        "timeout_count=$((timeout_count + 1));; "
+        "esac; "
+        "done; "
+        "if [ \"$script_count\" != 1 ] || [ \"$mode_count\" != 1 ] || "
+        "[ \"$target_pid_count\" != 1 ] || [ \"$target_start_count\" != 1 ] || "
+        "[ \"$timeout_count\" != 1 ]; then exit 9; fi; "
+    )
+
+
+def _owned_watchdog_liveness_command(
+    pid: int,
+    process_start_ticks: int,
+    *,
+    target_pid: int,
+    target_process_start_ticks: int,
+    timeout_seconds: int,
+    expected_script_relative: str,
+    mode: str = QUICKSTART_WATCHDOG_MODE,
+) -> str:
+    if (
+        pid <= 1
+        or process_start_ticks <= 0
+        or target_pid <= 1
+        or target_process_start_ticks <= 0
+        or not 60 <= timeout_seconds <= 3_600
+    ):
+        raise ValueError("owned watchdog identity must be positive")
+    expected_mode = _validate_watchdog_mode(mode)
+    return _remote_nonlogin_bash(
+        "set -eu; "
+        f"pid={pid}; "
+        f"expected_start={process_start_ticks}; "
+        "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
+        "if [ -z \"$stat\" ]; then exit 10; fi; "
+        "tail=${stat##*) }; "
+        "set -- $tail; "
+        "state=$1; "
+        "eval \"current_pgrp=\\${3}\"; "
+        "eval \"current_session=\\${4}\"; "
+        "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_pgrp\" != \"$pid\" ] || "
+        "[ \"$current_session\" != \"$pid\" ]; then exit 9; fi; "
+        "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
+        "if [ \"$state\" = \"Z\" ]; then exit 10; fi; "
+        "if [ ! -r \"/proc/$pid/cmdline\" ]; then exit 10; fi; "
+        + _owned_watchdog_argument_check(
+            target_pid=target_pid,
+            target_process_start_ticks=target_process_start_ticks,
+            timeout_seconds=timeout_seconds,
+            expected_script_relative=expected_script_relative,
+            mode=expected_mode,
+        )
+        + "exit 0"
+    )
+
+
+def _owned_watchdog_absence_command(
+    pid: int,
+    process_start_ticks: int,
+    *,
+    attempts: int = 40,
+    target_pid: int,
+    target_process_start_ticks: int,
+    timeout_seconds: int,
+    expected_script_relative: str,
+    mode: str = QUICKSTART_WATCHDOG_MODE,
+) -> str:
+    if (
+        pid <= 1
+        or process_start_ticks <= 0
+        or target_pid <= 1
+        or target_process_start_ticks <= 0
+        or not 60 <= timeout_seconds <= 3_600
+    ):
+        raise ValueError("owned watchdog identity must be positive")
+    if not 1 <= attempts <= 100_000:
+        raise ValueError("owned watchdog wait attempts must be bounded")
+    expected_mode = _validate_watchdog_mode(mode)
+    return _remote_nonlogin_bash(
+        "set -eu; "
+        f"pid={pid}; "
+        f"expected_start={process_start_ticks}; "
+        f"for _ in {{1..{attempts}}}; do "
+        "stat=$(cat \"/proc/$pid/stat\" 2>/dev/null || true); "
+        "if [ -z \"$stat\" ]; then "
+        "if [ ! -e \"/proc/$pid/stat\" ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
+        "tail=${stat##*) }; "
+        "set -- $tail; "
+        "state=$1; "
+        "eval \"current_pgrp=\\${3}\"; "
+        "eval \"current_session=\\${4}\"; "
+        "eval \"current_start=\\${20}\"; "
+        "if [ \"$current_pgrp\" != \"$pid\" ] || "
+        "[ \"$current_session\" != \"$pid\" ]; then exit 9; fi; "
+        "if [ \"$current_start\" != \"$expected_start\" ]; then exit 9; fi; "
+        "if [ \"$state\" = \"Z\" ]; then exit 0; fi; "
+        "if [ ! -r \"/proc/$pid/cmdline\" ]; then "
+        "if [ ! -e \"/proc/$pid/stat\" ]; then exit 0; fi; "
+        "exit 9; "
+        "fi; "
+        + _owned_watchdog_argument_check(
+            target_pid=target_pid,
+            target_process_start_ticks=target_process_start_ticks,
+            timeout_seconds=timeout_seconds,
+            expected_script_relative=expected_script_relative,
+            mode=expected_mode,
+        )
+        + "sleep 0.25; "
         "done; "
         "exit 10"
     )
@@ -357,6 +1080,7 @@ class RemoteLab:
         self.scp_options = _scp_options(args)
         self.current_phase = "not_started"
         self.current_output: Path | None = None
+        self.current_output_owned = False
         self.current_commit: str | None = None
         self.last_preflight: dict[str, Any] | None = None
 
@@ -413,6 +1137,23 @@ class RemoteLab:
         )
         return _last_json_object(result.stdout)
 
+    @staticmethod
+    def _lab_cpu_cap(preflight: dict[str, Any]) -> int:
+        host = preflight.get("host")
+        if not isinstance(host, dict):
+            raise RuntimeError("resource preflight omitted host CPU capacity")
+        try:
+            cpu_count = int(host["cpu_count"])
+            cap = max_lab_cpu_assignment(cpu_count)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RuntimeError("resource preflight has invalid host CPU capacity") from exc
+        if cap < 1:
+            raise RuntimeError("shared-host CPU reserve leaves no CPU for the lab")
+        reported_cap = host.get("max_lab_cpu_assignment")
+        if reported_cap is not None and reported_cap != cap:
+            raise RuntimeError("resource preflight CPU reserve report is inconsistent")
+        return cap
+
     def _git_value(self, *arguments: str) -> str:
         result = subprocess.run(
             ["git", *arguments],
@@ -429,6 +1170,27 @@ class RemoteLab:
         if self._git_value("status", "--porcelain"):
             raise RuntimeError("remote deployment requires a clean Git worktree")
         return self._git_value("rev-parse", "HEAD")
+
+    @staticmethod
+    def _reserve_local_output(path: Path) -> Path:
+        try:
+            path.mkdir(parents=True, exist_ok=False)
+        except FileExistsError as exc:
+            raise FileExistsError(
+                f"local output already exists; refusing to overwrite it: {path}"
+            ) from exc
+        return path
+
+    def _new_failure_output(self) -> Path:
+        root = (ROOT / "tmp" / "remote-experiments" / self.args.host).resolve()
+        suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        for index in range(1, 1000):
+            candidate = root / f"failed-{suffix}-{index:03d}"
+            try:
+                return self._reserve_local_output(candidate)
+            except FileExistsError:
+                continue
+        raise RuntimeError("could not reserve a unique remote-lab failure output")
 
     def _copy_to_remote(self, local: Path, remote: str, *, recursive: bool = False) -> None:
         command = [self.scp, *self.scp_options]
@@ -574,13 +1336,185 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "absence_returncode": absence_result.returncode,
         }
 
+    def _stop_owned_remote_group_safely(
+        self,
+        pid: int,
+        process_start_ticks: int,
+    ) -> dict[str, Any]:
+        """Keep a transport failure from skipping later owned cleanup."""
+
+        try:
+            return self._stop_owned_remote_group(pid, process_start_ticks)
+        except (OSError, RuntimeError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+            return {
+                "verified": False,
+                "stop_returncode": -1,
+                "absence_returncode": -1,
+                "error_type": type(exc).__name__,
+            }
+
+    def _verify_owned_remote_watchdog_live(
+        self,
+        pid: int,
+        process_start_ticks: int,
+        *,
+        target_pid: int,
+        target_process_start_ticks: int,
+        timeout_seconds: int,
+        expected_script_relative: str,
+        mode: str = QUICKSTART_WATCHDOG_MODE,
+    ) -> dict[str, int | bool | str]:
+        command = _owned_watchdog_liveness_command(
+            pid,
+            process_start_ticks,
+            target_pid=target_pid,
+            target_process_start_ticks=target_process_start_ticks,
+            timeout_seconds=timeout_seconds,
+            expected_script_relative=expected_script_relative,
+            mode=mode,
+        )
+        self.ssh_run(command, timeout=15)
+        return {
+            "verified": True,
+            "pid": pid,
+            "process_start_ticks": process_start_ticks,
+            "target_pid": target_pid,
+            "target_process_start_ticks": target_process_start_ticks,
+            "timeout_seconds": timeout_seconds,
+            "expected_script_relative": expected_script_relative,
+            "mode": mode,
+        }
+
+    def _wait_owned_remote_watchdog_exit(
+        self,
+        pid: int,
+        process_start_ticks: int,
+        *,
+        target_pid: int,
+        target_process_start_ticks: int,
+        timeout_seconds: int,
+        expected_script_relative: str,
+        mode: str = QUICKSTART_WATCHDOG_MODE,
+    ) -> dict[str, int | bool]:
+        try:
+            command = _owned_watchdog_absence_command(
+                pid,
+                process_start_ticks,
+                target_pid=target_pid,
+                target_process_start_ticks=target_process_start_ticks,
+                timeout_seconds=timeout_seconds,
+                expected_script_relative=expected_script_relative,
+                mode=mode,
+            )
+        except ValueError:
+            return {"verified": False, "absence_returncode": -1}
+        result = subprocess.run(
+            [
+                self.ssh,
+                *self.ssh_options,
+                *_no_forwarding_options(),
+                self.target,
+                command,
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+        return {
+            "verified": result.returncode == 0,
+            "absence_returncode": result.returncode,
+        }
+
+    def _wait_owned_remote_watchdog_exit_safely(
+        self,
+        pid: int,
+        process_start_ticks: int,
+        *,
+        target_pid: int,
+        target_process_start_ticks: int,
+        timeout_seconds: int,
+        expected_script_relative: str,
+        mode: str = QUICKSTART_WATCHDOG_MODE,
+    ) -> dict[str, Any]:
+        """Always report a failed watchdog check instead of aborting cleanup."""
+
+        try:
+            return self._wait_owned_remote_watchdog_exit(
+                pid,
+                process_start_ticks,
+                target_pid=target_pid,
+                target_process_start_ticks=target_process_start_ticks,
+                timeout_seconds=timeout_seconds,
+                expected_script_relative=expected_script_relative,
+                mode=mode,
+            )
+        except (OSError, RuntimeError, TypeError, ValueError, subprocess.SubprocessError) as exc:
+            return {
+                "verified": False,
+                "absence_returncode": -1,
+                "error_type": type(exc).__name__,
+            }
+
+    def _inspect_remote_loopback_listeners(
+        self,
+        *,
+        pid: int,
+        process_start_ticks: int,
+        expected_ports: tuple[int, int],
+    ) -> dict[str, Any]:
+        command = _remote_listener_inspection_command(
+            pid,
+            process_start_ticks,
+            expected_ports,
+        )
+        result = self.ssh_run(
+            command,
+            input_text=REMOTE_LISTENER_INSPECTION_SOURCE,
+            timeout=15,
+        )
+        return _validated_remote_listener_inspection(
+            _last_json_object(result.stdout),
+            pid=pid,
+            process_start_ticks=process_start_ticks,
+            expected_ports=expected_ports,
+        )
+
+    def _wait_for_remote_loopback_listeners(
+        self,
+        *,
+        pid: int,
+        process_start_ticks: int,
+        expected_ports: tuple[int, int],
+        timeout_seconds: int = 30,
+    ) -> dict[str, Any]:
+        deadline = time.monotonic() + timeout_seconds
+        last_error: Exception | None = None
+        while time.monotonic() < deadline:
+            try:
+                return self._inspect_remote_loopback_listeners(
+                    pid=pid,
+                    process_start_ticks=process_start_ticks,
+                    expected_ports=expected_ports,
+                )
+            except RuntimeError as exc:
+                last_error = exc
+                time.sleep(0.5)
+        raise RuntimeError(
+            "timed out waiting for remote loopback listener inspection: "
+            f"{last_error}"
+        )
+
     def _run_owned_remote_core(
         self,
         *,
         deployment_rel: str,
         remote_deployment: str,
         local_output: Path,
-    ) -> tuple[dict[str, Any], dict[str, int | bool]]:
+        max_cpus: int,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         start_command = _remote_bash(
             "set -eu; "
             "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
@@ -591,7 +1525,8 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             f"--max-load-per-cpu {self.args.max_load_per_cpu} "
             f"--min-memory-gib {self.args.min_memory_gib} "
             f"--min-disk-gib {self.args.min_disk_gib} "
-            "--max-cpus 2 --nice-increment 15"
+            f"--max-cpus {max_cpus} --nice-increment 15 "
+            f"--watchdog-seconds {self.args.timeout_seconds}"
         )
         started = self.ssh_run(start_command, timeout=30)
         start_info = _last_json_object(started.stdout)
@@ -599,12 +1534,31 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         process_start_ticks = int(start_info["process_start_ticks"])
         if remote_pid <= 1 or process_start_ticks <= 0:
             raise RuntimeError("remote core returned an invalid process identity")
-        cleanup: dict[str, int | bool] = {
+        cleanup: dict[str, Any] = {
             "verified": False,
             "stop_returncode": -1,
             "absence_returncode": -1,
         }
+        core_watchdog: dict[str, int | str] | None = None
+        watchdog_liveness: dict[str, int | bool | str] | None = None
+        watchdog_cleanup: dict[str, int | bool] = {
+            "verified": False,
+            "absence_returncode": -1,
+        }
         try:
+            core_watchdog = _validated_core_watchdog(
+                start_info,
+                timeout_seconds=self.args.timeout_seconds,
+            )
+            watchdog_liveness = self._verify_owned_remote_watchdog_live(
+                int(core_watchdog["pid"]),
+                int(core_watchdog["process_start_ticks"]),
+                target_pid=remote_pid,
+                target_process_start_ticks=process_start_ticks,
+                timeout_seconds=int(core_watchdog["timeout_seconds"]),
+                expected_script_relative=deployment_rel,
+                mode=CORE_WATCHDOG_MODE,
+            )
             wait_command = _owned_group_absence_command(
                 remote_pid,
                 process_start_ticks,
@@ -615,19 +1569,42 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 timeout=self.args.timeout_seconds + 30,
             )
         finally:
-            cleanup = self._stop_owned_remote_group(
-                remote_pid,
-                process_start_ticks,
-            )
             try:
-                self._copy_from_remote(
-                    f"~/{deployment_rel}/tmp/remote-core.log",
-                    local_output / "remote-core.log",
+                cleanup = self._stop_owned_remote_group_safely(
+                    remote_pid,
+                    process_start_ticks,
                 )
-            except (OSError, RuntimeError, subprocess.SubprocessError):
-                pass
+            finally:
+                try:
+                    if core_watchdog is not None:
+                        watchdog_cleanup = (
+                            self._wait_owned_remote_watchdog_exit_safely(
+                                int(core_watchdog["pid"]),
+                                int(core_watchdog["process_start_ticks"]),
+                                target_pid=remote_pid,
+                                target_process_start_ticks=process_start_ticks,
+                                timeout_seconds=int(core_watchdog["timeout_seconds"]),
+                                expected_script_relative=deployment_rel,
+                                mode=CORE_WATCHDOG_MODE,
+                            )
+                        )
+                finally:
+                    try:
+                        self._copy_from_remote(
+                            f"~/{deployment_rel}/tmp/remote-core.log",
+                            local_output / "remote-core.log",
+                        )
+                    except (OSError, RuntimeError, subprocess.SubprocessError):
+                        pass
         if not cleanup["verified"]:
             raise RuntimeError("could not verify cleanup of the remote core process group")
+        if core_watchdog is None or watchdog_liveness is None:
+            raise RuntimeError("remote core did not provide a valid watchdog")
+        if not watchdog_cleanup["verified"]:
+            raise RuntimeError("could not verify shutdown of the remote core watchdog")
+        cleanup["watchdog"] = core_watchdog
+        cleanup["watchdog_liveness"] = watchdog_liveness
+        cleanup["watchdog_cleanup"] = watchdog_cleanup
         self._copy_from_remote(
             f"~/{deployment_rel}/tmp/remote-core/core-experiment-report.json",
             local_output / "core-experiment-report.json",
@@ -649,11 +1626,14 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         preflight = self.preflight()
         if not preflight.get("safe_to_run"):
             raise RuntimeError("tunnel smoke blocked by the second resource guard")
+        max_cpus = self._lab_cpu_cap(preflight)
         remote_pilot_port, remote_rpc_port = self._remote_free_ports()
         local_pilot_port = _free_local_port()
         local_rpc_port = _free_local_port()
         while local_rpc_port == local_pilot_port:
             local_rpc_port = _free_local_port()
+        tunnel_dir = local_output / "tunnel"
+        tunnel_dir.mkdir(parents=True, exist_ok=False)
         start_command = _remote_bash(
             "set -eu; "
             "export PATH=\"$HOME/.local/bin:$HOME/.codex/tools/"
@@ -662,7 +1642,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "uv run python tools/start_shared_quickstart.py "
             "--root tmp/tunnel-pilot --host 127.0.0.1 "
             f"--port {remote_pilot_port} --rpc-port {remote_rpc_port} "
-            "--log tmp/tunnel-pilot.log --max-cpus 2 --nice-increment 15"
+            "--log tmp/tunnel-pilot.log "
+            f"--max-cpus {max_cpus} --nice-increment 15 "
+            f"--watchdog-seconds {REMOTE_QUICKSTART_WATCHDOG_SECONDS}"
         )
         started = self.ssh_run(start_command, timeout=30)
         start_info = _last_json_object(started.stdout)
@@ -671,10 +1653,10 @@ print(json.dumps({"package_archive": config["package_archive"]}))
         if remote_pid <= 1 or process_start_ticks <= 0:
             raise RuntimeError("remote Quickstart returned an invalid process identity")
 
-        tunnel_dir = local_output / "tunnel"
-        tunnel_dir.mkdir(parents=True, exist_ok=False)
+        watchdog: dict[str, int | str] | None = None
         tunnel_process: subprocess.Popen[str] | None = None
         node_processes: list[subprocess.Popen[str]] = []
+        local_process_cleanup: list[dict[str, Any]] = []
         report: dict[str, Any] | None = None
         owned_cleanup = False
         cleanup_verification: dict[str, int | bool] = {
@@ -682,7 +1664,28 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "stop_returncode": -1,
             "absence_returncode": -1,
         }
+        watchdog_cleanup: dict[str, int | bool] = {
+            "verified": False,
+            "absence_returncode": -1,
+        }
+        watchdog_liveness: dict[str, dict[str, int | bool | str]] = {}
         try:
+            watchdog = _validated_quickstart_watchdog(start_info)
+            listener_inspection = self._wait_for_remote_loopback_listeners(
+                pid=remote_pid,
+                process_start_ticks=process_start_ticks,
+                expected_ports=(remote_pilot_port, remote_rpc_port),
+            )
+            watchdog_liveness["before_tunnel_readiness"] = (
+                self._verify_owned_remote_watchdog_live(
+                    int(watchdog["pid"]),
+                    int(watchdog["process_start_ticks"]),
+                    target_pid=remote_pid,
+                    target_process_start_ticks=process_start_ticks,
+                    timeout_seconds=int(watchdog["timeout_seconds"]),
+                    expected_script_relative=deployment_rel,
+                )
+            )
             tunnel_process = subprocess.Popen(
                 [
                     self.ssh,
@@ -838,6 +1841,16 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     "within 60 seconds"
                 )
 
+            watchdog_liveness["before_task_submission"] = (
+                self._verify_owned_remote_watchdog_live(
+                    int(watchdog["pid"]),
+                    int(watchdog["process_start_ticks"]),
+                    target_pid=remote_pid,
+                    target_process_start_ticks=process_start_ticks,
+                    timeout_seconds=int(watchdog["timeout_seconds"]),
+                    expected_script_relative=deployment_rel,
+                )
+            )
             submissions: list[dict[str, Any]] = []
             for node_run in node_runs:
                 enqueue_command = _remote_bash(
@@ -853,7 +1866,13 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     f"--evidence-base-url http://127.0.0.1:{local_pilot_port}"
                 )
                 submitted = self.ssh_run(enqueue_command, timeout=30)
-                submissions.append(_last_json_object(submitted.stdout))
+                submissions.append(
+                    _validated_queued_submission(
+                        _last_json_object(submitted.stdout),
+                        task_id=node_run["task_id"],
+                        recipient=node_run["node"],
+                    )
+                )
 
             receipt_summaries: list[dict[str, Any]] = []
             for node_run in node_runs:
@@ -875,6 +1894,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                     node_result,
                     task_id=node_run["task_id"],
                     dispute_id=node_run["dispute_id"],
+                    expected_node=node_run["node"],
                 )
                 receipt_summaries.append(
                     {
@@ -912,8 +1932,16 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "remote_rpc_port": remote_rpc_port,
                 "local_pilot_port": local_pilot_port,
                 "local_rpc_port": local_rpc_port,
+                "listener_inspection": listener_inspection,
+                "watchdog": watchdog,
+                "watchdog_liveness": watchdog_liveness,
+                "resource_profile": {
+                    "max_cpus": max_cpus,
+                    "reserved_cpu_count": 1,
+                },
                 "node_count": TUNNEL_NODE_COUNT,
                 "nodes": [node_run["node"] for node_run in node_runs],
+                "expected_recipients": [node_run["node"] for node_run in node_runs],
                 "task_submissions": submissions,
                 "receipt_count": len(receipt_summaries),
                 "receipts": receipt_summaries,
@@ -924,42 +1952,62 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 ),
             }
         finally:
-            for node_process in node_processes:
-                if node_process.poll() is None:
-                    node_process.terminate()
-                    try:
-                        node_process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        node_process.kill()
-                        node_process.wait(timeout=5)
-            if tunnel_process is not None and tunnel_process.poll() is None:
-                tunnel_process.terminate()
-                try:
-                    tunnel_process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    tunnel_process.kill()
-                    tunnel_process.wait(timeout=5)
-            cleanup_verification = self._stop_owned_remote_group(
-                remote_pid, process_start_ticks
-            )
-            owned_cleanup = bool(cleanup_verification["verified"])
             try:
-                self._copy_from_remote(
-                    f"~/{deployment_rel}/tmp/tunnel-pilot.log",
-                    tunnel_dir / "quickstart.log",
-                )
-            except (OSError, RuntimeError, subprocess.SubprocessError):
-                pass
+                for index, node_process in enumerate(node_processes, start=1):
+                    local_process_cleanup.append(
+                        _reap_local_process(
+                            node_process,
+                            label=f"node-{index}",
+                        )
+                    )
+                if tunnel_process is not None:
+                    local_process_cleanup.append(
+                        _reap_local_process(tunnel_process, label="ssh_tunnel")
+                    )
+            finally:
+                try:
+                    cleanup_verification = self._stop_owned_remote_group_safely(
+                        remote_pid,
+                        process_start_ticks,
+                    )
+                    owned_cleanup = bool(cleanup_verification["verified"])
+                finally:
+                    try:
+                        if watchdog is not None:
+                            watchdog_cleanup = (
+                                self._wait_owned_remote_watchdog_exit_safely(
+                                    int(watchdog["pid"]),
+                                    int(watchdog["process_start_ticks"]),
+                                    target_pid=remote_pid,
+                                    target_process_start_ticks=process_start_ticks,
+                                    timeout_seconds=int(watchdog["timeout_seconds"]),
+                                    expected_script_relative=deployment_rel,
+                                )
+                            )
+                    finally:
+                        try:
+                            self._copy_from_remote(
+                                f"~/{deployment_rel}/tmp/tunnel-pilot.log",
+                                tunnel_dir / "quickstart.log",
+                            )
+                        except (OSError, RuntimeError, subprocess.SubprocessError):
+                            pass
         if report is None:
             raise RuntimeError("tunnel smoke ended without a report")
+        report["local_process_cleanup"] = local_process_cleanup
         report["owned_process_cleanup"] = owned_cleanup
         report["cleanup_verification"] = cleanup_verification
+        report["watchdog_cleanup"] = watchdog_cleanup
+        if not all(item.get("verified") is True for item in local_process_cleanup):
+            raise RuntimeError("could not verify cleanup of all local tunnel processes")
         if not owned_cleanup:
             raise RuntimeError(
                 "could not verify cleanup of the remote process group "
                 f"(stop={cleanup_verification['stop_returncode']}, "
                 f"absence={cleanup_verification['absence_returncode']})"
             )
+        if not watchdog_cleanup["verified"]:
+            raise RuntimeError("could not verify shutdown of the remote watchdog")
         return report
 
     def _run_once(self) -> dict[str, Any]:
@@ -974,6 +2022,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 "authentication": "publickey",
                 "preflight": preflight,
             }
+        core_max_cpus = self._lab_cpu_cap(preflight)
         self.current_phase = "source_validation"
         commit = self._require_clean_source()
         self.current_commit = commit
@@ -991,8 +2040,9 @@ print(json.dumps({"package_archive": config["package_archive"]}))
                 / f"{commit[:12]}-{suffix}"
             ).resolve()
         )
-        local_output.mkdir(parents=True, exist_ok=False)
+        self._reserve_local_output(local_output)
         self.current_output = local_output
+        self.current_output_owned = True
         started_at = _utc_now()
 
         self.current_phase = "remote_deployment_create"
@@ -1029,6 +2079,7 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             deployment_rel=deployment_rel,
             remote_deployment=remote_deployment,
             local_output=local_output,
+            max_cpus=core_max_cpus,
         )
         self.current_phase = "transcript_download"
         self._copy_from_remote(
@@ -1056,11 +2107,10 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             timeout=120,
         )
         offline = _last_json_object(verification.stdout)
-        if (
-            offline.get("verification_level") != "offline_integrity"
-            or offline.get("trust_bound") is not False
-        ):
-            raise RuntimeError("downloaded transcript failed offline boundary checks")
+        core_acceptance = _validate_remote_core_acceptance(
+            remote_report,
+            offline,
+        )
         self.current_phase = "tunnel_smoke"
         tunnel = self._tunnel_smoke(
             deployment_rel=deployment_rel,
@@ -1079,13 +2129,16 @@ print(json.dumps({"package_archive": config["package_archive"]}))
             "remote_bind": "loopback_only",
             "resource_profile": {
                 "nice_increment": 15,
-                "max_cpus": 2,
+                "max_cpus": core_max_cpus,
+                "reserved_cpu_count": 1,
+                "available_cpus": int(preflight["host"]["cpu_count"]),
                 "max_load_per_cpu": self.args.max_load_per_cpu,
             },
             "started_at": started_at,
             "completed_at": _utc_now(),
             "preflight": preflight,
             "core": remote_report,
+            "core_acceptance": core_acceptance,
             "tunnel_smoke": tunnel,
             "downloaded_transcript_verification": offline,
             "local_output": str(local_output),
@@ -1102,20 +2155,20 @@ print(json.dumps({"package_archive": config["package_archive"]}))
     def _write_report(self, report: dict[str, Any]) -> None:
         output = self.current_output
         if output is None:
-            suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            output = (
-                self.args.output.resolve()
-                if self.args.output
-                else (
-                    ROOT
-                    / "tmp"
-                    / "remote-experiments"
-                    / self.args.host
-                    / f"failed-{suffix}"
-                ).resolve()
-            )
-            output.mkdir(parents=True, exist_ok=True)
+            requested = self.args.output.resolve() if self.args.output else None
+            if requested is not None:
+                try:
+                    output = self._reserve_local_output(requested)
+                except FileExistsError:
+                    report["requested_output_collision"] = {
+                        "path": str(requested),
+                        "preserved": True,
+                    }
+                    output = self._new_failure_output()
+            else:
+                output = self._new_failure_output()
             self.current_output = output
+            self.current_output_owned = True
         (output / "remote-lab-report.json").write_text(
             json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
             + "\n",

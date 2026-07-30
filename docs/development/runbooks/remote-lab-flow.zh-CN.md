@@ -34,6 +34,8 @@ uv run python .\tools\run_remote_lab.py preflight `
 - Python、uv、Git、bash、tar、ps 可用，forge/anvil 精确为 Foundry 1.7.1；
 - 没有既有 LoveEngine/Anvil/Forge 进程；
 - load、内存和磁盘均在门槛内。
+- host 仍至少有一颗 CPU 预留给已有工作：2 vCPU 时实验只可绑定 1 核；更多 CPU
+  时最多绑定 2 核且保留 1 核。
 
 资源门返回退出码 4 时停止。共享主机不得通过降低门槛或手动修改报告绕过。
 
@@ -61,7 +63,8 @@ uv run python .\tools\run_remote_lab.py run `
 3. 在远端 home 下创建唯一、权限收紧的实验目录；
 4. 在唯一远端目录中先显式执行 `pilot contracts prepare`，从干净源码和 dependency lock
    重建忽略的合约产物；若已有受管依赖与锁失配则停止，不在共享主机上自动刷新。随后以
-   nice +15、最多两核和低构建并发执行 core/recovery 测试；
+   nice +15、低构建并发和保留一核的 CPU affinity 执行 core/recovery 测试，并为该独立
+   session 启动最长等于本次 `--timeout-seconds` 的 core guardian；
 5. 下载 report 和 transcript，并在本机重新离线验证；
 6. 再次执行资源门，启动一个受限的 loopback Quickstart；
 7. 建立本机 SSH tunnel，启动 3 个公开 `loveengine node connect` 进程；
@@ -70,6 +73,37 @@ uv run python .\tools\run_remote_lab.py run `
 9. 分别提交绑定 bundle/events/artifacts 的签名 V2 review task；每个节点实际
    复算自己的证据并返回与 node/task/dispute 绑定的 receipt；
 10. 终止且只终止本次创建的 Quickstart 进程组，再执行只读 postflight。
+
+SSH 调用只使用指定的 known_hosts，禁用系统全局 known_hosts，也不加载远端 login
+shell。Quickstart 在远端启动一个只在 Pilot 子进程存活期间担任 leader 的 supervisor 和独立、
+最长 900 秒的 watchdog。supervisor 必须先创建 watchdog、再启动 Pilot child，并且只在
+两者均已存在后以原子 ready record 向 launcher 返回身份；因此 SSH launcher 在此窗口消失
+也不会留下无期限的 Pilot 进程组。runner 对 watchdog 的存活检查还会核验独立 session、位于本次
+deployment `tools/start_shared_quickstart.py` 的 canonical 脚本，以及其 NUL 分隔 argv 中
+精确且唯一的 mode、target PID、target start tick 和 timeout。正常路径只在
+PID/start tick/PGID/SID/supervisor 命令都匹配时终止自己的 Quickstart 组。若 supervisor
+已消失，它只会在剩余非 zombie 进程仍证明
+`PGID == SID == 原始 PID` 时清理该原始会话；身份不符或 PID 重用都会拒绝操作。
+Pilot 子进程退出后 supervisor 也退出；若有残留成员，watchdog 以受限的 leader-loss
+路径回收同一 session。即使本地编排器异常退出，watchdog 也会限制该短实验的残留时间；
+正常停止后它必须自行退出。`/proc` 或 `ps` 无法确认 session 时不得发送信号；PID 仍存在
+但 cmdline 不可读时也不得把 watchdog 当作已退出，二者都以失败报告处理。
+启动阶段的失败清理同样不例外：只有已经记录的 PID start tick、`PGID == SID == PID`、
+canonical 启动脚本和预期 mode 全部仍匹配时才可向该组发 TERM/KILL；无法读取身份、
+leader 已消失或怀疑 PID 重用时不发信号，交由已认证 guardian 的期限或失败报告处理。
+
+core guardian 使用同样的 PID/start tick/PGID/SID/命令身份边界，并且其 canonical 脚本与
+NUL 分隔 argv 也必须精确绑定 mode、target PID、target start tick 和 timeout；它独立于 Quickstart
+watchdog。它覆盖 core/recovery 阶段中本地 SSH 编排器消失的情况；runner 在开始等待
+core 结果前确认 guardian 存活，停止 core 后确认 guardian 已退出。
+
+在建立 tunnel 前，runner 从 Quickstart 所属 process group 的 `/proc` socket inode
+读取实时 listener：只接受两个预期端口、`127.0.0.1` 或 `::1`，并在报告中保存 listener
+数、group 进程数和 extra/non-loopback listener 数。该检查不是端口探测的替代品，二者
+都必须通过。
+此外，runner 会在建立 tunnel/读取 `readyz` 前，以及三个节点都连接、任何 task 入队前，
+再次按 watchdog 的 PID、start tick、脚本、mode、target PID、target start tick 和 timeout
+核验它仍然存活；任一检查失败即停止，不提交任务。
 
 它不会清理远端目录。确认报告已回收且没有其他进程使用该目录后，再由主机操作者
 决定是否删除。
@@ -94,6 +128,10 @@ Pilot 配置改成 `0.0.0.0`。
 - `remote_bind: loopback_only`；
 - `remote_services_exposed: false`；
 - core status passed、Gate ready；
+- `core_acceptance.accepted: true`：远端 report 与本机下载 transcript 的 run ID、
+  12 个事件、3+3 receipt、Gate、恢复测试和离线边界均严格一致；
+- `core_cleanup_verification.watchdog_liveness.verified: true` 与
+  `core_cleanup_verification.watchdog_cleanup.verified: true`；
 - 3 个 observation receipt 和 3 个 review receipt；
 - recovery tests true；
 - 下载 transcript 为 offline_integrity 且 trust_bound false；
@@ -101,7 +139,17 @@ Pilot 配置改成 `0.0.0.0`。
 - 三份 receipt 均为 `evidence_verified: true`，且分别绑定自己的
   node/task/dispute；
 - `relay_acked: 3`、`relay_receipt_confirmed: 3`；
+- `task_submissions` 的三项均为 `queued:true`，其 task ID/recipient 分别等于对应
+  node 的预期值；
+- `listener_inspection.loopback_only: true`、
+  `listener_inspection.expected_ports_listening: true`，non-loopback 与 extra listener
+  计数均为 0；
 - `owned_process_cleanup: true`，远端实验文件仍保留。
+- `local_process_cleanup` 的每项均为 `verified: true`；本机 node 或 SSH tunnel 的
+  terminate/wait 失败也不得跳过远端 group 或 watchdog 的清理；
+- `watchdog_cleanup.verified: true`；
+- `watchdog_liveness.before_tunnel_readiness.verified: true` 与
+  `watchdog_liveness.before_task_submission.verified: true`；
 - `postflight_cleanup_verified: true`。若失败，报告还必须包含 `phase` 和稳定的
   error type；不要只看终端最后一行。
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import loveengine_witness.pilot_soak_process as pilot_soak_process
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.pilot_soak import SOAK_SUCCESS_CHECK_KEYS
 from loveengine_witness.pilot_soak_process import (
@@ -29,10 +30,51 @@ def _passing_report(started: dict[str, object]) -> dict[str, object]:
         "event_count": 12,
         "observer_count": 10,
         "requested_duration_seconds": 60,
+        "elapsed_seconds": 60,
         "run_id": started["run_id"],
         "checks": _passing_checks(),
         "failure": None,
+        "secret_leaks": [],
+        "transcript_path": str(
+            Path(str(started["output"])) / "witness-core.fixture.json"
+        ),
     }
+
+
+def _install_valid_core_transcript(
+    tmp_path: Path,
+    started: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    run_id: str | None = None,
+) -> None:
+    transcript_path = tmp_path / "witness-core.fixture.json"
+    transcript_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        pilot_soak_process,
+        "verify_core_transcript",
+        lambda transcript: {
+            "valid": True,
+            "verification_level": "offline_integrity",
+            "chain_verified": False,
+            "trust_bound": False,
+            "run_id": run_id or started["run_id"],
+            "event_count": 12,
+            "observation_receipts": 3,
+            "review_receipts": 3,
+            "gate_ready": True,
+        },
+    )
+
+
+def _mark_planned_duration_elapsed(
+    started: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        pilot_soak_process.time,
+        "time",
+        lambda: float(started["planned_end_epoch"]) + 1.0,
+    )
 
 def test_background_soak_writes_queryable_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -65,10 +107,12 @@ def test_background_soak_writes_queryable_state(
     assert state_path.is_file()
     assert "--background" not in captured["command"]
     assert "--duration-seconds" in captured["command"]
+    worker_run_id = captured["command"].index("--worker-run-id")
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["pid"] == FakeProcess.pid
     assert state["duration_seconds"] == 3600
-    assert state["run_id"] == captured["kwargs"]["env"]["LOVEENGINE_PILOT_SOAK_RUN_ID"]
+    assert state["run_id"] == captured["command"][worker_run_id + 1]
+    assert "env" not in captured["kwargs"]
     assert "token" not in state_path.read_text(encoding="utf-8").lower()
 
     status = background_soak_status(state_path)
@@ -90,6 +134,8 @@ def test_background_soak_status_uses_completed_report(
         observers=10,
     )
     report = _passing_report(started)
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
+    _mark_planned_duration_elapsed(started, monkeypatch)
     (tmp_path / "pilot-soak-report.json").write_text(
         json.dumps(report), encoding="utf-8"
     )
@@ -101,6 +147,56 @@ def test_background_soak_status_uses_completed_report(
     assert "failure_reason" not in status
     assert status["report"]["passed"] is True
     assert status["progress_percent"] == 100
+
+
+def test_background_soak_rejects_early_passing_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report["elapsed_seconds"] = 1
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["report_validation_error"] == "elapsed_duration_too_short"
+
+
+def test_background_soak_rejects_report_before_planned_wall_clock_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(_passing_report(started)), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["report_validation_error"] == "wall_clock_duration_too_short"
 
 
 def test_background_soak_rejects_incomplete_passing_report(
@@ -210,6 +306,83 @@ def test_background_soak_status_requires_matching_run_id(
     assert status["report_validation_error"] == "run_id_mismatch"
 
 
+@pytest.mark.parametrize(
+    ("state_has_run_id", "state_run_id"),
+    [
+        pytest.param(False, None, id="missing"),
+        pytest.param(True, None, id="null"),
+        pytest.param(True, "", id="empty"),
+        pytest.param(True, "   ", id="blank"),
+        pytest.param(True, 123, id="wrong-type"),
+    ],
+)
+def test_background_soak_status_requires_a_valid_state_run_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    state_has_run_id: bool,
+    state_run_id: object,
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
+    _mark_planned_duration_elapsed(started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(_passing_report(started)), encoding="utf-8"
+    )
+    state_path = Path(started["state_path"])
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    if state_has_run_id:
+        state["run_id"] = state_run_id
+    else:
+        state.pop("run_id")
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    status = background_soak_status(state_path)
+
+    assert status["status"] == "failed"
+    assert status["failure_reason"] == "soak_report_failed"
+    assert status["report_validation_error"] == "state_run_id_invalid"
+
+
+@pytest.mark.parametrize("report_run_id", [None, "", "   ", 123])
+def test_background_soak_status_requires_a_valid_report_run_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    report_run_id: object,
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
+    _mark_planned_duration_elapsed(started, monkeypatch)
+    report = _passing_report(started)
+    report["run_id"] = report_run_id
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["failure_reason"] == "soak_report_failed"
+    assert status["report_validation_error"] == "report_run_id_invalid"
+
+
 def test_background_soak_status_waits_for_child_exit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -226,6 +399,7 @@ def test_background_soak_status_waits_for_child_exit(
         event_count=12,
         observers=10,
     )
+    _install_valid_core_transcript(tmp_path, started, monkeypatch)
     (tmp_path / "pilot-soak-report.json").write_text(
         json.dumps(_passing_report(started)), encoding="utf-8"
     )
@@ -235,6 +409,122 @@ def test_background_soak_status_waits_for_child_exit(
     assert status["status"] == "running"
     assert status["process_alive"] is True
     assert status["progress_percent"] < 100
+
+
+def test_background_soak_rejects_passing_report_with_secret_findings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report["secret_leaks"] = ["unexpected-token.txt"]
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["report_validation_error"] == "secret_leaks_detected"
+
+
+def test_background_soak_rejects_missing_secret_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report.pop("secret_leaks")
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["report_validation_error"] == "secret_leaks_missing"
+
+
+def test_background_soak_rejects_missing_or_mismatched_transcript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report.pop("transcript_path")
+    _mark_planned_duration_elapsed(started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    missing = background_soak_status(Path(started["state_path"]))
+
+    assert missing["status"] == "failed"
+    assert missing["report_validation_error"] == "transcript_path_missing"
+
+    report = _passing_report(started)
+    _install_valid_core_transcript(
+        tmp_path, started, monkeypatch, run_id="different-run"
+    )
+    _mark_planned_duration_elapsed(started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    mismatched = background_soak_status(Path(started["state_path"]))
+
+    assert mismatched["status"] == "failed"
+    assert mismatched["report_validation_error"] == "transcript_run_id_mismatch"
+
+
+def test_background_soak_rejects_transcript_outside_its_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    report = _passing_report(started)
+    report["transcript_path"] = str(tmp_path.parent / "foreign-transcript.json")
+    _mark_planned_duration_elapsed(started, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(report), encoding="utf-8"
+    )
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "failed"
+    assert status["report_validation_error"] == "transcript_path_outside_output"
 
 
 def test_background_soak_rejects_orphaned_report_before_launch(

@@ -18,12 +18,14 @@
 
 - 远端 Pilot、Anvil 和 RPC 只监听 loopback。需要跨主机访问时使用 SSH tunnel，
   不直接绑定 Tailscale IP 或 `0.0.0.0`。
-- SSH 必须固定 host key 并使用独立 public key。远程工具没有 password 参数，
-  不把密码写入命令行、环境变量、文件、日志或 transcript。
+- SSH 必须固定 host key 并使用独立 public key。远程工具只读取指定的
+  `UserKnownHostsFile`，显式禁用 `GlobalKnownHostsFile`，且不加载远端 login shell；
+  工具没有 password 参数，不把密码写入命令行、环境变量、文件、日志或 transcript。
 - 不使用 sudo、systemd、Docker daemon、全局 Python 安装或系统包变更。
 - 每次部署使用 `$HOME/.local/share/loveengine-witness-lab/` 下的唯一目录，
   不覆盖既有目录，不自动删除远端证据。
-- 共享主机实验提高 nice 值、最多使用两个 CPU，并限制 uv/构建并发。
+- 共享主机实验提高 nice 值、限制 uv/构建并发，并始终为其他任务保留至少一个可用 CPU。
+  因此 2 vCPU 主机上的 lab 最多绑定 1 核；CPU 更多时最多绑定 2 核且仍保留 1 核。
 - 只读 preflight 不写远端状态；资源门不通过时不得用 override 强行运行。
 
 ## 实验阶段
@@ -73,6 +75,18 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 标记 `remote_services_exposed:false`、`remote_bind:loopback_only`、
 `actors_simulated:true`。
 
+远端 core 不以单个 `status: passed` 作为通过条件。runner 必须同时核对 core report 的
+`shared_host` 资源档、12 个事件、3 个 observation receipt、3 个 review receipt、
+Gate、恢复测试、三种 verification level 和 contract preparation；下载的 transcript
+必须以相同 `run_id` 返回 `valid:true`、`offline_integrity`、`chain_verified:false`、
+`trust_bound:false`、`local_anvil`、模拟 actor 和相同 quorum/Gate 字段。
+core/recovery 还必须由独立 guardian 限制生命周期：它以本次 runner 的超时上限运行，
+只在 PID、start tick、PGID、SID、`start_shared_core.py --supervisor` 命令，以及 guardian
+自身位于本次 deployment 的 canonical 脚本和 NUL 分隔 argv 中精确的 mode、target PID、
+target start tick 和 timeout 都可验证时作用于该 session。runner 在等待 core 结果前验证
+guardian 仍活着，完成或失败清理后验证它已退出；
+本地 SSH 编排器消失不能使 core 进程组无限保留。
+
 ### 4. SSH tunnel 分离实验
 
 `run_remote_lab.py run` 在 core/recovery 通过后重新执行资源门，把远端 loopback
@@ -84,6 +98,32 @@ Anvil 测试 signer 分别创建签名 NetworkTaskV2。辅助程序为每个任�
 `POST /v1/relay/tasks` 入队。每个节点必须实际取回并复算自己的证据，返回与当前
 连接、pending task 和 dispute 分别绑定的 receipt。该阶段不得直接暴露远端 RPC，
 也不得把 Operator token 或 Anvil 测试账户用于非实验网络。
+
+Quickstart supervisor 必须在启动 Pilot child 前创建独立 watchdog，并且仅在 watchdog 和
+child 都已启动后原子写出其 ready record；launcher 未获得该 record 前不得返回成功。因此
+本地 SSH 编排器在启动窗口消失时，watchdog 仍能限制该 detached process group。Quickstart
+启动后，runner 会从其拥有的 process group 的 `/proc` socket inode
+运行时读取 TCP listener，仅接受预期 Pilot 与 Anvil 端口、`127.0.0.1`/`::1` 地址和
+零个额外/非 loopback listener。启动器同时创建 60--900 秒范围内的独立 watchdog；
+runner 对它的存活检查必须同时核验 watchdog 的 PID/start tick、独立 session、位于本次
+远端 deployment `tools/start_shared_quickstart.py` 的 canonical 脚本、mode，以及 NUL 分隔
+argv 中精确且唯一的 target PID、target start tick 和 timeout。它在正常路径只会在 PID、
+start tick、PGID、SID 和受管 Quickstart supervisor 命令均匹配时终止该组；若 supervisor
+已消失，只会在存活成员仍证明
+`PGID == SID == 原始 PID` 时清理原始会话，PID 重用或身份不符均拒绝操作。
+`/proc` 或 `ps` 枚举不可用属于未知状态，不得发送 TERM/KILL，也不得把仍存在但 cmdline
+不可读的 watchdog 当作已退出；两种情况都必须失败并保留可诊断报告。
+启动异常时的 cleanup 也采用同一 fail-closed 规则：没有已记录 start tick、`PGID == SID == PID`、
+canonical 启动脚本和预期 mode 的完整匹配，不得按裸 PID 发送 group signal；此时保留
+失败报告，并只依赖已经通过身份验证的 guardian 的期限回收。
+supervisor 只在 Pilot 子进程存活期间担任组 leader；子进程退出后 supervisor 也退出，
+guardian 随即按上述受限的 leader-loss 路径回收仍存活的同一 session 成员。即使本地 SSH
+编排器消失，短实验也不会无限保留远端 Quickstart。
+正常清理后 watchdog 必须自行退出并被报告验证。
+此外 runner 必须在建立 tunnel/通过 `readyz` 前，以及三个公开节点已连接、任何任务
+提交前，重新按 watchdog 的 PID、start tick、脚本、mode、target PID、target start tick 和
+timeout 验证其存活；任何一次失败都不得继续
+进入或完成 task submission。
 
 ### 5. 长时间门
 
@@ -105,6 +145,16 @@ CPU、内存、磁盘、ACK 和恢复报告。内存报告必须区分根进程 
   必须各自包含 `evidence_verified:true` 并绑定正确 node/task/dispute，Relay
   必须精确记录 3 个 stored ACK 和 3 个 `receipt_confirmed`，并确认本次
   Quickstart 进程组已停止；
+- `tunnel_smoke.listener_inspection` 必须记录预期端口、listener 数、owned group
+  进程数、non-loopback/extra listener 数，并以 `loopback_only:true`、
+  `expected_ports_listening:true`、两个计数均为零通过；
+- 每个 `task_submissions` 必须显式为 `queued:true`，并与对应公开节点的预期
+  recipient 和 `review_dispute` task ID 一致；`watchdog_cleanup.verified` 必须为 true；
+- `tunnel_smoke.local_process_cleanup` 的每一项必须为 `verified:true`；即使本机 node 或
+  SSH tunnel 的 terminate/wait 报错，runner 仍必须继续执行远端 group 和 watchdog 清理；
+- `core_cleanup_verification` 必须同时记录并通过 core guardian 的 live/exit 校验；
+  `tunnel_smoke.watchdog_liveness` 必须在 `before_tunnel_readiness` 与
+  `before_task_submission` 两个时点均为 `verified:true`；
 - 成功或失败均写 `remote-lab-report.json`；最终 postflight 必须成功检查进程，
   且 `postflight_cleanup_verified:true`。postflight 的一分钟负载可保留刚结束
   实验的影响，因此清理判定只依赖进程快照成功且无相关进程；
