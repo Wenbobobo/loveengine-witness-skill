@@ -156,7 +156,24 @@ def _run_command(
     error_message: str,
     command_runner: CommandRunner | None,
     environment: dict[str, str] | None = None,
+    failure_stage: str | None = None,
 ) -> str:
+    def failure_message(
+        *,
+        returncode: int | None = None,
+        outcome: str | None = None,
+    ) -> str:
+        """Add only caller-supplied operational context, never tool output."""
+
+        if failure_stage is None:
+            return error_message
+        detail = f"stage={failure_stage}"
+        if returncode is not None:
+            detail += f", exit_code={returncode}"
+        elif outcome is not None:
+            detail += f", outcome={outcome}"
+        return f"{error_message} [{detail}]"
+
     try:
         if command_runner is not None:
             completed = command_runner(command, cwd)
@@ -172,10 +189,24 @@ def _run_command(
                 timeout=1_200,
                 env=environment,
             )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise LoveEngineError(error_code, error_message, 4) from exc
+    except OSError as exc:
+        raise LoveEngineError(
+            error_code,
+            failure_message(outcome="launch_error"),
+            4,
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise LoveEngineError(
+            error_code,
+            failure_message(outcome="timeout"),
+            4,
+        ) from exc
     if completed.returncode != 0:
-        raise LoveEngineError(error_code, error_message, 4)
+        raise LoveEngineError(
+            error_code,
+            failure_message(returncode=completed.returncode),
+            4,
+        )
     return completed.stdout or ""
 
 
@@ -1232,6 +1263,7 @@ def _install_dependency(
             error_message=f"could not install {name}",
             command_runner=command_runner,
             environment=environment,
+            failure_stage="git_init",
         )
         if _is_link_or_reparse_point(target) or not target.is_dir():
             raise LoveEngineError("contract_dependency_install_failed", name, 3)
@@ -1242,6 +1274,7 @@ def _install_dependency(
             error_message=f"could not install {name}",
             command_runner=command_runner,
             environment=environment,
+            failure_stage="git_remote_add",
         )
         _run_command(
             [
@@ -1258,6 +1291,7 @@ def _install_dependency(
             error_message=f"could not install {name}",
             command_runner=command_runner,
             environment=environment,
+            failure_stage="git_fetch",
         )
         _run_command(
             ["git", "checkout", "--detach", "--force", "FETCH_HEAD"],
@@ -1266,6 +1300,7 @@ def _install_dependency(
             error_message=f"could not install {name}",
             command_runner=command_runner,
             environment=environment,
+            failure_stage="git_checkout",
         )
         head = _run_command(
             ["git", "rev-parse", "HEAD"],
@@ -1274,6 +1309,7 @@ def _install_dependency(
             error_message=f"could not install {name}",
             command_runner=command_runner,
             environment=environment,
+            failure_stage="git_rev_parse",
         )
         if head.strip().lower() != configured["commit"]:
             raise LoveEngineError("contract_dependency_install_failed", name, 3)
@@ -1300,6 +1336,7 @@ def _install_dependency(
                 error_message=f"could not install {name}",
                 command_runner=command_runner,
                 environment=environment,
+                failure_stage="git_submodule_update",
             )
         _reject_nested_submodule_declarations(target, name=name)
         _strip_dependency_git_metadata(

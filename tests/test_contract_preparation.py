@@ -342,6 +342,40 @@ def test_prepare_contracts_rejects_unexpected_git_head_and_cleans_partial_tree(
     assert all(command[1:] != ["build", "--force", "--threads", "1"] for command in calls)
 
 
+def test_dependency_checkout_reports_safe_git_stage_without_raw_tool_output(
+    tmp_path: Path,
+) -> None:
+    contracts = _write_contract_project(tmp_path)
+
+    def runner(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+        if command[1] == "fetch":
+            return subprocess.CompletedProcess(
+                command,
+                128,
+                stdout="fetch diagnostics raw-tool-secret\n",
+                stderr="fatal: raw-tool-secret\n",
+            )
+        result = _simulate_dependency_git_checkout(command, cwd)
+        if result is not None:
+            return result
+        pytest.fail(f"unexpected command: {command}")
+
+    with pytest.raises(LoveEngineError) as error:
+        toolchain._install_dependency(
+            cwd=contracts,
+            dependency=CONTRACT_DEPENDENCIES[0],
+            expected_tree_sha256="sha256:" + "0" * 64,
+            command_runner=runner,
+        )
+
+    assert error.value.code == "contract_dependency_install_failed"
+    assert error.value.message == (
+        "could not install forge-std [stage=git_fetch, exit_code=128]"
+    )
+    assert "raw-tool-secret" not in error.value.message
+    assert not (contracts / "lib" / "forge-std").exists()
+
+
 def test_dependency_checkout_rejects_unconfigured_source_before_invoking_git(
     tmp_path: Path,
 ) -> None:

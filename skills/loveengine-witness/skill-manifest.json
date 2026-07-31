@@ -342,7 +342,7 @@
     "tools/start_shared_core.py": "sha256:06838bc7639a9b6d9dbbe51afb18931edafecbf88bbc3567616138f7dbde228c",
     "src/loveengine_witness/secrets.py": "sha256:1ab9c8a751c9c6e916aeb8a104837ae7b29d9761c02ff2e9a8c8f872c8561a35",
     "contracts/dependency-lock.json": "sha256:e6a8691ef641d09b59961a3158f44199110715cc6f741aea0b29ea4ec4927e49",
-    "src/loveengine_witness/toolchain.py": "sha256:34b4668b76adf256829f592397ada5a40bed8207147ab439622b86df4bf0fb1f"
+    "src/loveengine_witness/toolchain.py": "sha256:9223f26431de200ef91a9dd988ac596005db2d215c9ed7334f906aebc47f5dc9"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -436,7 +436,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:7e0f175b9c286108238c40698b11b4d538d96b7a68d7c758d5900518de1bebc3",
+  "package_hash": "sha256:5ab79db96658233fb980cbd76a834c22dd9b707a057ebe829c17f4d63d2089ef",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,
