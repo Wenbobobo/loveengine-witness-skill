@@ -176,7 +176,9 @@ Pilot 配置改成 `0.0.0.0`。
 - `watchdog_liveness.before_tunnel_readiness.verified: true` 与
   `watchdog_liveness.before_task_submission.verified: true`；
 - `postflight_cleanup_verified: true`。若失败，报告还必须包含 `phase` 和稳定的
-  error type；不要只看终端最后一行。
+  error type；`contracts-prepare` 失败时，core 报告只可附带允许列表中的依赖名、Git
+  stage 和退出码，顶层报告仅由这些字段派生摘要。原始 Git/Forge 输出留在受限远端目录，
+  不下载、不写入 transcript；不要只看终端最后一行。
 
 这证明相同 commit 能在受约束 Linux 主机上复跑，不证明现实事实、组织独立性、
 公网可用性、生产密钥安全或企业系统已经接入。

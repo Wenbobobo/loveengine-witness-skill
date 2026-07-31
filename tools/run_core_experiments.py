@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import time
@@ -26,6 +27,13 @@ ROOT = Path(__file__).resolve().parents[1]
 GIB = 1024**3
 MAX_SHARED_HOST_CPUS = 2
 MIN_SHARED_HOST_NICE_INCREMENT = 15
+CONTRACT_PREP_FAILURE_PATTERN = re.compile(
+    r"^could not install "
+    r"(?P<dependency>forge-std|openzeppelin-contracts) "
+    r"\[stage=(?P<stage>git_init|git_remote_add|git_fetch|git_checkout|"
+    r"git_rev_parse|git_submodule_update), "
+    r"exit_code=(?P<command_exit_code>[1-9][0-9]{0,2})\]$"
+)
 
 
 def _utc_now() -> str:
@@ -40,6 +48,44 @@ def _last_json_object(text: str) -> dict[str, Any]:
             if isinstance(value, dict):
                 return value
     raise RuntimeError("command did not emit a JSON object")
+
+
+def _safe_contract_prepare_diagnostic(stderr: str) -> dict[str, Any] | None:
+    """Extract only the terminal allowlisted CLI error from stderr."""
+
+    for line in reversed(stderr[-16_384:].splitlines()):
+        try:
+            payload = json.loads(line.strip())
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if "error" not in payload:
+            continue
+        error = payload["error"]
+        if not isinstance(error, dict):
+            return None
+        if error.get("code") != "contract_dependency_install_failed":
+            return None
+        message = error.get("message")
+        if not isinstance(message, str):
+            return None
+        match = CONTRACT_PREP_FAILURE_PATTERN.fullmatch(message)
+        if match is None:
+            return None
+        dependency = match.group("dependency")
+        stage = match.group("stage")
+        command_exit_code = int(match.group("command_exit_code"))
+        if not 1 <= command_exit_code <= 255:
+            continue
+        return {
+            "kind": "contract_prepare",
+            "error_code": "contract_dependency_install_failed",
+            "dependency": dependency,
+            "stage": stage,
+            "command_exit_code": command_exit_code,
+        }
+    return None
 
 
 def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, Any]:
@@ -108,15 +154,18 @@ class Experiment:
             (result.stdout or "") + (result.stderr or ""),
             encoding="utf-8",
         )
-        self.steps.append(
-            {
-                "name": label,
-                "command": command,
-                "exit_code": result.returncode,
-                "duration_seconds": duration,
-                "log": str(log_path),
-            }
-        )
+        step = {
+            "name": label,
+            "command": command,
+            "exit_code": result.returncode,
+            "duration_seconds": duration,
+            "log": str(log_path),
+        }
+        if result.returncode == 4 and label == "contracts-prepare":
+            diagnostic = _safe_contract_prepare_diagnostic(result.stderr or "")
+            if diagnostic is not None:
+                step["diagnostic"] = diagnostic
+        self.steps.append(step)
         if result.returncode != 0:
             raise RuntimeError(f"{label} failed with exit code {result.returncode}")
         return result.stdout or ""

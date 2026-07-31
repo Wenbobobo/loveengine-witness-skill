@@ -180,7 +180,9 @@ same owned process group. No reusable handoff file, nonce option, PID
 exemption, or `--skip-preflight` switch exists. A rejected core gate starts no
 owned core group and leaves a structured `core-experiment-report.json`; a
 Quickstart rejection is returned with the same structured preflight and exit
-status 4.
+status 4. A failed `contracts-prepare` step may retain only an allowlisted
+dependency, Git stage, and exit-code diagnostic; raw Git and Forge output stays
+on the constrained host and is never copied into the remote-lab report.
 The lock coordinates compliant LoveEngine processes only: it is not a hostile
 same-UID security boundary or a promise that unrelated host work cannot begin
 after the instantaneous capacity snapshot.

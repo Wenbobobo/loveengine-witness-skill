@@ -43,6 +43,17 @@ CORE_WATCHDOG_RESULT_SCHEMA_VERSION = "loveengine.core-watchdog-result/1"
 QUICKSTART_WATCHDOG_RESULT_SCHEMA_VERSION = "loveengine.quickstart-watchdog-result/1"
 SHARED_HOST_LEASE_SCHEMA_VERSION = "loveengine.shared-host-preflight-lease/1"
 GIB = 1024**3
+CORE_DIAGNOSTIC_DEPENDENCIES = frozenset({"forge-std", "openzeppelin-contracts"})
+CORE_DIAGNOSTIC_STAGES = frozenset(
+    {
+        "git_init",
+        "git_remote_add",
+        "git_fetch",
+        "git_checkout",
+        "git_rev_parse",
+        "git_submodule_update",
+    }
+)
 
 
 class ResourceGuardBlocked(RuntimeError):
@@ -52,6 +63,57 @@ class ResourceGuardBlocked(RuntimeError):
         super().__init__(f"{phase} blocked by the shared-host resource guard")
         self.phase = phase
         self.preflight = preflight
+
+
+def _remote_core_failure_message(remote_report: object) -> str:
+    """Render only the bounded diagnostic produced by the core runner."""
+
+    if (
+        not isinstance(remote_report, dict)
+        or remote_report.get("status") != "failed"
+    ):
+        return "remote core experiment did not pass"
+    steps = remote_report.get("steps")
+    if not isinstance(steps, list):
+        return "remote core experiment did not pass"
+    for step in steps:
+        if (
+            not isinstance(step, dict)
+            or step.get("name") != "contracts-prepare"
+            or isinstance(step.get("exit_code"), bool)
+            or step.get("exit_code") != 4
+        ):
+            continue
+        diagnostic = step.get("diagnostic")
+        if not isinstance(diagnostic, dict) or set(diagnostic) != {
+            "kind",
+            "error_code",
+            "dependency",
+            "stage",
+            "command_exit_code",
+        }:
+            continue
+        dependency = diagnostic.get("dependency")
+        stage = diagnostic.get("stage")
+        command_exit_code = diagnostic.get("command_exit_code")
+        if (
+            diagnostic.get("kind") != "contract_prepare"
+            or diagnostic.get("error_code") != "contract_dependency_install_failed"
+            or not isinstance(dependency, str)
+            or not isinstance(stage, str)
+            or dependency not in CORE_DIAGNOSTIC_DEPENDENCIES
+            or stage not in CORE_DIAGNOSTIC_STAGES
+            or isinstance(command_exit_code, bool)
+            or not isinstance(command_exit_code, int)
+            or not 1 <= command_exit_code <= 255
+        ):
+            continue
+        return (
+            "remote core contracts-prepare failed "
+            f"[dependency={dependency}, stage={stage}, "
+            f"command_exit_code={command_exit_code}]"
+        )
+    return "remote core experiment did not pass"
 
 
 def _utc_now() -> str:
@@ -2222,7 +2284,7 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
             (local_output / "core-experiment-report.json").read_text(encoding="utf-8")
         )
         if remote_report.get("status") != "passed":
-            raise RuntimeError("remote core experiment did not pass")
+            raise RuntimeError(_remote_core_failure_message(remote_report))
         if (
             start_info.get("resource_preflight")
             != remote_report.get("resource_preflight")

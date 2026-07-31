@@ -354,6 +354,248 @@ def test_core_runner_does_not_offer_contract_prepare_bypass() -> None:
         run_core_experiments.build_parser().parse_args(["--prepare-contracts"])
 
 
+def test_contract_prepare_failure_report_keeps_only_allowlisted_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "raw-tool-secret-must-not-enter-report"
+    completed = subprocess.CompletedProcess(
+        args=["uv", "run", "loveengine", "pilot", "contracts", "prepare"],
+        returncode=4,
+        stdout="",
+        stderr=(
+            '{"error":{"code":"contract_dependency_install_failed",'
+            '"message":"could not install openzeppelin-contracts '
+            '[stage=git_submodule_update, exit_code=128]"}}\n'
+            + secret
+        ),
+    )
+    monkeypatch.setattr(
+        run_core_experiments.subprocess,
+        "run",
+        lambda *args, **kwargs: completed,
+    )
+    experiment = run_core_experiments.Experiment(
+        tmp_path,
+        timeout_seconds=10,
+        environment={},
+    )
+
+    with pytest.raises(RuntimeError, match="contracts-prepare failed with exit code 4"):
+        experiment.run("contracts-prepare", ["uv", "run", "loveengine"])
+
+    diagnostic = experiment.steps[0]["diagnostic"]
+    assert diagnostic == {
+        "kind": "contract_prepare",
+        "error_code": "contract_dependency_install_failed",
+        "dependency": "openzeppelin-contracts",
+        "stage": "git_submodule_update",
+        "command_exit_code": 128,
+    }
+    assert secret not in json.dumps(experiment.steps)
+
+
+def test_contract_prepare_failure_rejects_unbounded_cli_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completed = subprocess.CompletedProcess(
+        args=["uv"],
+        returncode=4,
+        stdout="",
+        stderr=(
+            '{"error":{"code":"contract_dependency_install_failed",'
+            '"message":"could not install openzeppelin-contracts '
+            '[stage=git_fetch, exit_code=128]; secret=do-not-persist"}}\n'
+        ),
+    )
+    monkeypatch.setattr(
+        run_core_experiments.subprocess,
+        "run",
+        lambda *args, **kwargs: completed,
+    )
+    experiment = run_core_experiments.Experiment(
+        tmp_path,
+        timeout_seconds=10,
+        environment={},
+    )
+
+    with pytest.raises(RuntimeError):
+        experiment.run("contracts-prepare", ["uv"])
+
+    assert "diagnostic" not in experiment.steps[0]
+    assert "do-not-persist" not in json.dumps(experiment.steps)
+
+
+def test_contract_prepare_failure_uses_only_terminal_stderr_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completed = subprocess.CompletedProcess(
+        args=["uv"],
+        returncode=4,
+        stdout=(
+            '{"error":{"code":"contract_dependency_install_failed",'
+            '"message":"could not install openzeppelin-contracts '
+            '[stage=git_submodule_update, exit_code=128]"}}\n'
+        ),
+        stderr=(
+            '{"error":{"code":"contract_build_failed",'
+            '"message":"pinned Forge build failed"}}\n'
+        ),
+    )
+    monkeypatch.setattr(
+        run_core_experiments.subprocess,
+        "run",
+        lambda *args, **kwargs: completed,
+    )
+    experiment = run_core_experiments.Experiment(
+        tmp_path,
+        timeout_seconds=10,
+        environment={},
+    )
+
+    with pytest.raises(RuntimeError):
+        experiment.run("contracts-prepare", ["uv"])
+
+    assert "diagnostic" not in experiment.steps[0]
+
+
+def test_contract_prepare_diagnostic_requires_cli_exit_code_four(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completed = subprocess.CompletedProcess(
+        args=["uv"],
+        returncode=1,
+        stdout="",
+        stderr=(
+            '{"error":{"code":"contract_dependency_install_failed",'
+            '"message":"could not install openzeppelin-contracts '
+            '[stage=git_submodule_update, exit_code=128]"}}\n'
+        ),
+    )
+    monkeypatch.setattr(
+        run_core_experiments.subprocess,
+        "run",
+        lambda *args, **kwargs: completed,
+    )
+    experiment = run_core_experiments.Experiment(
+        tmp_path,
+        timeout_seconds=10,
+        environment={},
+    )
+
+    with pytest.raises(RuntimeError):
+        experiment.run("contracts-prepare", ["uv"])
+
+    assert "diagnostic" not in experiment.steps[0]
+
+
+def test_contract_prepare_failure_report_and_stdout_exclude_raw_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    secret = "raw-tool-secret-must-not-enter-core-report"
+    contract_failure = subprocess.CompletedProcess(
+        args=["uv", "run", "loveengine", "pilot", "contracts", "prepare"],
+        returncode=4,
+        stdout="",
+        stderr=(
+            '{"error":{"code":"contract_dependency_install_failed",'
+            '"message":"could not install openzeppelin-contracts '
+            '[stage=git_submodule_update, exit_code=128]"}}\n'
+            + secret
+        ),
+    )
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        if command[1:] == ["sync", "--frozen"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        if command[1:] == [
+            "run",
+            "loveengine",
+            "pilot",
+            "contracts",
+            "prepare",
+        ]:
+            return contract_failure
+        raise AssertionError(f"unexpected command: {command}")
+
+    monkeypatch.setattr(run_core_experiments.shutil, "which", lambda _: "uv")
+    monkeypatch.setattr(run_core_experiments.subprocess, "run", fake_run)
+    args = Namespace(
+        output=tmp_path,
+        events=12,
+        observers=3,
+        include_recovery_tests=False,
+        shared_host=False,
+        max_cpus=2,
+        nice_increment=15,
+        max_load_per_cpu=0.5,
+        min_memory_gib=3.0,
+        min_disk_gib=5.0,
+        step_timeout_seconds=10,
+    )
+
+    assert run_core_experiments.run_core_experiment(args) == 1
+
+    report_text = (tmp_path / "core-experiment-report.json").read_text(
+        encoding="utf-8"
+    )
+    assert secret not in report_text
+    assert secret not in capsys.readouterr().out
+    report = json.loads(report_text)
+    assert report["steps"][-1]["diagnostic"] == {
+        "kind": "contract_prepare",
+        "error_code": "contract_dependency_install_failed",
+        "dependency": "openzeppelin-contracts",
+        "stage": "git_submodule_update",
+        "command_exit_code": 128,
+    }
+
+
+def test_remote_core_failure_message_uses_only_validated_diagnostic() -> None:
+    report = {
+        "status": "failed",
+        "steps": [
+            {
+                "name": "contracts-prepare",
+                "exit_code": 4,
+                "diagnostic": {
+                    "kind": "contract_prepare",
+                    "error_code": "contract_dependency_install_failed",
+                    "dependency": "openzeppelin-contracts",
+                    "stage": "git_submodule_update",
+                    "command_exit_code": 128,
+                },
+            }
+        ]
+    }
+    assert run_remote_lab._remote_core_failure_message(report) == (
+        "remote core contracts-prepare failed "
+        "[dependency=openzeppelin-contracts, stage=git_submodule_update, "
+        "command_exit_code=128]"
+    )
+
+    report["steps"][0]["diagnostic"]["dependency"] = "raw-tool-secret"
+    assert run_remote_lab._remote_core_failure_message(report) == (
+        "remote core experiment did not pass"
+    )
+
+    report["steps"][0]["diagnostic"]["dependency"] = ["openzeppelin-contracts"]
+    assert run_remote_lab._remote_core_failure_message(report) == (
+        "remote core experiment did not pass"
+    )
+
+    report["steps"][0]["diagnostic"]["dependency"] = "openzeppelin-contracts"
+    report["steps"][0]["exit_code"] = 1
+    assert run_remote_lab._remote_core_failure_message(report) == (
+        "remote core experiment did not pass"
+    )
+
+
 def test_remote_preflight_fails_closed_when_process_inspection_fails() -> None:
     snapshot = _safe_snapshot()
     snapshot["process_snapshot_ok"] = False
