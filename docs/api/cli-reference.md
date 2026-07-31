@@ -229,6 +229,11 @@ stage、事件数与观察者数；它同时要求完整的标准成功检查集
 还必须确有 3 个 observation receipt、3 个 review receipt 和 ready Gate。格式错误、
 stale/cross-run 错绑、缺少标准 checks、secret finding、不可复验 transcript 或
 `passed:true` 与 checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
+记录的子进程已退出后，状态读取器才会以同目录的原子替换把首次经复验的终态写回 state：
+`status`、`finished_at` 以及适用的窄化失败分类。子进程仍存活时，即使已经出现部分或
+失败报告，state 仍保持 `running`；在启动器尚未登记 PID 的短窗口，state 保持 `starting`。
+这些持久字段只是可恢复的生命周期摘要，每次查询仍会
+重新验证 report 与 transcript，不能充当信任锚。
 
 `peak_rss_bytes` 保留为兼容字段，且由 `peak_rss_bytes_scope` 明确标记为根进程的
 OS 峰值。`memory.root_process_peak_rss_bytes` 也是该局部诊断；完整实验的资源门是

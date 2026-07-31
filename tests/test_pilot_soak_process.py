@@ -147,6 +147,19 @@ def test_background_soak_status_uses_completed_report(
     assert "failure_reason" not in status
     assert status["report"]["passed"] is True
     assert status["progress_percent"] == 100
+    persisted = json.loads(
+        Path(started["state_path"]).read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "passed"
+    assert persisted["finished_at"] == status["checked_at"]
+    assert "failure_reason" not in persisted
+    assert "report_validation_error" not in persisted
+    first_state_bytes = Path(started["state_path"]).read_bytes()
+
+    repeated = background_soak_status(Path(started["state_path"]))
+
+    assert repeated["status"] == "passed"
+    assert Path(started["state_path"]).read_bytes() == first_state_bytes
 
 
 def test_background_soak_rejects_early_passing_report(
@@ -155,6 +168,11 @@ def test_background_soak_rejects_early_passing_report(
     monkeypatch.setattr(
         "loveengine_witness.pilot_soak_process.subprocess.Popen",
         lambda *args, **kwargs: FakeProcess(),
+    )
+    process_alive = True
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process._process_alive",
+        lambda pid: process_alive,
     )
     started = start_background_soak(
         tmp_path,
@@ -168,11 +186,40 @@ def test_background_soak_rejects_early_passing_report(
     (tmp_path / "pilot-soak-report.json").write_text(
         json.dumps(report), encoding="utf-8"
     )
+    process_alive = False
 
     status = background_soak_status(Path(started["state_path"]))
 
     assert status["status"] == "failed"
     assert status["report_validation_error"] == "elapsed_duration_too_short"
+    persisted = json.loads(
+        Path(started["state_path"]).read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "failed"
+    assert persisted["failure_reason"] == "soak_report_failed"
+    assert persisted["report_validation_error"] == "elapsed_duration_too_short"
+    assert isinstance(persisted["finished_at"], str)
+
+
+def test_background_soak_status_keeps_unregistered_launch_starting(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "pilot-soak-run.json"
+    original = {
+        "schema_version": "loveengine.pilot-soak-run/1",
+        "status": "starting",
+        "pid": None,
+        "started_at_epoch": 0,
+        "duration_seconds": 60,
+        "output": str(tmp_path),
+    }
+    state_path.write_text(json.dumps(original), encoding="utf-8")
+
+    status = background_soak_status(state_path)
+
+    assert status["status"] == "starting"
+    assert status["process_alive"] is False
+    assert json.loads(state_path.read_text(encoding="utf-8")) == original
 
 
 def test_background_soak_rejects_report_before_planned_wall_clock_end(
@@ -409,6 +456,49 @@ def test_background_soak_status_waits_for_child_exit(
     assert status["status"] == "running"
     assert status["process_alive"] is True
     assert status["progress_percent"] < 100
+    persisted = json.loads(
+        Path(started["state_path"]).read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "running"
+    assert "finished_at" not in persisted
+
+
+def test_background_soak_status_waits_for_child_exit_before_failing_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process.subprocess.Popen",
+        lambda *args, **kwargs: FakeProcess(),
+    )
+    monkeypatch.setattr(
+        "loveengine_witness.pilot_soak_process._process_alive", lambda pid: True
+    )
+    started = start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps({"passed": False}), encoding="utf-8"
+    )
+    original_read_json = pilot_soak_process.read_json
+
+    def read_state_only(path: Path) -> object:
+        assert path.name != "pilot-soak-report.json"
+        return original_read_json(path)
+
+    monkeypatch.setattr(pilot_soak_process, "read_json", read_state_only)
+
+    status = background_soak_status(Path(started["state_path"]))
+
+    assert status["status"] == "running"
+    assert status["report"] is None
+    persisted = json.loads(
+        Path(started["state_path"]).read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "running"
+    assert "finished_at" not in persisted
 
 
 def test_background_soak_rejects_passing_report_with_secret_findings(
@@ -596,6 +686,12 @@ def test_background_soak_status_marks_dead_process_without_report_failed(
     assert status["failure_reason"] == "process_exited_without_report"
     assert status["report"] is None
     assert status["stderr_path"].endswith("pilot-soak.stderr.log")
+    persisted = json.loads(
+        Path(started["state_path"]).read_text(encoding="utf-8")
+    )
+    assert persisted["status"] == "failed"
+    assert persisted["failure_reason"] == "process_exited_without_report"
+    assert persisted["finished_at"] == status["finished_at"]
 
 
 def test_background_soak_status_names_failed_report(

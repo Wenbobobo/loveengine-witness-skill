@@ -39,6 +39,8 @@ from .typed_data import build_register_typed_data
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = SKILL_VERSION
 ZERO_HASH = "0x" + "00" * 32
+PILOT_RELAY_READY_TIMEOUT_SECONDS = 30.0
+PILOT_RELAY_ACK_TIMEOUT_SECONDS = 10.0
 
 
 @dataclass
@@ -390,7 +392,7 @@ async def _wait_for_relay_task_acceptance(
     *,
     node: str,
     task_id: str,
-    timeout_seconds: float = 10.0,
+    timeout_seconds: float = PILOT_RELAY_ACK_TIMEOUT_SECONDS,
 ) -> None:
     """Wait until the Relay durably records this connection's task ACK."""
 
@@ -409,7 +411,7 @@ async def _wait_for_relay_node_connections(
     *,
     nodes: list[str],
     connected: bool,
-    timeout_seconds: float = 10.0,
+    timeout_seconds: float = PILOT_RELAY_READY_TIMEOUT_SECONDS,
 ) -> None:
     """Wait for authenticated Relay membership to reach the requested state."""
 
@@ -428,6 +430,30 @@ async def _wait_for_relay_node_connections(
                 f"pilot_relay_{state}_timeout", ",".join(sorted(expected)), 4
             )
         await asyncio.sleep(0.05)
+
+
+async def _enqueue_task_after_relay_connection(
+    environment: PilotEnvironment,
+    client: ClientSession,
+    hub: Any,
+    *,
+    task: dict[str, Any],
+    node: str,
+) -> None:
+    """Submit a signed task only after its public node has authenticated.
+
+    Bootstrap and release verification can take longer than task delivery. By
+    separating that readiness wait from ACK latency, the Pilot proves the
+    post-connection delivery path without treating process startup as an ACK.
+    """
+
+    await _wait_for_relay_node_connections(
+        hub, nodes=[node], connected=True
+    )
+    await _enqueue_task_through_operator_api(environment, client, task)
+    await _wait_for_relay_task_acceptance(
+        hub, node=node, task_id=task["task_id"]
+    )
 
 
 async def _stop_processes(
@@ -512,7 +538,6 @@ async def _run_observation_phase(
             build_task_v2_typed_data(task),
         )
         tasks.append(task)
-        await _enqueue_task_through_operator_api(environment, client, task)
         result_path = environment.output / "observations" / f"node-{index}.json"
         result_path.parent.mkdir(parents=True, exist_ok=True)
         observation_specs.append((index, node, result_path))
@@ -528,13 +553,12 @@ async def _run_observation_phase(
         delayed_processes = _start_observation_processes(
             environment, [delayed_spec]
         )
-        await _wait_for_relay_task_acceptance(
+        await _enqueue_task_after_relay_connection(
+            environment,
+            client,
             hub,
+            task=delayed_task,
             node=delayed_spec[1],
-            task_id=delayed_task["task_id"],
-        )
-        await _wait_for_relay_node_connections(
-            hub, nodes=[delayed_spec[1]], connected=True
         )
         await _stop_processes(delayed_processes)
         await _wait_for_relay_node_connections(
@@ -552,12 +576,9 @@ async def _run_observation_phase(
     active_specs = observation_specs[:-1]
     observation_processes = _start_observation_processes(environment, active_specs)
     for task, spec in zip(tasks[:-1], active_specs, strict=True):
-        await _wait_for_relay_task_acceptance(
-            hub, node=spec[1], task_id=task["task_id"]
+        await _enqueue_task_after_relay_connection(
+            environment, client, hub, task=task, node=spec[1]
         )
-    await _wait_for_relay_node_connections(
-        hub, nodes=[spec[1] for spec in active_specs], connected=True
-    )
     fault_recovery_seconds = 0.0
     await asyncio.sleep(0.4)
     for index in range(1, event_count + 1):
@@ -642,10 +663,16 @@ async def _run_observation_phase(
         raise LoveEngineError("observer_event_loss", json.dumps(observer_results))
 
     observation_clients = await _collect(observation_processes, "observation")
-    delayed_clients = await _collect(
-        _start_observation_processes(environment, [delayed_spec]),
-        "delayed_observation",
-    )
+    delayed_processes = _start_observation_processes(environment, [delayed_spec])
+    if not simulate_faults:
+        await _enqueue_task_after_relay_connection(
+            environment,
+            client,
+            hub,
+            task=delayed_task,
+            node=delayed_spec[1],
+        )
+    delayed_clients = await _collect(delayed_processes, "delayed_observation")
     observation_receipts = [
         receipt
         for client_result in [*observation_clients, *delayed_clients]
@@ -786,7 +813,6 @@ async def _run_evidence_phase(
             build_task_v2_typed_data(task),
         )
         observation.tasks.append(task)
-        await _enqueue_task_through_operator_api(environment, client, task)
         verdict_path = environment.output / "verdicts" / f"node-{index}.json"
         verdict_path.parent.mkdir(parents=True, exist_ok=True)
         write_json(verdict_path, {dispute["dispute_id"]: verdict})
@@ -816,6 +842,13 @@ async def _run_evidence_phase(
             ]
         )
         environment.all_processes.append(process)
+        await _enqueue_task_after_relay_connection(
+            environment,
+            client,
+            observation.hub,
+            task=task,
+            node=node,
+        )
         review_clients.extend(
             await _collect([(process, result_path)], "review")
         )

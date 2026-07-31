@@ -31,6 +31,22 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
+def _write_soak_state(state_path: Path, state: dict[str, Any]) -> None:
+    """Atomically replace one local lifecycle state record."""
+
+    temporary_path = state_path.with_name(
+        f".{state_path.name}.{uuid.uuid4().hex}.tmp"
+    )
+    try:
+        write_json(temporary_path, state)
+        os.replace(temporary_path, state_path)
+    finally:
+        try:
+            temporary_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def _process_alive(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -197,6 +213,49 @@ def _passed_report_issue(
     return _verified_report_transcript(report, state, output)
 
 
+def _persist_terminal_state(
+    state_path: Path,
+    state: dict[str, Any],
+    *,
+    status: str,
+    checked_at: str,
+    failure_reason: str | None,
+    report_error: str | None,
+) -> dict[str, Any]:
+    """Persist a verified terminal result after the recorded child exits.
+
+    The report and transcript are still revalidated on every status query. The
+    persisted fields are a durable lifecycle summary, not a substitute for
+    report verification or a trust anchor.
+    """
+
+    if status not in {"passed", "failed"}:
+        return state
+    if (
+        state.get("status") == status
+        and isinstance(state.get("finished_at"), str)
+        and state["finished_at"].strip()
+    ):
+        return state
+
+    persisted = dict(state)
+    persisted["status"] = status
+    persisted["finished_at"] = checked_at
+    if failure_reason is None:
+        persisted.pop("failure_reason", None)
+    else:
+        persisted["failure_reason"] = failure_reason
+    if report_error is None:
+        persisted.pop("report_validation_error", None)
+    else:
+        persisted["report_validation_error"] = report_error
+
+    if persisted == state:
+        return state
+    _write_soak_state(state_path, persisted)
+    return persisted
+
+
 def background_soak_status(state_path: Path) -> dict[str, Any]:
     state_path = Path(state_path).resolve()
     state = read_json(state_path)
@@ -206,27 +265,33 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         raise LoveEngineError("invalid_soak_state", str(state_path))
     output = Path(str(state["output"])).resolve()
     report_path = output / REPORT_FILENAME
+    pid = int(state.get("pid") or 0)
+    process_alive = _process_alive(pid)
+    starting_without_pid = (
+        state.get("status") == "starting"
+        and pid <= 0
+        and not state.get("launch_error")
+    )
     report: Any = None
     report_error: str | None = None
-    if report_path.is_file():
+    if not process_alive and not starting_without_pid and report_path.is_file():
         try:
             report = read_json(report_path)
         except LoveEngineError as error:
             report_error = error.code
         if report_error is None and not isinstance(report, dict):
             report_error = "report_not_object"
-    pid = int(state.get("pid") or 0)
-    process_alive = _process_alive(pid)
     failure_reason: str | None = None
-    if isinstance(report, dict):
+    if starting_without_pid:
+        status = "starting"
+    elif process_alive:
+        # A child can expose an incomplete or final report just before it
+        # exits. Keep the durable state non-terminal until the PID is gone.
+        status = "running"
+    elif isinstance(report, dict):
         if report.get("passed") is True:
-            if process_alive:
-                # A child can write its report just before its process exits.
-                # Do not accept it until the recorded process has actually ended.
-                status = "running"
-            else:
-                report_error = _passed_report_issue(report, state, output)
-                status = "failed" if report_error is not None else "passed"
+            report_error = _passed_report_issue(report, state, output)
+            status = "failed" if report_error is not None else "passed"
         else:
             status = "failed"
         if status == "failed":
@@ -234,8 +299,6 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
     elif report_error is not None:
         status = "failed"
         failure_reason = "soak_report_failed"
-    elif process_alive:
-        status = "running"
     else:
         status = "failed"
         failure_reason = (
@@ -250,12 +313,22 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         if status == "passed"
         else min(99.9, elapsed / duration * 100)
     )
+    checked_at = _utc_now()
+    if not process_alive:
+        state = _persist_terminal_state(
+            state_path,
+            state,
+            status=status,
+            checked_at=checked_at,
+            failure_reason=failure_reason,
+            report_error=report_error,
+        )
     result = {
         **state,
         "state_path": str(state_path),
         "status": status,
         "process_alive": process_alive,
-        "checked_at": _utc_now(),
+        "checked_at": checked_at,
         "elapsed_seconds": round(elapsed, 3),
         "remaining_seconds": round(max(0.0, duration - elapsed), 3),
         "progress_percent": round(progress, 2),
@@ -334,7 +407,7 @@ def start_background_soak(
         "report_path": str(report_path),
         "package_root": str(Path(__file__).resolve().parents[2]),
     }
-    write_json(state_path, state)
+    _write_soak_state(state_path, state)
     creationflags = 0
     process_kwargs: dict[str, Any] = {
         "cwd": str(Path(__file__).resolve().parents[2]),
@@ -364,11 +437,11 @@ def start_background_soak(
     except OSError as exc:
         state["status"] = "failed"
         state["launch_error"] = exc.__class__.__name__
-        write_json(state_path, state)
+        _write_soak_state(state_path, state)
         raise LoveEngineError(
             "pilot_soak_launch_failed", exc.__class__.__name__, 4
         ) from exc
     state["pid"] = process.pid
     state["status"] = "running"
-    write_json(state_path, state)
+    _write_soak_state(state_path, state)
     return background_soak_status(state_path)

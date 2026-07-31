@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import loveengine_witness.pilot_phases as pilot_phases
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.pilot_phases import (
     _new_pilot_client_session,
@@ -135,6 +136,96 @@ def test_wait_for_relay_node_connections_times_out_without_disconnect() -> None:
         )
 
     assert error.value.code == "pilot_relay_disconnect_timeout"
+
+
+def test_pilot_enqueues_task_only_after_authenticated_relay_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def wait_for_connection(
+        hub: object,
+        *,
+        nodes: list[str],
+        connected: bool,
+    ) -> None:
+        assert hub is not None
+        assert nodes == ["node-1"]
+        assert connected is True
+        calls.append("connected")
+
+    async def enqueue(
+        environment: object, client: object, task: dict[str, object]
+    ) -> None:
+        assert environment is not None
+        assert client is not None
+        assert task["task_id"] == "task-1"
+        calls.append("enqueued")
+
+    async def wait_for_acceptance(
+        hub: object, *, node: str, task_id: str
+    ) -> None:
+        assert hub is not None
+        assert node == "node-1"
+        assert task_id == "task-1"
+        calls.append("accepted")
+
+    monkeypatch.setattr(
+        pilot_phases, "_wait_for_relay_node_connections", wait_for_connection
+    )
+    monkeypatch.setattr(
+        pilot_phases, "_enqueue_task_through_operator_api", enqueue
+    )
+    monkeypatch.setattr(
+        pilot_phases, "_wait_for_relay_task_acceptance", wait_for_acceptance
+    )
+
+    asyncio.run(
+        pilot_phases._enqueue_task_after_relay_connection(
+            object(),
+            object(),
+            object(),
+            task={"task_id": "task-1"},
+            node="node-1",
+        )
+    )
+
+    assert calls == ["connected", "enqueued", "accepted"]
+
+
+def test_pilot_does_not_enqueue_task_when_relay_connection_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def wait_for_connection(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise LoveEngineError("pilot_relay_connection_timeout", "node-1", 4)
+
+    async def enqueue(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        calls.append("enqueued")
+
+    monkeypatch.setattr(
+        pilot_phases, "_wait_for_relay_node_connections", wait_for_connection
+    )
+    monkeypatch.setattr(
+        pilot_phases, "_enqueue_task_through_operator_api", enqueue
+    )
+
+    with pytest.raises(LoveEngineError) as error:
+        asyncio.run(
+            pilot_phases._enqueue_task_after_relay_connection(
+                object(),
+                object(),
+                object(),
+                task={"task_id": "task-1"},
+                node="node-1",
+            )
+        )
+
+    assert error.value.code == "pilot_relay_connection_timeout"
+    assert calls == []
 
 
 def test_rejected_review_receipt_has_a_stable_pilot_error() -> None:
