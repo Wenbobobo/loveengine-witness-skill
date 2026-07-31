@@ -524,6 +524,12 @@ def test_contract_prepare_failure_report_and_stdout_exclude_raw_error(
         raise AssertionError(f"unexpected command: {command}")
 
     monkeypatch.setattr(run_core_experiments.shutil, "which", lambda _: "uv")
+    monkeypatch.setattr(run_core_experiments.platform, "node", lambda: "fixture-host")
+    monkeypatch.setattr(
+        run_core_experiments.platform,
+        "platform",
+        lambda: "fixture-platform",
+    )
     monkeypatch.setattr(run_core_experiments.subprocess, "run", fake_run)
     args = Namespace(
         output=tmp_path,
