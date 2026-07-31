@@ -15,8 +15,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from remote_host_preflight import CapacityThresholds, run_preflight
-from start_shared_quickstart import select_shared_host_cpus
+from remote_host_preflight import (
+    CapacityThresholds,
+    is_passing_preflight,
+)
+from start_shared_quickstart import _limit_process, select_shared_host_cpus
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,21 +43,12 @@ def _last_json_object(text: str) -> dict[str, Any]:
 
 
 def _apply_shared_host_limits(max_cpus: int, nice_increment: int) -> dict[str, Any]:
-    validate_shared_host_limits(max_cpus, nice_increment)
-    result: dict[str, Any] = {
-        "nice_increment": 0,
-        "cpu_affinity": None,
+    affinity, process_nice = _limit_process(max_cpus, nice_increment)
+    return {
+        "nice_increment": nice_increment,
+        "process_nice": process_nice,
+        "cpu_affinity": affinity,
     }
-    if os.name != "nt":
-        os.nice(nice_increment)
-        result["nice_increment"] = nice_increment
-        if hasattr(os, "sched_getaffinity") and hasattr(os, "sched_setaffinity"):
-            selected = select_shared_host_cpus(
-                os.sched_getaffinity(0), max_cpus
-            )
-            os.sched_setaffinity(0, selected)
-            result["cpu_affinity"] = selected
-    return result
 
 
 def validate_shared_host_limits(max_cpus: int, nice_increment: int) -> None:
@@ -62,6 +56,15 @@ def validate_shared_host_limits(max_cpus: int, nice_increment: int) -> None:
         raise ValueError("shared-host max CPUs must be between 1 and 2")
     if not MIN_SHARED_HOST_NICE_INCREMENT <= nice_increment <= 19:
         raise ValueError("shared-host nice increment must be between 15 and 19")
+
+
+def _shared_host_thresholds(args: argparse.Namespace) -> CapacityThresholds:
+    return CapacityThresholds(
+        max_load_per_cpu=args.max_load_per_cpu,
+        min_available_memory_bytes=int(args.min_memory_gib * GIB),
+        min_free_disk_bytes=int(args.min_disk_gib * GIB),
+        min_cpu_count=2,
+    )
 
 
 class Experiment:
@@ -127,11 +130,11 @@ class Experiment:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    parser.set_defaults(shared_host=False)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--events", type=int, default=12)
     parser.add_argument("--observers", type=int, default=10)
     parser.add_argument("--include-recovery-tests", action="store_true")
-    parser.add_argument("--shared-host", action="store_true")
     parser.add_argument("--max-cpus", type=int, default=2)
     parser.add_argument("--nice-increment", type=int, default=15)
     parser.add_argument("--max-load-per-cpu", type=float, default=0.5)
@@ -141,8 +144,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def run_core_experiment(
+    args: argparse.Namespace,
+    *,
+    shared_host_preflight: dict[str, Any] | None = None,
+    shared_host_preflight_source: str | None = None,
+    resource_preflight_binding: dict[str, Any] | None = None,
+    shared_host_limits: dict[str, Any] | None = None,
+) -> int:
+    """Run the core experiment after the shared-host launcher binds a lease."""
+
     run_id = (
         "core-"
         + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -167,24 +178,6 @@ def main() -> int:
             "PYTHONUNBUFFERED": "1",
         }
     )
-    if args.shared_host:
-        validate_shared_host_limits(args.max_cpus, args.nice_increment)
-        if not hasattr(os, "sched_getaffinity") or not hasattr(
-            os, "sched_setaffinity"
-        ):
-            raise RuntimeError("shared-host CPU affinity enforcement is required")
-        thresholds = CapacityThresholds(
-            max_load_per_cpu=args.max_load_per_cpu,
-            min_available_memory_bytes=int(args.min_memory_gib * GIB),
-            min_free_disk_bytes=int(args.min_disk_gib * GIB),
-            min_cpu_count=2,
-        )
-        preflight = run_preflight(output, thresholds)
-        if not preflight["safe_to_run"]:
-            print(json.dumps(preflight, ensure_ascii=False, sort_keys=True))
-            return 4
-        limits = _apply_shared_host_limits(args.max_cpus, args.nice_increment)
-
     experiment = Experiment(
         output,
         timeout_seconds=args.step_timeout_seconds,
@@ -200,11 +193,87 @@ def main() -> int:
         "actors_simulated": True,
         "resource_profile": "shared_host" if args.shared_host else "default",
         "resource_preflight": preflight,
+        "resource_preflight_source": None,
+        "resource_preflight_binding": None,
         "resource_limits": limits,
         "started_at": started_at,
         "steps": experiment.steps,
     }
     try:
+        if shared_host_preflight is not None and not args.shared_host:
+            raise ValueError("shared-host preflight lease requires --shared-host")
+        if (
+            shared_host_preflight_source is not None
+            or resource_preflight_binding is not None
+        ) and shared_host_preflight is None:
+            raise ValueError("shared-host preflight metadata requires a lease")
+        if shared_host_limits is not None and shared_host_preflight is None:
+            raise ValueError("shared-host limits require a preflight lease")
+        if args.shared_host:
+            validate_shared_host_limits(args.max_cpus, args.nice_increment)
+            if not hasattr(os, "sched_getaffinity") or not hasattr(
+                os, "sched_setaffinity"
+            ):
+                raise RuntimeError("shared-host CPU affinity enforcement is required")
+            thresholds = _shared_host_thresholds(args)
+            if shared_host_preflight is None:
+                raise ValueError(
+                    "shared-host core runs require start_shared_core.py and its one-shot lease"
+                )
+            if shared_host_preflight_source != "launcher_fd_lease":
+                raise ValueError("shared-host preflight lease source is invalid")
+            if not is_passing_preflight(
+                shared_host_preflight,
+                output,
+                thresholds,
+            ):
+                raise ValueError("shared-host preflight lease is not passing")
+            if not isinstance(resource_preflight_binding, dict):
+                raise ValueError("shared-host preflight lease binding is invalid")
+            preflight = shared_host_preflight
+            preflight_source = shared_host_preflight_source
+            report["resource_preflight"] = preflight
+            report["resource_preflight_source"] = preflight_source
+            report["resource_preflight_binding"] = resource_preflight_binding
+            if not preflight["safe_to_run"]:
+                report.update(
+                    {
+                        "status": "blocked_by_resource_guard",
+                        "completed_at": _utc_now(),
+                        "error": {
+                            "code": "resource_preflight_rejected",
+                            "reasons": preflight.get("reasons", []),
+                        },
+                    }
+                )
+                experiment.write_report(report)
+                print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+                return 4
+            if shared_host_limits is None:
+                limits = _apply_shared_host_limits(args.max_cpus, args.nice_increment)
+            else:
+                affinity = shared_host_limits.get("cpu_affinity")
+                if (
+                    set(shared_host_limits)
+                    != {"nice_increment", "process_nice", "cpu_affinity"}
+                    or shared_host_limits.get("nice_increment") != args.nice_increment
+                    or shared_host_limits.get("process_nice") != args.nice_increment
+                    or not isinstance(affinity, list)
+                    or not affinity
+                    or len(affinity) > args.max_cpus
+                    or len(set(affinity)) != len(affinity)
+                    or any(
+                        isinstance(cpu, bool) or not isinstance(cpu, int)
+                        for cpu in affinity
+                    )
+                ):
+                    raise ValueError("shared-host launcher limits are invalid")
+                limits = {
+                    "nice_increment": args.nice_increment,
+                    "process_nice": args.nice_increment,
+                    "cpu_affinity": affinity,
+                }
+            report["resource_limits"] = limits
         uv = shutil.which("uv")
         if uv is None:
             raise RuntimeError("uv is required")
@@ -347,6 +416,10 @@ def main() -> int:
     experiment.write_report(report)
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0
+
+
+def main() -> int:
+    return run_core_experiment(build_parser().parse_args())
 
 
 if __name__ == "__main__":

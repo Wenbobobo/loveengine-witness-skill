@@ -61,6 +61,13 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 
 远端调用同一个 `tools/run_core_experiments.py`：
 
+- 在启动 core supervisor、guardian 和 Anvil 之前，`start_shared_core.py` 必须先取得按用户
+  范围的 advisory lock，并在本次唯一输出目录执行一次资源门。通过结果只以短时、一次性
+  POSIX FD lease 传给直接 supervisor；lease 绑定 schema、`safe_to_run:true`、未弱化阈值、
+  输出目录和 launcher PID/start tick，并在 15 秒内 EOF 消费。supervisor 在同一受管进程组
+  内执行 core，不保留可重放 handoff 文件、nonce 或 child-side bypass。不能用裸 PID、
+  通配命令行或 `skip` 开关绕过该门；拒绝时不得创建 core 进程组，并必须留下结构化失败报告；
+
 - `uv sync --frozen`；
 - 显式运行 `loveengine pilot contracts prepare`：严格核对 forge/anvil 1.7.1 和
   dependency lock；缺少合约依赖时按固定 commit 安装，已有不匹配目录则失败关闭（仅在
@@ -84,8 +91,14 @@ core/recovery 还必须由独立 guardian 限制生命周期：它以本次 runn
 只在 PID、start tick、PGID、SID、`start_shared_core.py --supervisor` 命令，以及 guardian
 自身位于本次 deployment 的 canonical 脚本和 NUL 分隔 argv 中精确的 mode、target PID、
 target start tick 和 timeout 都可验证时作用于该 session。runner 在等待 core 结果前验证
-guardian 仍活着，完成或失败清理后验证它已退出；
+guardian 仍活着，完成或失败清理后验证它已退出，并要求其原子终态文件与当前 guardian/
+target 身份匹配。通过的 core 只接受 `target_exited_before_deadline` / `terminated:false`；
+身份错绑、不可检查、超时回收或缺少终态文件均失败关闭；
 本地 SSH 编排器消失不能使 core 进程组无限保留。
+
+该 lock 只协调遵守协议的 LoveEngine 进程；同一 Unix UID 不是安全隔离边界，容量检查也是
+启动瞬间的快照。要获得对恶意同 UID 或外部并行任务的隔离，需要独立账号、cgroup/容器或 VM，
+本规格不作此承诺。
 
 ### 4. SSH tunnel 分离实验
 
@@ -101,6 +114,10 @@ Anvil 测试 signer 分别创建签名 NetworkTaskV2。辅助程序为每个任�
 
 Quickstart supervisor 必须在启动 Pilot child 前创建独立 watchdog，并且仅在 watchdog 和
 child 都已启动后原子写出其 ready record；launcher 未获得该 record 前不得返回成功。因此
+Quickstart launcher 也必须取得与 core 相同的 advisory lock，在唯一输出目录内重新执行资源门，
+并以一次性 POSIX FD lease 绑定 supervisor 的输出目录、完整阈值和 launcher 身份；执行时
+资源拒绝返回 `blocked_by_resource_guard` 和退出码 4，不进入启动恢复。该 lock 只协调遵守协议
+的 LoveEngine 实验，不是同一 UID 的恶意隔离边界。
 本地 SSH 编排器在启动窗口消失时，watchdog 仍能限制该 detached process group。Quickstart
 启动后，runner 会从其拥有的 process group 的 `/proc` socket inode
 运行时读取 TCP listener，仅接受预期 Pilot 与 Anvil 端口、`127.0.0.1`/`::1` 地址和
@@ -119,7 +136,8 @@ canonical 启动脚本和预期 mode 的完整匹配，不得按裸 PID 发送 g
 supervisor 只在 Pilot 子进程存活期间担任组 leader；子进程退出后 supervisor 也退出，
 guardian 随即按上述受限的 leader-loss 路径回收仍存活的同一 session 成员。即使本地 SSH
 编排器消失，短实验也不会无限保留远端 Quickstart。
-正常清理后 watchdog 必须自行退出并被报告验证。
+runner 会主动停止持久 Quickstart 进程组；正常清理后 watchdog 必须自行退出并被报告验证，
+但该终态只能标注为 `requested_teardown`，不构成 Quickstart 自然完成证明。
 此外 runner 必须在建立 tunnel/通过 `readyz` 前，以及三个公开节点已连接、任何任务
 提交前，重新按 watchdog 的 PID、start tick、脚本、mode、target PID、target start tick 和
 timeout 验证其存活；任何一次失败都不得继续
@@ -153,7 +171,10 @@ CPU、内存、磁盘、ACK 和恢复报告。内存报告必须区分根进程 
 - `tunnel_smoke.local_process_cleanup` 的每一项必须为 `verified:true`；即使本机 node 或
   SSH tunnel 的 terminate/wait 报错，runner 仍必须继续执行远端 group 和 watchdog 清理；
 - `core_cleanup_verification` 必须同时记录并通过 core guardian 的 live/exit 校验；
-  `tunnel_smoke.watchdog_liveness` 必须在 `before_tunnel_readiness` 与
+- `tunnel_smoke.requested_teardown.group_cleanup_verified:true` 与
+  `tunnel_smoke.requested_teardown.watchdog_safe_terminal:true`；该字段表示 runner 主动
+  请求的受控回收，不表示 Quickstart 自然结束；
+- `tunnel_smoke.watchdog_liveness` 必须在 `before_tunnel_readiness` 与
   `before_task_submission` 两个时点均为 `verified:true`；
 - 成功或失败均写 `remote-lab-report.json`；最终 postflight 必须成功检查进程，
   且 `postflight_cleanup_verified:true`。postflight 的一分钟负载可保留刚结束

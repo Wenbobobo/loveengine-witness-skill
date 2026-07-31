@@ -23,7 +23,7 @@ transcripts remain verifiable.
 | Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
 | ProposalGate and verifiable core transcript | Implemented locally |
 | WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
-| Shared Linux preflight and key-only remote lab tooling | Implemented; short ARM64 Linux acceptance passed |
+| Shared Linux preflight and key-only remote lab tooling | Implemented; prior ARM64 short acceptance is historical evidence |
 | Company livestream adapter and autonomous discovery | Not implemented |
 | Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
 
@@ -146,10 +146,17 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 
 The remote runner deliberately has no password option and does not use sudo,
 systemd, or public binds. Its owned core and Quickstart groups have bounded,
-identity-checked watchdogs. The detached Quickstart supervisor creates its
-watchdog before its Pilot child and writes its ready record only after both
-exist; the runner verifies watchdog liveness before core waiting or task
-submission and verifies exit after cleanup. See the
+identity-checked watchdogs. Both shared-host launchers acquire the same
+per-user advisory lock, re-check the capacity gate, and pass a one-shot POSIX
+FD lease to the supervisor; an execution-time rejection is reported as
+`blocked_by_resource_guard`, not as a failed experiment. The runner accepts
+that rejection only when its preflight has the current schema,
+`safe_to_run:false`, non-empty reasons, `mutated_host:false`, and the exact
+requested workspace and resource thresholds. The detached
+Quickstart supervisor creates its watchdog before its Pilot child and writes
+its ready record only after both exist; the runner verifies watchdog liveness
+before task submission and verifies requested teardown after cleanup. That
+teardown is not evidence of natural Quickstart completion. See the
 [shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
 Startup-failure cleanup follows the same rule: without the expected PID start
 tick, private session/group identity, canonical launcher path, and mode, it
@@ -157,6 +164,27 @@ does not signal a process group. Success and failure both produce a
 machine-readable report. The final
 postflight records whether process inspection succeeded and no lab process
 remained; one-minute load can still reflect the experiment that just ended.
+
+Before a core or Quickstart supervisor, watchdog, or Anvil child is created,
+the corresponding launcher obtains a per-user advisory lock and evaluates the
+shared-host resource gate in its unique output directory. It passes a
+short-lived, EOF-delimited POSIX FD lease directly to the supervisor; the
+supervisor consumes it once, starts the guardian, and runs the workload in the
+same owned process group. No reusable handoff file, nonce option, PID
+exemption, or `--skip-preflight` switch exists. A rejected core gate starts no
+owned core group and leaves a structured `core-experiment-report.json`; a
+Quickstart rejection is returned with the same structured preflight and exit
+status 4.
+The lock coordinates compliant LoveEngine processes only: it is not a hostile
+same-UID security boundary or a promise that unrelated host work cannot begin
+after the instantaneous capacity snapshot.
+
+The core guardian persists an identity-bound terminal result before exiting.
+The runner requires normal completion, not merely guardian disappearance, and
+downloads only canonical files below the unique deployment directory. A lost
+startup SSH connection attempts cleanup only after recovering that owned,
+identity-bound launch record; otherwise the bounded guardian remains the
+fail-closed cleanup mechanism.
 
 The latest accepted short cross-host run used merged commit
 `76b7163fc2a72c503db6a1b34fd2670b5b9ab580`. It produced three observation

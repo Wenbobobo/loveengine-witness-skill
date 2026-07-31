@@ -20,7 +20,7 @@ loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验�
 | package/Registry 信任、签名任务/回执、证据和争议复核 | 已在本机实现 |
 | ProposalGate 和可验证核心 transcript | 已在本机实现 |
 | WitnessDAO、显式投票和 PublicSink | 可选治理实验 |
-| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；ARM64 Linux 短验收已通过 |
+| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；既有 ARM64 短验收仅作历史证据 |
 | 公司直播 adapter 和自动发现 | 未实现 |
 | Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
 
@@ -126,13 +126,31 @@ uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identi
 ```
 
 远程 runner 故意不提供 password 参数，也不使用 sudo、systemd 或公开端口绑定。
-它为自己创建的 core 与 Quickstart 进程组设置有上限、身份绑定的 watchdog；脱离 SSH 的
-Quickstart supervisor 会先创建 watchdog、再启动 Pilot child，并且只在二者都已存在后写出
-ready record。在等待 core 或提交任务前检查 watchdog 存活，清理后还要验证其退出。完整步骤见
+它为自己创建的 core 与 Quickstart 进程组设置有上限、身份绑定的 watchdog；两种 shared-host
+launcher 都取得同一按用户范围的 advisory lock，重新执行资源门，再把一次性 POSIX FD lease
+交给 supervisor。执行时资源拒绝会返回结构化的 `blocked_by_resource_guard`，而不是被归类为
+实验失败。runner 只接受带有当前 schema、`safe_to_run:false`、非空 reasons、
+`mutated_host:false`，并且与本次 workspace/资源阈值精确绑定的拒绝记录。脱离 SSH 的
+Quickstart supervisor 会先创建 watchdog、再启动 Pilot child，并且只在
+二者都已存在后写出 ready record；runner 在提交任务前检查 watchdog 存活，并在清理后验证
+请求式回收。该回收不证明 Quickstart 自然完成。完整步骤见
 [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)。
 启动失败时也遵守同一边界：没有预期 PID start tick、私有 session/group 身份、canonical
 启动脚本和 mode 的完整匹配，就不得向进程组发送信号。成功和失败都会产生机器可读报告。最终 postflight 明确记录进程检查是否成功、是否
 无本次实验残留；一分钟负载仍可能包含刚结束实验的影响。
+
+core 或 Quickstart supervisor、watchdog 或 Anvil child 创建前，对应 launcher 会先取得按用户
+范围的 advisory lock，并在本次唯一输出目录执行共享主机资源门。通过结果只以短时、EOF 分隔的
+POSIX FD lease 直接传给 supervisor；supervisor 只能消费一次，随后创建 guardian，并在同一
+受管进程组内执行 workload。不存在可重用的 handoff 文件、nonce 参数、PID 豁免或
+`--skip-preflight` 开关。core 资源门拒绝时不会启动本次 core 进程组，并会留下结构化
+`core-experiment-report.json`；Quickstart 拒绝使用同样的结构化 preflight 并返回退出码 4。该 lock 只协调遵守协议的 LoveEngine 进程；它不是
+针对同一 Unix UID 恶意进程的安全边界，也不承诺容量瞬时快照之后其他主机任务不会启动。
+
+core guardian 在退出前会持久化与目标身份绑定的终态结果。runner 要求正常完成，不能只看
+guardian 已消失，并且只下载唯一 deployment 目录下的 canonical 文件。SSH 在启动阶段断开
+时，runner 只有恢复到该受管、身份绑定的 launch record 后才会尝试清理；否则由有期限的
+guardian 作为 fail-closed 清理机制。
 
 最新一次已验收的短时跨主机实验使用合并后的 commit
 `76b7163fc2a72c503db6a1b34fd2670b5b9ab580`。它得到 3 个观察回执、3 个复核
