@@ -673,6 +673,14 @@ async def _run_observation_phase(
             node=delayed_spec[1],
         )
     delayed_clients = await _collect(delayed_processes, "delayed_observation")
+    # Review tasks reuse the observation identities. Wait until each completed
+    # observation socket is gone so readiness below belongs to the new review
+    # child, not a closing predecessor with the same address.
+    await _wait_for_relay_node_connections(
+        hub,
+        nodes=list(environment.node_accounts),
+        connected=False,
+    )
     observation_receipts = [
         receipt
         for client_result in [*observation_clients, *delayed_clients]

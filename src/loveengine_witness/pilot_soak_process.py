@@ -25,6 +25,7 @@ STDERR_FILENAME = "pilot-soak.stderr.log"
 REPORT_FILENAME = "pilot-soak-report.json"
 REPORT_SCHEMA_VERSION = "loveengine.pilot-soak-report/1"
 REPORT_DURATION_TOLERANCE_SECONDS = 1.0
+LAUNCH_REGISTRATION_GRACE_SECONDS = 30.0
 
 
 def _utc_now() -> str:
@@ -45,6 +46,48 @@ def _write_soak_state(state_path: Path, state: dict[str, Any]) -> None:
             temporary_path.unlink()
         except FileNotFoundError:
             pass
+
+
+def _reserve_initial_soak_state(state_path: Path, state: dict[str, Any]) -> bool:
+    """Create the initial lifecycle state exactly once without partial JSON.
+
+    A same-directory hard link gives us an exclusive, atomic publication of a
+    fully written state file on both supported local filesystems. Later state
+    updates use ``os.replace`` and are not part of the startup race.
+    """
+
+    temporary_path = state_path.with_name(
+        f".{state_path.name}.{uuid.uuid4().hex}.reserve"
+    )
+    try:
+        write_json(temporary_path, state)
+        try:
+            os.link(temporary_path, state_path)
+        except FileExistsError:
+            return False
+        return True
+    finally:
+        try:
+            temporary_path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _launch_registration_deadline_epoch(state: dict[str, Any]) -> float:
+    """Return the bounded lease for the pre-PID launcher window.
+
+    Older state files do not carry the explicit deadline, so they retain the
+    same bounded behavior relative to their recorded start time.
+    """
+
+    raw_deadline = state.get("launch_registration_deadline_epoch")
+    if (
+        isinstance(raw_deadline, (int, float))
+        and not isinstance(raw_deadline, bool)
+        and isfinite(float(raw_deadline))
+    ):
+        return float(raw_deadline)
+    return float(state["started_at_epoch"]) + LAUNCH_REGISTRATION_GRACE_SECONDS
 
 
 def _process_alive(pid: int) -> bool:
@@ -272,6 +315,11 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         and pid <= 0
         and not state.get("launch_error")
     )
+    now_epoch = time.time()
+    launch_registration_timed_out = (
+        starting_without_pid
+        and now_epoch >= _launch_registration_deadline_epoch(state)
+    )
     report: Any = None
     report_error: str | None = None
     if not process_alive and not starting_without_pid and report_path.is_file():
@@ -282,8 +330,14 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         if report_error is None and not isinstance(report, dict):
             report_error = "report_not_object"
     failure_reason: str | None = None
-    if starting_without_pid:
+    if starting_without_pid and not launch_registration_timed_out:
         status = "starting"
+    elif launch_registration_timed_out:
+        # The launcher may crash between atomically reserving the output and
+        # recording the detached child PID. Do not leave a stale reservation
+        # blocking recovery forever, and do not accept an unbound report.
+        status = "failed"
+        failure_reason = "launch_registration_timeout"
     elif process_alive:
         # A child can expose an incomplete or final report just before it
         # exits. Keep the durable state non-terminal until the PID is gone.
@@ -307,7 +361,7 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
             else "process_exited_without_report"
         )
     duration = float(state["duration_seconds"])
-    elapsed = max(0.0, time.time() - float(state["started_at_epoch"]))
+    elapsed = max(0.0, now_epoch - float(state["started_at_epoch"]))
     progress = (
         100.0
         if status == "passed"
@@ -358,7 +412,7 @@ def start_background_soak(
     report_path = output / REPORT_FILENAME
     if state_path.is_file():
         existing = background_soak_status(state_path)
-        if existing["status"] == "running":
+        if existing["status"] in {"starting", "running"}:
             raise LoveEngineError(
                 "pilot_soak_already_running", str(state_path), 4
             )
@@ -395,6 +449,9 @@ def start_background_soak(
         "pid": None,
         "started_at": _utc_now(),
         "started_at_epoch": started_at_epoch,
+        "launch_registration_deadline_epoch": (
+            started_at_epoch + LAUNCH_REGISTRATION_GRACE_SECONDS
+        ),
         "planned_end_epoch": started_at_epoch + duration_seconds,
         "duration_seconds": duration_seconds,
         "event_count": event_count,
@@ -407,7 +464,13 @@ def start_background_soak(
         "report_path": str(report_path),
         "package_root": str(Path(__file__).resolve().parents[2]),
     }
-    _write_soak_state(state_path, state)
+    if not _reserve_initial_soak_state(state_path, state):
+        existing = background_soak_status(state_path)
+        if existing["status"] in {"starting", "running"}:
+            raise LoveEngineError(
+                "pilot_soak_already_running", str(state_path), 4
+            )
+        raise LoveEngineError("pilot_soak_state_exists", str(state_path), 3)
     creationflags = 0
     process_kwargs: dict[str, Any] = {
         "cwd": str(Path(__file__).resolve().parents[2]),

@@ -231,7 +231,12 @@ stale/cross-run 错绑、缺少标准 checks、secret finding、不可复验 tra
 `passed:true` 与 checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
 记录的子进程已退出后，状态读取器才会以同目录的原子替换把首次经复验的终态写回 state：
 `status`、`finished_at` 以及适用的窄化失败分类。子进程仍存活时，即使已经出现部分或
-失败报告，state 仍保持 `running`；在启动器尚未登记 PID 的短窗口，state 保持 `starting`。
+失败报告，state 仍保持 `running`；在启动器尚未登记 PID 的短窗口，state 保持 `starting`，
+但该 launch lease 最长为 30 秒。超过 lease 而仍未登记 PID 会原子写为
+`failed`，并带 `failure_reason: launch_registration_timeout`，使监控得到明确终态；
+保留该 state 以保护原始证据，新的实验必须选择新的 output 目录。
+同一 output 目录的初始 state 使用排他保留；另一个启动器在 PID 登记窗口或运行期间尝试
+复用该目录会被拒绝，不能产生两份共享 report 的 worker。
 这些持久字段只是可恢复的生命周期摘要，每次查询仍会
 重新验证 report 与 transcript，不能充当信任锚。
 

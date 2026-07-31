@@ -9,6 +9,7 @@ import loveengine_witness.pilot_soak_process as pilot_soak_process
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.pilot_soak import SOAK_SUCCESS_CHECK_KEYS
 from loveengine_witness.pilot_soak_process import (
+    LAUNCH_REGISTRATION_GRACE_SECONDS,
     background_soak_status,
     start_background_soak,
 )
@@ -16,6 +17,17 @@ from loveengine_witness.pilot_soak_process import (
 
 class FakeProcess:
     pid = 43210
+
+
+@pytest.fixture(autouse=True)
+def _default_fake_process_is_not_alive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep synthetic PID assertions independent of the host PID allocator."""
+
+    monkeypatch.setattr(
+        pilot_soak_process, "_process_alive", lambda pid: False
+    )
 
 
 def _passing_checks() -> dict[str, bool]:
@@ -111,6 +123,9 @@ def test_background_soak_writes_queryable_state(
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["pid"] == FakeProcess.pid
     assert state["duration_seconds"] == 3600
+    assert state["launch_registration_deadline_epoch"] == pytest.approx(
+        state["started_at_epoch"] + LAUNCH_REGISTRATION_GRACE_SECONDS
+    )
     assert state["run_id"] == captured["command"][worker_run_id + 1]
     assert "env" not in captured["kwargs"]
     assert "token" not in state_path.read_text(encoding="utf-8").lower()
@@ -201,25 +216,61 @@ def test_background_soak_rejects_early_passing_report(
     assert isinstance(persisted["finished_at"], str)
 
 
-def test_background_soak_status_keeps_unregistered_launch_starting(
-    tmp_path: Path,
+def test_background_soak_status_keeps_unregistered_launch_starting_within_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     state_path = tmp_path / "pilot-soak-run.json"
+    started_at_epoch = 1_000.0
     original = {
         "schema_version": "loveengine.pilot-soak-run/1",
         "status": "starting",
         "pid": None,
-        "started_at_epoch": 0,
+        "started_at_epoch": started_at_epoch,
+        "launch_registration_deadline_epoch": (
+            started_at_epoch + LAUNCH_REGISTRATION_GRACE_SECONDS
+        ),
         "duration_seconds": 60,
         "output": str(tmp_path),
     }
     state_path.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setattr(pilot_soak_process.time, "time", lambda: started_at_epoch)
 
     status = background_soak_status(state_path)
 
     assert status["status"] == "starting"
     assert status["process_alive"] is False
     assert json.loads(state_path.read_text(encoding="utf-8")) == original
+
+
+def test_background_soak_status_fails_unregistered_launch_after_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    state_path = tmp_path / "pilot-soak-run.json"
+    started_at_epoch = 1_000.0
+    original = {
+        "schema_version": "loveengine.pilot-soak-run/1",
+        "status": "starting",
+        "pid": None,
+        "started_at_epoch": started_at_epoch,
+        "duration_seconds": 60,
+        "output": str(tmp_path),
+    }
+    state_path.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setattr(
+        pilot_soak_process.time,
+        "time",
+        lambda: started_at_epoch + LAUNCH_REGISTRATION_GRACE_SECONDS + 1.0,
+    )
+
+    status = background_soak_status(state_path)
+
+    assert status["status"] == "failed"
+    assert status["process_alive"] is False
+    assert status["failure_reason"] == "launch_registration_timeout"
+    persisted = json.loads(state_path.read_text(encoding="utf-8"))
+    assert persisted["status"] == "failed"
+    assert persisted["failure_reason"] == "launch_registration_timeout"
+    assert isinstance(persisted["finished_at"], str)
 
 
 def test_background_soak_rejects_report_before_planned_wall_clock_end(
@@ -660,6 +711,55 @@ def test_background_soak_rejects_second_live_process(
         )
 
     assert error.value.code == "pilot_soak_already_running"
+
+
+def test_background_soak_initial_state_reservation_is_exclusive(
+    tmp_path: Path,
+) -> None:
+    state_path = tmp_path / "pilot-soak-run.json"
+    state = {
+        "schema_version": "loveengine.pilot-soak-run/1",
+        "status": "starting",
+        "pid": None,
+        "started_at_epoch": 1_000.0,
+        "duration_seconds": 60,
+        "output": str(tmp_path),
+    }
+
+    assert pilot_soak_process._reserve_initial_soak_state(state_path, state)
+    assert not pilot_soak_process._reserve_initial_soak_state(state_path, state)
+    assert json.loads(state_path.read_text(encoding="utf-8")) == state
+
+
+def test_background_soak_rejects_second_start_during_pid_registration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    nested_errors: list[LoveEngineError] = []
+
+    def fake_popen(*args: object, **kwargs: object) -> FakeProcess:
+        del args, kwargs
+        with pytest.raises(LoveEngineError) as error:
+            start_background_soak(
+                tmp_path,
+                duration_seconds=60,
+                event_count=12,
+                observers=10,
+            )
+        nested_errors.append(error.value)
+        return FakeProcess()
+
+    monkeypatch.setattr(pilot_soak_process.subprocess, "Popen", fake_popen)
+
+    start_background_soak(
+        tmp_path,
+        duration_seconds=60,
+        event_count=12,
+        observers=10,
+    )
+
+    assert [error.code for error in nested_errors] == [
+        "pilot_soak_already_running"
+    ]
 
 
 def test_background_soak_status_marks_dead_process_without_report_failed(
