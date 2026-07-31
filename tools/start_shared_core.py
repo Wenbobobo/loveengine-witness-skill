@@ -23,6 +23,7 @@ from remote_host_preflight import (
     create_shared_host_preflight_lease,
     run_preflight,
     shared_host_lock_rejection,
+    validate_shared_host_lock_descriptor,
 )
 from run_core_experiments import run_core_experiment
 from start_shared_quickstart import (
@@ -173,6 +174,7 @@ def supervise_core(
 
     if os.name == "nt":
         raise RuntimeError("shared-host core supervisor requires POSIX")
+    validate_shared_host_lock_descriptor(shared_host_lock_fd)
     validate_shared_host_limits(max_cpus, nice_increment)
     validate_core_watchdog_seconds(watchdog_seconds)
     if shutil.which("uv") is None:

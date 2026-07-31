@@ -22,6 +22,7 @@ from remote_host_preflight import (
     create_shared_host_preflight_lease,
     run_preflight,
     shared_host_lock_rejection,
+    validate_shared_host_lock_descriptor,
 )
 
 
@@ -571,7 +572,7 @@ def _watchdog_command(
     shared_host_lock_fd: int,
 ) -> list[str]:
     validate_watchdog_seconds(watchdog_seconds)
-    if pid <= 1 or expected_start_ticks <= 0 or shared_host_lock_fd < 0:
+    if pid <= 1 or expected_start_ticks <= 0 or shared_host_lock_fd < 3:
         raise ValueError("owned Quickstart process identity must be positive")
     return [
         sys.executable,
@@ -599,7 +600,7 @@ def _core_watchdog_command(
     shared_host_lock_fd: int,
 ) -> list[str]:
     validate_core_watchdog_seconds(watchdog_seconds)
-    if pid <= 1 or expected_start_ticks <= 0 or shared_host_lock_fd < 0:
+    if pid <= 1 or expected_start_ticks <= 0 or shared_host_lock_fd < 3:
         raise ValueError("owned core process identity must be positive")
     return [
         sys.executable,
@@ -730,6 +731,7 @@ def supervise_quickstart(
 
     if os.name == "nt":
         raise RuntimeError("shared-host Quickstart supervisor requires POSIX")
+    validate_shared_host_lock_descriptor(shared_host_lock_fd)
     if host not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("shared-host Quickstart must bind loopback")
     validate_shared_host_limits(max_cpus, nice_increment)
@@ -1056,10 +1058,7 @@ def main() -> int:
                 "watchdog requires --watchdog-pid, --watchdog-start-ticks, "
                 "--watchdog-result-file, and --shared-host-lock-fd"
             )
-        try:
-            os.fstat(args.shared_host_lock_fd)
-        except OSError as exc:
-            raise ValueError("Quickstart watchdog shared-host lock is unavailable") from exc
+        validate_shared_host_lock_descriptor(args.shared_host_lock_fd)
         guardian_pid = os.getpid()
         guardian_start_ticks = _linux_process_start_ticks(guardian_pid)
         result = watch_owned_quickstart(
@@ -1090,10 +1089,7 @@ def main() -> int:
                 "core watchdog requires --watchdog-pid, --watchdog-start-ticks, "
                 "--watchdog-result-file, and --shared-host-lock-fd"
             )
-        try:
-            os.fstat(args.shared_host_lock_fd)
-        except OSError as exc:
-            raise ValueError("core watchdog shared-host lock is unavailable") from exc
+        validate_shared_host_lock_descriptor(args.shared_host_lock_fd)
         guardian_pid = os.getpid()
         guardian_start_ticks = _linux_process_start_ticks(guardian_pid)
         result = watch_owned_core(

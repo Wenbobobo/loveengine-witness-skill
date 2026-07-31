@@ -131,6 +131,21 @@ def acquire_shared_host_lock() -> int | None:
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)
     try:
+        # A non-interactive caller can arrive with one of its standard streams
+        # closed, in which case ``open`` is allowed to return 0, 1, or 2. The
+        # supervisor/guardian protocol deliberately refuses those descriptors,
+        # so normalize the launcher-owned lock before it crosses that boundary.
+        if descriptor < 3:
+            duplicate_command = getattr(fcntl, "F_DUPFD_CLOEXEC", fcntl.F_DUPFD)
+            replacement = fcntl.fcntl(descriptor, duplicate_command, 3)
+            try:
+                os.close(descriptor)
+            except OSError:
+                os.close(replacement)
+                raise
+            descriptor = replacement
+        if descriptor < 3:
+            raise RuntimeError("shared-host lab lock descriptor is not non-standard")
         mode = os.fstat(descriptor).st_mode
         if not stat.S_ISREG(mode):
             raise RuntimeError("shared-host lab lock is not a regular file")
@@ -149,6 +164,58 @@ def acquire_shared_host_lock() -> int | None:
 def close_shared_host_lock(descriptor: int | None) -> None:
     if descriptor is not None:
         os.close(descriptor)
+
+
+def validate_shared_host_lock_descriptor(descriptor: int) -> None:
+    """Require a non-standard descriptor for the canonical held lab lock.
+
+    The launcher passes the advisory lock through the supervisor to the
+    guardian.  A descriptor that merely happens to be open cannot establish
+    that lifecycle boundary: standard streams and an unrelated file would let
+    the launcher release the real lock while a claimed guardian still runs.
+    ``flock`` on an inherited open-file description keeps the lock held by the
+    guardian after the supervisor exits.
+    """
+
+    if os.name == "nt":
+        raise RuntimeError("shared-host locking requires POSIX")
+    if type(descriptor) is not int or descriptor < 3:
+        raise ValueError("shared-host lock descriptor must be at least 3")
+    path = shared_host_lock_path()
+    try:
+        path_lstat = path.lstat()
+        expected = path.stat()
+        actual = os.fstat(descriptor)
+    except OSError as exc:
+        raise ValueError("shared-host lock descriptor is unavailable") from exc
+    if (
+        stat.S_ISLNK(path_lstat.st_mode)
+        or not stat.S_ISREG(expected.st_mode)
+        or not stat.S_ISREG(actual.st_mode)
+        or (path_lstat.st_dev, path_lstat.st_ino)
+        != (expected.st_dev, expected.st_ino)
+        or (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino)
+    ):
+        raise ValueError("shared-host lock descriptor is not the canonical lock")
+    import fcntl
+
+    try:
+        # This is a no-op for the inherited lock's open-file description. If
+        # the descriptor was separately opened, it becomes the guardian's own
+        # held lock before any workload lifetime is accepted.
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        raise ValueError("shared-host lock descriptor is not the held lock") from exc
+    try:
+        current_path_lstat = path.lstat()
+    except OSError as exc:
+        raise ValueError("shared-host lock path changed during validation") from exc
+    if (
+        stat.S_ISLNK(current_path_lstat.st_mode)
+        or (current_path_lstat.st_dev, current_path_lstat.st_ino)
+        != (expected.st_dev, expected.st_ino)
+    ):
+        raise ValueError("shared-host lock path changed during validation")
 
 
 def _read_lease_bytes(descriptor: int) -> bytes:

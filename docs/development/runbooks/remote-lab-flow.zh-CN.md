@@ -88,7 +88,9 @@ shell。Quickstart 在远端启动一个只在 Pilot 子进程存活期间担任
 两者均已存在后以原子 ready record 向 launcher 返回身份；因此 SSH launcher 在此窗口消失
 也不会留下无期限的 Pilot 进程组。runner 对 watchdog 的存活检查还会核验独立 session、位于本次
 deployment `tools/start_shared_quickstart.py` 的 canonical 脚本，以及其 NUL 分隔 argv 中
-精确且唯一的 mode、target PID、target start tick 和 timeout。正常路径只在
+精确且唯一的 mode、target PID、target start tick、timeout 和共享 lock FD。该 FD 必须大于等于
+3，指向按用户 canonical lock 的同一 regular-file inode，并由 guardian 持有 `flock`；runner
+还会经 `/proc/<pid>/fd/<fd>` 再次核验路径。正常路径只在
 PID/start tick/PGID/SID/supervisor 命令都匹配时终止自己的 Quickstart 组。若 supervisor
 已消失，它只会在剩余非 zombie 进程仍证明
 `PGID == SID == 原始 PID` 时清理该原始会话；身份不符或 PID 重用都会拒绝操作。
@@ -104,7 +106,8 @@ canonical 启动脚本和预期 mode 全部仍匹配时才可向该组发 TERM/K
 leader 已消失或怀疑 PID 重用时不发信号，交由已认证 guardian 的期限或失败报告处理。
 
 core guardian 使用同样的 PID/start tick/PGID/SID/命令身份边界，并且其 canonical 脚本与
-NUL 分隔 argv 也必须精确绑定 mode、target PID、target start tick 和 timeout；它独立于 Quickstart
+NUL 分隔 argv 也必须精确绑定 mode、target PID、target start tick、timeout 和同一共享 lock FD；
+该 FD 以同样的 inode、`flock` 和 `/proc/<pid>/fd/<fd>` 规则核验。它独立于 Quickstart
 watchdog。它覆盖 core/recovery 阶段中本地 SSH 编排器消失的情况；runner 在开始等待
 core 结果前确认 guardian 存活，停止 core 后确认 guardian 已退出，并下载/核验其原子写入的
 身份绑定终态文件。只有 `target_exited_before_deadline` 且 `terminated:false` 才能接受一次

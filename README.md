@@ -158,6 +158,12 @@ its ready record only after both exist; the runner verifies watchdog liveness
 before task submission and verifies requested teardown after cleanup. That
 teardown is not evidence of natural Quickstart completion. See the
 [shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md).
+The launcher normalizes its acquired shared-lock descriptor to `>=3`; the
+supervisor and watchdog reject lower descriptors and descriptors for another
+file, then reassert an exclusive advisory lock on the inherited descriptor.
+Liveness verification binds the descriptor through `/proc/<pid>/fd/<fd>` to
+the canonical per-user lock inode and confirms the lock is still held before it
+accepts a guardian.
 Startup-failure cleanup follows the same rule: without the expected PID start
 tick, private session/group identity, canonical launcher path, and mode, it
 does not signal a process group. Success and failure both produce a

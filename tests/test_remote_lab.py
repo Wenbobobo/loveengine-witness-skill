@@ -957,6 +957,15 @@ def test_remote_quickstart_watchdog_is_bounded_and_identity_guarded() -> None:
     assert "--watchdog-pid" in command
     assert "--watchdog-start-ticks" in command
     assert command[command.index("--shared-host-lock-fd") + 1] == "12"
+    for descriptor in (-1, 0, 1, 2):
+        with pytest.raises(ValueError, match="positive"):
+            _watchdog_command(
+                4321,
+                987654,
+                REMOTE_QUICKSTART_WATCHDOG_SECONDS,
+                result_file=Path("/tmp/pilot/.quickstart-watchdog-result.json"),
+                shared_host_lock_fd=descriptor,
+            )
     supervisor = _supervisor_command(
         Path("/tmp/pilot"),
         host="127.0.0.1",
@@ -1001,11 +1010,17 @@ def test_remote_quickstart_watchdog_is_bounded_and_identity_guarded() -> None:
     assert '"${argv[1]}" != "$expected_script"' in absence
     assert '"${argv[9]}" != "--watchdog-result-file"' in absence
     assert '"${argv[11]}" != "--shared-host-lock-fd"' in absence
+    assert 'if [ "${argv[12]}" -lt 3 ]; then exit 9; fi' in absence
+    assert "/proc/{pid}/fd/{descriptor}" in absence
+    assert "fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)" in absence
     assert "expected_mode=--watchdog" in absence
     assert liveness.startswith("bash -c ")
     assert f"expected_script_relative={WATCHDOG_SCRIPT_RELATIVE}" in liveness
     assert '"${#argv[@]}" -ne 13' in liveness
     assert '"${argv[1]}" != "$expected_script"' in liveness
+    assert 'if [ "${argv[12]}" -lt 3 ]; then exit 9; fi' in liveness
+    assert "/proc/{pid}/fd/{descriptor}" in liveness
+    assert "fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)" in liveness
     assert "expected_mode=--watchdog" in liveness
     assert "expected_target_pid=4321" in liveness
     assert "expected_target_start=987654" in liveness
@@ -1057,6 +1072,15 @@ def test_remote_core_watchdog_is_bounded_and_identity_guarded() -> None:
     assert "--core-watchdog" in command
     assert "--watchdog-pid" in command
     assert command[command.index("--shared-host-lock-fd") + 1] == "12"
+    for descriptor in (-1, 0, 1, 2):
+        with pytest.raises(ValueError, match="positive"):
+            _core_watchdog_command(
+                4321,
+                987654,
+                1_800,
+                result_file=Path("/tmp/core-output/.core-watchdog-result.json"),
+                shared_host_lock_fd=descriptor,
+            )
     absence = _owned_watchdog_absence_command(
         4323,
         987656,
@@ -1205,6 +1229,7 @@ def test_core_supervisor_starts_guardian_before_inline_core_runner(
 ) -> None:
     calls: list[list[str]] = []
     popen_kwargs: list[dict[str, object]] = []
+    validated_lock_fds: list[int] = []
     supervisor_pid = os.getpid()
     launcher_pid = os.getppid()
     core_calls: list[dict[str, object]] = []
@@ -1227,6 +1252,11 @@ def test_core_supervisor_starts_guardian_before_inline_core_runner(
 
     monkeypatch.setattr(start_shared_core.os, "name", "posix")
     monkeypatch.setattr(start_shared_core.shutil, "which", lambda _: "uv")
+    monkeypatch.setattr(
+        start_shared_core,
+        "validate_shared_host_lock_descriptor",
+        validated_lock_fds.append,
+    )
     monkeypatch.setattr(
         start_shared_core,
         "_core_watchdog_command",
@@ -1280,6 +1310,7 @@ def test_core_supervisor_starts_guardian_before_inline_core_runner(
     )
 
     assert result == 0
+    assert validated_lock_fds == [12]
     assert "--core-watchdog" in calls[0]
     assert len(calls) == 1
     assert popen_kwargs[0]["pass_fds"] == (12,)
@@ -1318,6 +1349,11 @@ def test_core_supervisor_preserves_start_tick_race_and_fails_closed(
     # control-flow test on the host's concrete path implementation.
     monkeypatch.setattr(start_shared_core, "Path", path_type)
     monkeypatch.setattr(start_shared_core.shutil, "which", lambda _: "uv")
+    monkeypatch.setattr(
+        start_shared_core,
+        "validate_shared_host_lock_descriptor",
+        lambda _: None,
+    )
     monkeypatch.setattr(
         start_shared_core,
         "_core_watchdog_command",
@@ -1647,6 +1683,187 @@ def test_guardian_inherited_lock_blocks_a_second_compliant_launcher(
         remote_host_preflight.close_shared_host_lock(reacquired)
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks require fcntl")
+def test_shared_host_lock_descriptor_is_canonical_and_held(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lock_path = tmp_path / "shared-host-core.lock"
+    wrong_path = tmp_path / "not-the-shared-lock"
+    monkeypatch.setattr(remote_host_preflight, "shared_host_lock_path", lambda: lock_path)
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    wrong_descriptor = os.open(wrong_path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        remote_host_preflight.validate_shared_host_lock_descriptor(descriptor)
+        assert remote_host_preflight.acquire_shared_host_lock() is None
+        for standard_descriptor in (0, 1, 2):
+            with pytest.raises(ValueError, match="at least 3"):
+                remote_host_preflight.validate_shared_host_lock_descriptor(
+                    standard_descriptor
+                )
+        with pytest.raises(ValueError, match="canonical lock"):
+            remote_host_preflight.validate_shared_host_lock_descriptor(
+                wrong_descriptor
+            )
+        link_path = tmp_path / "shared-host-core-link"
+        link_path.symlink_to(lock_path)
+        monkeypatch.setattr(
+            remote_host_preflight,
+            "shared_host_lock_path",
+            lambda: link_path,
+        )
+        with pytest.raises(ValueError, match="canonical lock"):
+            remote_host_preflight.validate_shared_host_lock_descriptor(descriptor)
+        monkeypatch.setattr(
+            remote_host_preflight,
+            "shared_host_lock_path",
+            lambda: lock_path,
+        )
+        lock_path.unlink()
+        lock_path.touch(mode=0o600)
+        with pytest.raises(ValueError, match="canonical lock"):
+            remote_host_preflight.validate_shared_host_lock_descriptor(descriptor)
+    finally:
+        os.close(wrong_descriptor)
+        os.close(descriptor)
+
+    reacquired = remote_host_preflight.acquire_shared_host_lock()
+    try:
+        assert reacquired is not None
+    finally:
+        remote_host_preflight.close_shared_host_lock(reacquired)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX descriptor allocation is required")
+def test_shared_host_lock_acquisition_normalizes_a_closed_standard_descriptor(
+    tmp_path: Path,
+) -> None:
+    pythonpath = str(TOOLS)
+    if existing_pythonpath := os.environ.get("PYTHONPATH"):
+        pythonpath = pythonpath + os.pathsep + existing_pythonpath
+    source = "\n".join(
+        (
+            "import os",
+            "from remote_host_preflight import acquire_shared_host_lock, close_shared_host_lock",
+            "os.close(0)",
+            "try:",
+            "    os.fstat(0)",
+            "except OSError:",
+            "    pass",
+            "else:",
+            "    raise SystemExit('standard descriptor remained open')",
+            "descriptor = acquire_shared_host_lock()",
+            "if descriptor is None or descriptor < 3:",
+            "    raise SystemExit('lock descriptor was not normalized')",
+            "close_shared_host_lock(descriptor)",
+            "print(descriptor)",
+        )
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", source],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "home"),
+            "PYTHONPATH": pythonpath,
+        },
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert int(completed.stdout.strip()) >= 3
+
+
+def test_watchdog_entrypoints_validate_the_inherited_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    validated: list[int] = []
+
+    def reject_lock(descriptor: int) -> None:
+        validated.append(descriptor)
+        raise ValueError("shared-host lock descriptor is invalid")
+
+    monkeypatch.setattr(
+        start_shared_quickstart,
+        "validate_shared_host_lock_descriptor",
+        reject_lock,
+    )
+    for mode in ("--watchdog", "--core-watchdog"):
+        monkeypatch.setattr(
+            start_shared_quickstart.sys,
+            "argv",
+            [
+                "start_shared_quickstart.py",
+                mode,
+                "--watchdog-pid",
+                "4321",
+                "--watchdog-start-ticks",
+                "987654",
+                "--watchdog-result-file",
+                str(tmp_path / f"{mode[2:]}.json"),
+                "--shared-host-lock-fd",
+                "12",
+            ],
+        )
+        with pytest.raises(ValueError, match="lock descriptor is invalid"):
+            start_shared_quickstart.main()
+    assert validated == [12, 12]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX advisory locks require fcntl")
+def test_watchdog_entrypoint_accepts_an_inherited_canonical_lock(
+    tmp_path: Path,
+) -> None:
+    import fcntl
+
+    home = tmp_path / "home"
+    lock_path = (
+        home
+        / ".local"
+        / "share"
+        / "loveengine-witness-lab"
+        / ".shared-host-core.lock"
+    )
+    lock_path.parent.mkdir(parents=True)
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    result_path = tmp_path / "watchdog-result.json"
+    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(TOOLS / "start_shared_quickstart.py"),
+                "--watchdog",
+                "--watchdog-pid",
+                "999999",
+                "--watchdog-start-ticks",
+                "1",
+                "--watchdog-seconds",
+                "60",
+                "--watchdog-result-file",
+                str(result_path),
+                "--shared-host-lock-fd",
+                str(descriptor),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env={**os.environ, "HOME": str(home)},
+            pass_fds=(descriptor,),
+        )
+    finally:
+        os.close(descriptor)
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "target_exited_before_deadline"
+    assert json.loads(result_path.read_text(encoding="utf-8")) == payload
+
+
 def test_remote_watchdog_liveness_is_identity_bound_and_fail_closed() -> None:
     lab = object.__new__(run_remote_lab.RemoteLab)
     commands: list[tuple[str, int]] = []
@@ -1679,6 +1896,14 @@ def test_remote_watchdog_liveness_is_identity_bound_and_fail_closed() -> None:
     assert '"${#argv[@]}" -ne 13' in commands[0][0]
     assert '"${argv[1]}" != "$expected_script"' in commands[0][0]
     assert '"${argv[11]}" != "--shared-host-lock-fd"' in commands[0][0]
+    assert 'if [ "${argv[12]}" -lt 3 ]; then exit 9; fi' in commands[0][0]
+    assert (
+        'expected_lock_path="$HOME/.local/share/loveengine-witness-lab/'
+        '.shared-host-core.lock"'
+        in commands[0][0]
+    )
+    assert "/proc/{pid}/fd/{descriptor}" in commands[0][0]
+    assert "fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)" in commands[0][0]
     assert "expected_mode=--watchdog" in commands[0][0]
     assert "argv=()" in commands[0][0]
     assert "current_pgrp" in commands[0][0]
@@ -1824,6 +2049,12 @@ def test_quickstart_supervisor_starts_guardian_before_child(
     # ``os.name`` is shared with pathlib on Windows. Keep this POSIX-only
     # control-flow test on the host's concrete path implementation.
     monkeypatch.setattr(start_shared_quickstart, "Path", path_type)
+    validated_lock_fds: list[int] = []
+    monkeypatch.setattr(
+        start_shared_quickstart,
+        "validate_shared_host_lock_descriptor",
+        validated_lock_fds.append,
+    )
     monkeypatch.setattr(start_shared_quickstart, "_limit_process", lambda *_: ([1], 15))
     monkeypatch.setattr(
         start_shared_quickstart,
@@ -1881,6 +2112,7 @@ def test_quickstart_supervisor_starts_guardian_before_child(
     )
 
     assert result == 23
+    assert validated_lock_fds == [12]
     assert calls == [
         ["quickstart-guardian", "--watchdog"],
         ["quickstart-child"],
@@ -2293,6 +2525,39 @@ def test_posix_shell_cleanup_refuses_a_non_supervisor_orphaned_session_group(
 
 
 @pytest.mark.skipif(os.name == "nt", reason="requires POSIX process groups")
+def test_posix_shell_cleanup_allows_an_absent_empty_session_group() -> None:
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is required for the POSIX process-group regression")
+    process = subprocess.Popen(
+        [bash, "-c", "sleep 0.2"],
+        start_new_session=True,
+    )
+    process_start_ticks = start_shared_quickstart._linux_process_start_ticks(
+        process.pid
+    )
+    process.wait(timeout=5)
+    assert not start_shared_quickstart._owned_session_group_has_live_members(
+        process.pid
+    )
+
+    result = subprocess.run(
+        _owned_group_stop_command(
+            process.pid,
+            process_start_ticks,
+            expected_script_relative="remote-lab",
+            expected_script_name="start_shared_quickstart.py",
+        ),
+        shell=True,
+        executable=bash,
+        check=False,
+        timeout=10,
+    )
+
+    assert result.returncode == 0
+
+
+@pytest.mark.skipif(os.name == "nt", reason="requires POSIX process groups")
 def test_posix_shell_cleanup_rejects_supervisor_argument_smuggling(
     tmp_path: Path,
 ) -> None:
@@ -2416,11 +2681,29 @@ def test_posix_watchdog_liveness_binds_canonical_argv(tmp_path: Path) -> None:
         script.parent.mkdir(parents=True, exist_ok=True)
         script.write_text("#!/usr/bin/env bash\nsleep 30\n", encoding="utf-8")
         script.chmod(0o700)
+    lock_path = (
+        tmp_path
+        / ".local"
+        / "share"
+        / "loveengine-witness-lab"
+        / ".shared-host-core.lock"
+    )
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    wrong_lock_descriptor = os.open(
+        tmp_path / "not-the-shared-lock",
+        os.O_RDWR | os.O_CREAT,
+        0o600,
+    )
+    import fcntl
+
+    fcntl.flock(lock_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def verify(script: Path, arguments: list[str]) -> int:
         process = subprocess.Popen(
             [str(script), *arguments],
             start_new_session=True,
+            pass_fds=(lock_descriptor, wrong_lock_descriptor),
         )
         try:
             assert process.poll() is None
@@ -2456,13 +2739,40 @@ def test_posix_watchdog_liveness_binds_canonical_argv(tmp_path: Path) -> None:
         "987654",
         "--watchdog-seconds",
         str(REMOTE_QUICKSTART_WATCHDOG_SECONDS),
+        "--watchdog-result-file",
+        str(tmp_path / "remote-lab" / ".quickstart-watchdog-result.json"),
+        "--shared-host-lock-fd",
+        str(lock_descriptor),
     ]
-    assert verify(canonical, correct) == 0
-    assert verify(canonical, [*correct[:2], "4322", *correct[3:]]) == 9
-    assert verify(canonical, [*correct, "--watchdog-pid", "4321"]) == 9
-    assert verify(canonical, ["--core-watchdog", *correct[1:]]) == 9
-    assert verify(canonical, [*correct[:-1], "601"]) == 9
-    assert verify(unexpected, correct) == 9
+    try:
+        assert verify(canonical, correct) == 0
+        assert verify(canonical, [*correct[:2], "4322", *correct[3:]]) == 9
+        assert verify(canonical, [*correct, "--watchdog-pid", "4321"]) == 9
+        assert verify(canonical, ["--core-watchdog", *correct[1:]]) == 9
+        wrong_timeout = list(correct)
+        wrong_timeout[6] = "601"
+        assert verify(canonical, wrong_timeout) == 9
+        invalid_lock_fd = list(correct)
+        invalid_lock_fd[-1] = "not-an-fd"
+        assert verify(canonical, invalid_lock_fd) == 9
+        standard_lock_fd = list(correct)
+        standard_lock_fd[-1] = "0"
+        assert verify(canonical, standard_lock_fd) == 9
+        wrong_lock_fd = list(correct)
+        wrong_lock_fd[-1] = str(wrong_lock_descriptor)
+        assert verify(canonical, wrong_lock_fd) == 9
+        assert verify(unexpected, correct) == 9
+        unheld_lock_descriptor = os.open(lock_path, os.O_RDWR)
+        try:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+            unheld_lock_fd = list(correct)
+            unheld_lock_fd[-1] = str(unheld_lock_descriptor)
+            assert verify(canonical, unheld_lock_fd) == 9
+        finally:
+            os.close(unheld_lock_descriptor)
+    finally:
+        os.close(wrong_lock_descriptor)
+        os.close(lock_descriptor)
 
 
 def test_shared_host_cpu_reserve_keeps_one_cpu_unassigned() -> None:
@@ -2523,6 +2833,8 @@ def test_owned_process_cleanup_is_pid_and_deployment_bound() -> None:
     assert '"$pgid" = "$pid" ] && [ "$sid" = "$pid"' in command
     assert 'if [ -z "$stat" ]; then' in command
     assert 'if [ -e "/proc/$pid/stat" ]; then exit 9; fi' in command
+    assert 'if group_has_live_members; then exit 9; else group_status=$?; fi' in command
+    assert 'if [ "$state" = "Z" ]; then' in command
     assert 'expected_script="$expected_script_dir/start_shared_core.py"' in command
     assert '[ "${argv[1]}" != "$expected_script" ]' in command
     assert '[ "${argv[2]}" != "--supervisor" ]' in command

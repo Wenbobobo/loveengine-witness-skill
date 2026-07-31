@@ -90,7 +90,10 @@ Gate、恢复测试、三种 verification level 和 contract preparation；下�
 core/recovery 还必须由独立 guardian 限制生命周期：它以本次 runner 的超时上限运行，
 只在 PID、start tick、PGID、SID、`start_shared_core.py --supervisor` 命令，以及 guardian
 自身位于本次 deployment 的 canonical 脚本和 NUL 分隔 argv 中精确的 mode、target PID、
-target start tick 和 timeout 都可验证时作用于该 session。runner 在等待 core 结果前验证
+target start tick、timeout 和共享 lock FD 都可验证时作用于该 session。该 FD 必须大于等于 3、
+与按用户 canonical lock 是同一 regular-file inode，并在 guardian 进程内持有非阻塞
+exclusive `flock`；runner 还必须经 `/proc/<pid>/fd/<fd>` 将 live guardian 绑定到同一路径。
+runner 在等待 core 结果前验证
 guardian 仍活着，完成或失败清理后验证它已退出，并要求其原子终态文件与当前 guardian/
 target 身份匹配。通过的 core 只接受 `target_exited_before_deadline` / `terminated:false`；
 身份错绑、不可检查、超时回收或缺少终态文件均失败关闭；
@@ -124,7 +127,9 @@ Quickstart launcher 也必须取得与 core 相同的 advisory lock，在唯一�
 零个额外/非 loopback listener。启动器同时创建 60--900 秒范围内的独立 watchdog；
 runner 对它的存活检查必须同时核验 watchdog 的 PID/start tick、独立 session、位于本次
 远端 deployment `tools/start_shared_quickstart.py` 的 canonical 脚本、mode，以及 NUL 分隔
-argv 中精确且唯一的 target PID、target start tick 和 timeout。它在正常路径只会在 PID、
+argv 中精确且唯一的 target PID、target start tick、timeout 和共享 lock FD。该 FD 必须是
+大于等于 3 的 inherited descriptor，指向 canonical per-user lock 的同一 inode，并由 guardian
+持有 `flock`；runner 通过 `/proc/<pid>/fd/<fd>` 复核路径。它在正常路径只会在 PID、
 start tick、PGID、SID 和受管 Quickstart supervisor 命令均匹配时终止该组；若 supervisor
 已消失，只会在存活成员仍证明
 `PGID == SID == 原始 PID` 时清理原始会话，PID 重用或身份不符均拒绝操作。
