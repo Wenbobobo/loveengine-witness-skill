@@ -266,6 +266,10 @@ uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts <known-hosts>
 ```
 
+run 在上传前从本机锁定树构建确定性依赖 ZIP；远端以本机 archive hash 验证全部
+成员，在 staging 复算 manifest、逐文件 hash 和树摘要后原子安装。因此共享主机不执行
+Git 依赖下载，报告以 `contract_dependency_bundle.verified:true` 绑定两侧摘要。
+
 run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
 低并发，并始终预留一颗 CPU 给既有任务（2 vCPU 时 lab 仅绑定 1 核，否则最多
 2 核）。每个受控 core/Quickstart 组都有身份绑定、带期限的 watchdog；runner

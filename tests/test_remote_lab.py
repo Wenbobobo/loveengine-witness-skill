@@ -47,6 +47,7 @@ from run_remote_lab import (  # noqa: E402
     _validated_queued_submission,
     _validated_core_watchdog,
     _validated_core_watchdog_result,
+    _validated_dependency_bundle_binding,
     _validated_quickstart_watchdog,
     _validated_quickstart_watchdog_result,
     _validated_remote_launch_lease,
@@ -600,6 +601,46 @@ def test_remote_core_failure_message_uses_only_validated_diagnostic() -> None:
     assert run_remote_lab._remote_core_failure_message(report) == (
         "remote core experiment did not pass"
     )
+
+
+def test_remote_dependency_bundle_requires_exact_local_binding() -> None:
+    dependency = {
+        "name": "forge-std",
+        "package": "foundry-rs/forge-std",
+        "commit": "a" * 40,
+        "tree_sha256": "sha256:" + "b" * 64,
+        "file_count": 2,
+    }
+    built = {
+        "schema_version": "loveengine.contract-dependency-bundle-result/1",
+        "operation": "build",
+        "archive": "contract-dependencies.zip",
+        "archive_sha256": "sha256:" + "c" * 64,
+        "manifest_sha256": "sha256:" + "d" * 64,
+        "file_count": 2,
+        "total_size": 123,
+        "dependencies": [dependency],
+    }
+    installed = {**built, "operation": "install"}
+
+    assert _validated_dependency_bundle_binding(built, installed) == {
+        "verified": True,
+        **{
+            key: built[key]
+            for key in (
+                "archive",
+                "archive_sha256",
+                "manifest_sha256",
+                "file_count",
+                "total_size",
+                "dependencies",
+            )
+        },
+    }
+
+    installed["archive_sha256"] = "sha256:" + "e" * 64
+    with pytest.raises(RuntimeError, match="not locally bound"):
+        _validated_dependency_bundle_binding(built, installed)
 
 
 def test_remote_preflight_fails_closed_when_process_inspection_fails() -> None:

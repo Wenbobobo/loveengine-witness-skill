@@ -59,7 +59,9 @@ uv run python .\tools\run_remote_lab.py run `
 编排器会：
 
 1. 再次执行只读 preflight；
-2. 将当前 commit 打成 tar；
+2. 将当前 commit 打成 tar；同时在本机把已通过 dependency lock 验证的
+   `contracts/lib` 构建为确定性 ZIP，manifest 记录固定 commit、树摘要和逐文件
+   SHA-256；
 3. 在远端 home 下创建唯一、权限收紧的实验目录；
 4. 在 core supervisor、guardian 或 Anvil child 创建前，先取得按用户范围的 advisory
    lock，并在该唯一输出目录内再次执行资源门。只有 `safe_to_run:true` 的结果才能以短时、
@@ -67,8 +69,10 @@ uv run python .\tools\run_remote_lab.py run `
    完整阈值和 launcher PID/start tick。supervisor 随后在同一进程组运行 core，因此不再有
    可重放 handoff 文件、nonce 或 child-side 资源门。该机制不是通用 PID 白名单或跳过资源门
    的选项；拒绝时不创建 core 进程组，并留下结构化 `core-experiment-report.json`；
-5. 在唯一远端目录中先显式执行 `pilot contracts prepare`，从干净源码和 dependency lock
-   重建忽略的合约产物；若已有受管依赖与锁失配则停止，不在共享主机上自动刷新。随后以
+5. 远端先校验 ZIP 的本机预期 hash，拒绝链接、重复条目和路径逃逸，在 staging 中
+   复算完整依赖树后原子安装 `contracts/lib`。共享主机不访问 GitHub 获取依赖；随后显式
+   执行 `pilot contracts prepare`，从干净源码、已绑定依赖和 dependency lock 重建忽略的
+   合约产物；若受管依赖与锁失配则停止，不在共享主机上自动刷新。然后以
    nice +15、低构建并发和保留一核的 CPU affinity 执行 core/recovery 测试，并为该独立
    session 启动最长等于本次 `--timeout-seconds` 的 core guardian；
 6. 下载 report 和 transcript，并在本机重新离线验证；
@@ -149,6 +153,8 @@ Pilot 配置改成 `0.0.0.0`。
 
 - `remote_bind: loopback_only`；
 - `remote_services_exposed: false`；
+- `contract_dependency_bundle.verified: true`，且 archive/manifest hash、固定依赖、
+  文件数和字节数与本机构建结果一致；
 - core status passed、Gate ready；
 - `core_acceptance.accepted: true`：远端 report 与本机下载 transcript 的 run ID、
   12 个事件、3+3 receipt、Gate、恢复测试和离线边界均严格一致；

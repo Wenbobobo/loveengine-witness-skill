@@ -139,6 +139,13 @@ starts three authenticated processes before task submission; each receives its
 own post-connection task, verifies retrievable finalized evidence, and returns
 an individually bound receipt.
 
+Before upload, the runner verifies the locally prepared dependency trees
+against `contracts/dependency-lock.json` and builds a deterministic dependency
+ZIP with a canonical manifest and per-file SHA-256 values. The remote installer
+binds that ZIP to the local archive hash, rejects links, duplicate entries and
+path escapes, verifies the complete staged trees, then atomically installs
+`contracts/lib`. The shared host therefore performs no Git dependency fetch.
+
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -183,6 +190,9 @@ Quickstart rejection is returned with the same structured preflight and exit
 status 4. A failed `contracts-prepare` step may retain only an allowlisted
 dependency, Git stage, and exit-code diagnostic; raw Git and Forge output stays
 on the constrained host and is never copied into the remote-lab report.
+The final report also requires `contract_dependency_bundle.verified:true` and
+matching archive, manifest, dependency-tree, file-count, and byte-count fields
+from the local build and remote installation.
 The lock coordinates compliant LoveEngine processes only: it is not a hostile
 same-UID security boundary or a promise that unrelated host work cannot begin
 after the instantaneous capacity snapshot.

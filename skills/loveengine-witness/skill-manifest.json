@@ -172,7 +172,8 @@
     "tools/start_shared_core.py",
     "src/loveengine_witness/secrets.py",
     "contracts/dependency-lock.json",
-    "src/loveengine_witness/toolchain.py"
+    "src/loveengine_witness/toolchain.py",
+    "src/loveengine_witness/contract_dependency_bundle.py"
   ],
   "source_hashes": {
     "docs/specs/love-engine-master-plan.md": "sha256:54af12f047bc9bb8ea11b1144495a5b7405ddd392f12d06562dad6b445b7002e",
@@ -264,10 +265,10 @@
     "src/loveengine_witness/pilot_transcript.py": "sha256:86b51c1bfd4183edbf345a2648e08c6caf62679370e78439f4db47bd1c1494ce",
     "src/loveengine_witness/pilot_demo.py": "sha256:c0e4f5dc1f24cffa79a8787b9472c87c80bd4f57e3326482c2777df817f83312",
     "src/loveengine_witness/pilot_soak.py": "sha256:961a502f77805542ce78733e7aa64fe12f3fe2a10d75cbde7dc3d80c4ae6a0d7",
-    "tools/refresh_manifests.py": "sha256:3a47a82bc49caa91c980e3031e4663d8e91443f824a216c541e86b848054b02a",
+    "tools/refresh_manifests.py": "sha256:85ca04627989198dc3fd385eca9390ca037c22cf96b769f98cc08593e8bf42fe",
     "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md": "sha256:096b6f171d15810ab585daddf6f532e012de216155f96d2e850133922e9f83d5",
     "LICENSE": "sha256:a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
-    "docs/api/cli-reference.md": "sha256:68441e97bc4f11c66a45935e1749bb1c7dfbf8d876b8901810f73776275103e9",
+    "docs/api/cli-reference.md": "sha256:10c92c48337ba25509a042bf10461f3cdc1c83b48a6b5bb3e611a8008dbfa0b7",
     "docs/reference/licenses/scc0-provenance.md": "sha256:ab012520122b39e694fdaab3f214532e89f7015a698993b854b325bc9bd83007",
     "src/loveengine_witness/pilot_soak_process.py": "sha256:477219d2b9b873b3421a978a97d1c751436324b88885c00c26b3caca765bf992",
     "src/loveengine_witness/ui_fixture.py": "sha256:bf9b3679f73fdf6b312d05eae63fd3dc1eb9a99ff65c96b13d38093e567fb801",
@@ -292,12 +293,12 @@
     "schemas/pilot-transcript-v2.schema.json": "sha256:b576fda40f40c76f862610ca49c88602639825a9c1f79dbdf3f5768f85cc34f2",
     "schemas/pilot-snapshot-v1.schema.json": "sha256:ff43ce35e0d5f2519df8083c0c4b09cbf01cf7cd001f4cc54a7cac36bcb11a64",
     "schemas/pilot-snapshot-checksums-v1.schema.json": "sha256:98f2291e79255bc9a8be2a1ae9ea1694a29655f61a88fe1f22907655a47e4dfc",
-    "README.md": "sha256:52abd25433b75b92f077e47f69d8585bf8539d298d5b8eb5ec3755a5b490112c",
+    "README.md": "sha256:a0c91321a6dae7c48f0ad95dc964e4138a48c49037b742a13402cf85a2735b1f",
     "AGENTS.md": "sha256:ad783a1fa04a3809f1836dbb90a391774850a6b263633d11563c9169d9344509",
     "CONTRIBUTING.md": "sha256:f4214be2e7366192d1db0262af538aaab6b88ab116083a956676f21f986afda3",
     "docs/README.md": "sha256:4d5adade856dbd0c77823d30115c0a3ff00065ddb0a9000c251500b33765b757",
     "docs/development/repository-structure.md": "sha256:37b41617bdfcbfa2683db63a180dd1fdf04ede1d90df33be8755bcd8e49d1a8c",
-    "docs/development/integration-guide.md": "sha256:1645436f5d01cb31d65fecdeb119996769f41e01197e763cad51a2cc41dc1469",
+    "docs/development/integration-guide.md": "sha256:da77952e33fa0946fcb40c5124fa75e44fcf0e736f8acc44f2b61548019c0ca5",
     "docs/api/README.md": "sha256:ab926cb4f0fa0534f602b005776d04945e4d261ac5da225790314bd21b6a7cf7",
     "examples/transcripts/local-loop.fixture.json": "sha256:cf1ccd5727289e244ea45eea5053cb3f9f4becab3fcef030080134441f865742",
     "skills/loveengine-witness/agent-onboarding.md": "sha256:f5b5df586b7829d6a245050580f0b44b8962d0df7a76f2d426ad1e750064ec2f",
@@ -307,7 +308,7 @@
     "tools/loveengine_m0_self_check.py": "sha256:060f39dd3dd8e17cb677baf953b73b80d7c233e7bf20a9ae5a4374209e4d6aa4",
     "tools/validate_sources.py": "sha256:b4820c6096009ab57e4e8fe6c3a141be62f04cbeb3c4a68fbb6f9a809dc65442",
     "examples/transcripts/network-pilot.fixture.json": "sha256:c7fcf441aaa7cc642cee8c55d905f121e345e79e4cb8daf61808ded1c4dba331",
-    "README.zh-CN.md": "sha256:51f2ad4150583de5b1330cfb433c823bb8229748ab72db3ba050d5e99f434881",
+    "README.zh-CN.md": "sha256:816289edd3400977d34bb4a1d8b6ac2b911ec379e627415375fedbce2654efa4",
     "examples/transcripts/live-review.fixture.json": "sha256:5026f7b01839d0e64e67da925c56a8325bef0d0d507ddd0a9818143590ea9648",
     "docs/kb/sources.json": "sha256:c636984fa572b03f8be1796c63903ab12f13c9c7a6fef8d321f690e4746c4db2",
     "src/loveengine_witness/pilot_config.py": "sha256:c6d0906bbc53128e5a286096a9a71974a2c018e8dfc2c53e6a535bc1337f12f7",
@@ -330,9 +331,9 @@
     "tools/run_core_experiments.ps1": "sha256:cba5823a70f1ec4df1ef5023c65d95c8ec983e81fbf883a6e44f91682dd34adc",
     "tools/run_core_experiments.py": "sha256:3234a32d55d972208222ca289795fa1eda065547da7dd2b54b5491a80fed0695",
     "tools/remote_host_preflight.py": "sha256:d66278b7f30696f78905236e563c70d3aa6c95fae8e0a61578251148b611428e",
-    "tools/run_remote_lab.py": "sha256:af98ff284dec65e4e9707b2d5c879610ec70e55c2dd4489c2440a457544810cf",
-    "docs/development/runbooks/remote-lab-flow.zh-CN.md": "sha256:634dbdde5ef3a7c84d77a16246ddccad6981fba9bbf2716ff9d38a69a5068053",
-    "docs/specs/love-engine-pre-enterprise-remote-lab.md": "sha256:b37a53f4c0c19359fc211bd6be74c11abe0735adb4cadd839895b0d2c62540fe",
+    "tools/run_remote_lab.py": "sha256:41e029c801f124dd1fd4053d214d247151a67ee589a089af652a688377b3bc54",
+    "docs/development/runbooks/remote-lab-flow.zh-CN.md": "sha256:85b90aeb82e805e3be446307c926452b640ceee42b6a881ddd2b7c2abe8e8a40",
+    "docs/specs/love-engine-pre-enterprise-remote-lab.md": "sha256:f83ae09fcebe06da26fb242b4b0ab1b494b7b8797e8df70232937c2b3a69e5f9",
     "src/loveengine_witness/pilot_task_ingress.py": "sha256:b15a599008fea8b56db22ada4bbd775672135251c433f0cc5b648eb6c74da99a",
     "tools/enqueue_pilot_task.py": "sha256:626ec3b8744d0b1a94ec918b77ce94a065ba49602284c8006fa3925aaf707ea9",
     "tools/start_shared_quickstart.py": "sha256:6514f8a02c6a3122e4cebdd4637a8d9ed48971c1d3cf7271bd90fbaf593ed157",
@@ -342,7 +343,8 @@
     "tools/start_shared_core.py": "sha256:77c72c5c5d750b27ac57a154b43c5a24e3a000db23fb2193dfa070fb49e88838",
     "src/loveengine_witness/secrets.py": "sha256:1ab9c8a751c9c6e916aeb8a104837ae7b29d9761c02ff2e9a8c8f872c8561a35",
     "contracts/dependency-lock.json": "sha256:e6a8691ef641d09b59961a3158f44199110715cc6f741aea0b29ea4ec4927e49",
-    "src/loveengine_witness/toolchain.py": "sha256:9223f26431de200ef91a9dd988ac596005db2d215c9ed7334f906aebc47f5dc9"
+    "src/loveengine_witness/toolchain.py": "sha256:9223f26431de200ef91a9dd988ac596005db2d215c9ed7334f906aebc47f5dc9",
+    "src/loveengine_witness/contract_dependency_bundle.py": "sha256:576434b6a8759cf7f87a1939117f076138cfe4996f7e598258e626c452de71aa"
   },
   "commands": {
     "manifest_verify": "loveengine manifest verify",
@@ -436,7 +438,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:c13ae74e03fad29a62fa03169f8b0577fd5be2da5fd60c981c64e4c3694f4459",
+  "package_hash": "sha256:61ee8dfb63c8b6b694e44a14672ea6445d4fa05b788d658f55f8dcbbebb722af",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

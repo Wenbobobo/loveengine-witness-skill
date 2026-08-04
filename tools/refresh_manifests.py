@@ -63,6 +63,7 @@ RELEASE_ROOT_REFS = [
     "src/loveengine_witness/cli_trust.py",
     "src/loveengine_witness/cli_pilot.py",
     "src/loveengine_witness/toolchain.py",
+    "src/loveengine_witness/contract_dependency_bundle.py",
     "src/loveengine_witness/agent_session.py",
     "src/loveengine_witness/review_evidence.py",
     "src/loveengine_witness/secrets.py",

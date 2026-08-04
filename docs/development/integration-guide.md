@@ -162,6 +162,9 @@ uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
 ```
 
+远端运行前，runner 会在本机从 dependency lock 验证并构建确定性依赖 bundle；远端
+只接受相同 archive/manifest hash，在 staging 复算树后原子安装，不执行 Git 依赖下载。
+
 preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
 +15、低构建并发运行 core/recovery，并始终为既有任务留一颗 CPU（2 vCPU 时 lab
 只绑定 1 核，否则最多 2 核）。Pilot 与 Anvil 不绑定 Tailscale

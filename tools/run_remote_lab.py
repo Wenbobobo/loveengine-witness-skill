@@ -20,6 +20,10 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
 
+from loveengine_witness.contract_dependency_bundle import (
+    BUNDLE_RESULT_SCHEMA_VERSION,
+    build_contract_dependency_bundle,
+)
 from remote_host_preflight import (
     SCHEMA_VERSION as REMOTE_PREFLIGHT_SCHEMA_VERSION,
     SHARED_HOST_LEASE_TTL_NS,
@@ -232,6 +236,34 @@ def _last_json_object(text: str) -> dict[str, Any]:
             if isinstance(value, dict):
                 return value
     raise RuntimeError("remote command did not emit a JSON object")
+
+
+def _validated_dependency_bundle_binding(
+    built: dict[str, Any],
+    installed: dict[str, Any],
+) -> dict[str, Any]:
+    """Bind the remote installation to the exact locally verified archive."""
+
+    shared_fields = (
+        "archive",
+        "archive_sha256",
+        "manifest_sha256",
+        "file_count",
+        "total_size",
+        "dependencies",
+    )
+    if (
+        built.get("schema_version") != BUNDLE_RESULT_SCHEMA_VERSION
+        or built.get("operation") != "build"
+        or installed.get("schema_version") != BUNDLE_RESULT_SCHEMA_VERSION
+        or installed.get("operation") != "install"
+        or any(built.get(field) != installed.get(field) for field in shared_fields)
+    ):
+        raise RuntimeError("remote contract dependency bundle is not locally bound")
+    return {
+        "verified": True,
+        **{field: built[field] for field in shared_fields},
+    }
 
 
 def _resolve_executable(value: str | None, name: str) -> str:
@@ -3157,18 +3189,32 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
         )
         self.ssh_run(create_command, timeout=30)
         self.current_remote_deployment_created = True
-        self.current_phase = "source_archive_upload"
+        self.current_phase = "dependency_bundle_build"
         with tempfile.TemporaryDirectory(prefix="loveengine-remote-lab-") as raw_temp:
             archive = Path(raw_temp) / "source.tar"
+            dependency_archive = Path(raw_temp) / "contract-dependencies.zip"
+            dependency_bundle_build = build_contract_dependency_bundle(
+                dependency_archive,
+                contracts_root=ROOT / "contracts",
+            )
+            self.current_dependency_bundle = {
+                "verified": False,
+                "local": dependency_bundle_build,
+            }
             subprocess.run(
                 ["git", "archive", "--format=tar", "-o", str(archive), commit],
                 cwd=ROOT,
                 check=True,
                 timeout=120,
             )
+            self.current_phase = "source_archive_upload"
             self._copy_to_remote(
                 archive,
                 _owned_remote_file(deployment_rel, "source.tar"),
+            )
+            self._copy_to_remote(
+                dependency_archive,
+                _owned_remote_file(deployment_rel, "contract-dependencies.zip"),
             )
 
         self.current_phase = "remote_source_extract"
@@ -3179,6 +3225,24 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
             "rm -f source.tar"
         )
         self.ssh_run(extract_command, timeout=120)
+        self.current_phase = "remote_dependency_bundle_install"
+        install_command = _remote_bash(
+            "set -eu; "
+            f"cd \"{remote_deployment}\"; "
+            "PYTHONPATH=src python3 -m "
+            "loveengine_witness.contract_dependency_bundle install "
+            "contract-dependencies.zip --contracts-root contracts "
+            "--expected-sha256 "
+            f"{dependency_bundle_build['archive_sha256']}; "
+            "rm -f contract-dependencies.zip"
+        )
+        installed_output = self.ssh_run(install_command, timeout=300)
+        dependency_bundle_install = _last_json_object(installed_output.stdout)
+        dependency_bundle_binding = _validated_dependency_bundle_binding(
+            dependency_bundle_build,
+            dependency_bundle_install,
+        )
+        self.current_dependency_bundle = dependency_bundle_binding
         self.current_phase = "remote_core"
         remote_report, core_cleanup = self._run_owned_remote_core(
             deployment_rel=deployment_rel,
@@ -3252,6 +3316,7 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
             "started_at": started_at,
             "completed_at": _utc_now(),
             "preflight": preflight,
+            "contract_dependency_bundle": dependency_bundle_binding,
             "core": remote_report,
             "core_acceptance": core_acceptance,
             "tunnel_smoke": tunnel,
@@ -3329,6 +3394,11 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
                 "start_recoveries": list(getattr(self, "start_recoveries", [])),
                 "execution_resource_blocks": list(
                     getattr(self, "execution_resource_blocks", [])
+                ),
+                "contract_dependency_bundle": getattr(
+                    self,
+                    "current_dependency_bundle",
+                    None,
                 ),
                 "postflight": postflight,
                 "postflight_cleanup_verified": bool(

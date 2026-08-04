@@ -51,7 +51,10 @@
 ### 2. 精确源码部署
 
 `tools/run_remote_lab.py` 只接受干净 Git worktree，使用 `git archive` 传输当前
-commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
+commit。它同时在本机核对版本化 dependency lock 和完整依赖树，生成带规范 manifest、
+逐文件 SHA-256 和固定时间戳的确定性 ZIP。远端必须绑定本机 ZIP hash，拒绝链接、重复
+成员和路径逃逸，完整验证 staging 树后原子安装 `contracts/lib`；远端不从 GitHub
+获取合约依赖。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
 `StrictHostKeyChecking=yes` 和指定 known_hosts/identity。
 
 上传只发生在 preflight 通过后。远端目录已存在即拒绝，避免覆盖并行任务或旧
@@ -69,9 +72,9 @@ commit。SSH 强制 `BatchMode=yes`、`PasswordAuthentication=no`、
   通配命令行或 `skip` 开关绕过该门；拒绝时不得创建 core 进程组，并必须留下结构化失败报告；
 
 - `uv sync --frozen`；
-- 显式运行 `loveengine pilot contracts prepare`：严格核对 forge/anvil 1.7.1 和
-  dependency lock；缺少合约依赖时按固定 commit 安装，已有不匹配目录则失败关闭（仅在
-  明确需要修复时使用 `--refresh-dependencies`），并执行 `forge build --threads 1`；报告
+- 显式运行 `loveengine pilot contracts prepare`：严格核对 forge/anvil 1.7.1、
+  dependency lock 与刚安装的本地依赖树；缺失或不匹配均失败关闭，不在共享主机执行
+  dependency Git fetch 或 `--refresh-dependencies`，并执行 `forge build --threads 1`；报告
   保留实际 artifact、源码、依赖树和 attestation 摘要。归档不携带本机 `contracts/out`；
 - 12 个事件、3 个模拟观察者的 core stage；
 - offline/RPC/policy 三种验证等级；
@@ -160,6 +163,8 @@ CPU、内存、磁盘、ACK 和恢复报告。内存报告必须区分根进程 
 ## 验收
 
 - preflight 输出 `loveengine.remote-host-preflight/1` 且 `safe_to_run:true`；
+- dependency bundle 的本机构建和远端安装必须由同一 archive/manifest hash、依赖树、
+  文件数和字节数绑定，并返回 `contract_dependency_bundle.verified:true`；
 - 远端 core 报告状态 passed，3 个 observation receipt、3 个 review receipt、
   Gate ready；
 - restart/snapshot 测试通过，下载 transcript 在本机返回

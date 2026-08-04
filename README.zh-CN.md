@@ -120,6 +120,11 @@ host key，只接受 public-key 认证，先执行只读资源门，再把一个
 分别提交任务；每个节点取回并复算各自的 finalized evidence，再返回与
 node/task/dispute 分别绑定的 receipt。
 
+上传前，runner 会在本机核对 `contracts/dependency-lock.json` 与已准备的依赖树，
+生成带规范 manifest 和逐文件 SHA-256 的确定性依赖 ZIP。远端安装器把 ZIP 绑定到
+本机 archive hash，拒绝链接、重复条目和路径逃逸，完整验证 staging 树后再原子安装
+`contracts/lib`；共享主机不再执行 Git 依赖下载。
+
 ```powershell
 uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
@@ -146,6 +151,8 @@ POSIX FD lease 直接传给 supervisor；supervisor 只能消费一次，随后�
 `--skip-preflight` 开关。core 资源门拒绝时不会启动本次 core 进程组，并会留下结构化
 `core-experiment-report.json`；Quickstart 拒绝使用同样的结构化 preflight 并返回退出码 4。该 lock 只协调遵守协议的 LoveEngine 进程；它不是
 针对同一 Unix UID 恶意进程的安全边界，也不承诺容量瞬时快照之后其他主机任务不会启动。
+最终报告还必须包含 `contract_dependency_bundle.verified:true`，并证明本机构建与
+远端安装的 archive、manifest、依赖树、文件数和字节数完全一致。
 
 core guardian 在退出前会持久化与目标身份绑定的终态结果。runner 要求正常完成，不能只看
 guardian 已消失，并且只下载唯一 deployment 目录下的 canonical 文件。SSH 在启动阶段断开
