@@ -324,6 +324,7 @@ def test_task_enqueue_reads_token_file_and_returns_no_token(
     input_path.write_text(json.dumps(task), encoding="utf-8")
     token_file = tmp_path / "operator.token"
     token_file.write_text("safe-test-token-123456", encoding="utf-8")
+    token_file.chmod(0o600)
     monkeypatch.setattr(invited_operator, "validate_schema", lambda *_args: None)
     seen = {}
 

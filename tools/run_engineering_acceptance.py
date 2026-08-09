@@ -329,6 +329,25 @@ def _validate_terminal_evidence(
         raise AcceptanceError("transcript_run_id_mismatch")
 
 
+def _soak_transcript_path(report: dict[str, Any], soak_output: Path) -> Path:
+    if report.get("passed") is not True:
+        failure = report.get("failure")
+        code = failure.get("code") if isinstance(failure, dict) else None
+        suffix = f":{code}" if isinstance(code, str) and code else ""
+        raise AcceptanceError("soak_report_failed" + suffix)
+    raw_path = report.get("transcript_path")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise AcceptanceError("soak_transcript_path_missing")
+    transcript_path = Path(raw_path).resolve()
+    try:
+        transcript_path.relative_to(soak_output.resolve())
+    except ValueError as exc:
+        raise AcceptanceError("soak_transcript_path_outside_output") from exc
+    if not transcript_path.is_file():
+        raise AcceptanceError("soak_transcript_missing")
+    return transcript_path
+
+
 def _initial_report(
     git_context: dict[str, str], manifest_package_hash: str
 ) -> dict[str, Any]:
@@ -475,7 +494,7 @@ def run(output: Path) -> dict[str, Any]:
 
         soak_report_path = soak_output / "pilot-soak-report.json"
         soak_report = json.loads(soak_report_path.read_text(encoding="utf-8"))
-        transcript_path = Path(str(soak_report["transcript_path"])).resolve()
+        transcript_path = _soak_transcript_path(soak_report, soak_output)
         transcript = json.loads(transcript_path.read_text(encoding="utf-8"))
         if transcript.get("source_commit") != git_context["commit"]:
             raise AcceptanceError("transcript_source_commit_mismatch")

@@ -52,6 +52,7 @@ from .pilot_snapshot import create_system_snapshot, restore_system_snapshot
 from .pilot_transcript import pilot_transcript_hash, verify_pilot_transcript
 from .release_identity import PROTOCOL_VERSION, SKILL_VERSION
 from .participant_attestation import (
+    MAX_ATTESTATION_TTL_SECONDS,
     build_participant_attestation,
     build_participant_attestation_typed_data,
 )
@@ -252,6 +253,11 @@ def _signer_evidence_hash(kind: str, address: str, roles: list[str]) -> str:
     )
 
 
+def _participant_attestation_window(anchor_timestamp: str) -> tuple[str, str]:
+    issued_at = int(anchor_timestamp)
+    return str(issued_at), str(issued_at + MAX_ATTESTATION_TTL_SECONDS)
+
+
 def _local_v2_transcript(
     environment: PilotEnvironment,
     common: dict[str, Any],
@@ -321,6 +327,9 @@ def _local_v2_transcript(
         }
     ]
     participant_attestations = []
+    attestation_issued_at, attestation_valid_until = (
+        _participant_attestation_window(common["verified_at"])
+    )
     profiles = {
         Web3.to_checksum_address(item["profile"]["node"]): item["profile"]
         for item in environment.runtime.bootstrap["directory"]
@@ -371,8 +380,8 @@ def _local_v2_transcript(
             network_group_hash=payload_hash(
                 {"simulated_network_group": 1 if index == 0 else 2}
             ),
-            issued_at=common["verified_at"],
-            valid_until=environment.deadline,
+            issued_at=attestation_issued_at,
+            valid_until=attestation_valid_until,
         )
         attestation["signature"] = _rpc_sign(
             environment.w3,

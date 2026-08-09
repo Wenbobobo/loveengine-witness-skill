@@ -117,6 +117,31 @@ def test_terminal_evidence_accepts_complete_profile() -> None:
     )
 
 
+def test_soak_transcript_path_preserves_failure_and_rejects_null(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(
+        acceptance.AcceptanceError,
+        match="soak_report_failed:invalid_participant_attestation",
+    ):
+        acceptance._soak_transcript_path(
+            {
+                "passed": False,
+                "failure": {"code": "invalid_participant_attestation"},
+                "transcript_path": None,
+            },
+            tmp_path,
+        )
+
+    with pytest.raises(
+        acceptance.AcceptanceError, match="soak_transcript_path_missing"
+    ):
+        acceptance._soak_transcript_path(
+            {"passed": True, "failure": None, "transcript_path": None},
+            tmp_path,
+        )
+
+
 def test_terminal_evidence_rejects_missing_check_or_short_elapsed() -> None:
     status, report, verification = _terminal_evidence()
     report["checks"].pop("v2_wall_clock_duration_met")

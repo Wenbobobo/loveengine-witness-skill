@@ -337,7 +337,7 @@
     "tools/scan_secrets.py": "sha256:332a14bee9d83336a23c0e9840a0f6e4ef2035aa94e60fcb538dc937eb1da2ea",
     "tools/check.py": "sha256:3ea5b20b9af61f46b67df1eba4eb443b31bf3695d2e4cf9b1fae3bd5e7673af1",
     "src/loveengine_witness/pilot_ui.py": "sha256:7b4d9f2a52605541ce360bdc3119ae516268773660504a547db44d176a83182a",
-    "src/loveengine_witness/pilot_phases.py": "sha256:1e7d7b3f415401aea2b43c3684c5c90b6cd07412a8b60f14d95059da563c4142",
+    "src/loveengine_witness/pilot_phases.py": "sha256:4485a0ed655ded241906aa126aebd1e02ba3d760f16a06ef91e97c01f933f10e",
     "QA.md": "sha256:a820fe19b185e56322a9a9cce0f34723a3ac75afd45bb75b90af8b73231ade78",
     "docs/archive/specs/implemented/love-engine-witness-core-optimization.md": "sha256:382210a5740d5f77d8dbfb24010d919d55265f2905d3f6da226a5bad6510471d",
     "docs/architecture/witness-core-and-data-flow.zh-CN.md": "sha256:9e60d7cd82f146ffe009477e29d04a8871593af5c862344b8f20b8cc3604ffa3",
@@ -362,7 +362,7 @@
     "contracts/dependency-lock.json": "sha256:e6a8691ef641d09b59961a3158f44199110715cc6f741aea0b29ea4ec4927e49",
     "src/loveengine_witness/toolchain.py": "sha256:9223f26431de200ef91a9dd988ac596005db2d215c9ed7334f906aebc47f5dc9",
     "src/loveengine_witness/contract_dependency_bundle.py": "sha256:576434b6a8759cf7f87a1939117f076138cfe4996f7e598258e626c452de71aa",
-    "tools/run_engineering_acceptance.py": "sha256:654a37f6bbedc08e9503c065f6813b114d06f43cfac93869dd4707a108c61d90",
+    "tools/run_engineering_acceptance.py": "sha256:5d1fef90a3335fc82c1fd79e991d7b2b2cb8717505eba12a841f9e729f89cd66",
     "docs/specs/love-engine-invited-public-pilot.md": "sha256:6044866e1c4238a8b2505db11eca5bf0f17da95dceb635a6fc9f81c01c711555",
     "schemas/witness-core-transcript-v2.schema.json": "sha256:f9003be41e7c4e2ee35bc8eb345204dbafa8d0eede2090e5e7d8e395e97897e6",
     "schemas/pilot-config-v2.schema.json": "sha256:7749efa55b48d86d813acac7f685056aa6939737a7c6e9e9f1ccb633fcde6566",
@@ -478,7 +478,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:a0945b6e2fbd64a56e1ae59364be1f0b0c8068ef3aea1913e65bbc0eba6c7f77",
+  "package_hash": "sha256:b7243e596f3307066f3b50439f06f87ef0998f63ff22af40a5216be957337f03",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

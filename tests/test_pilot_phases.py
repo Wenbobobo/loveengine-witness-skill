@@ -10,12 +10,20 @@ from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.pilot_phases import (
     _carry_restart_metrics,
     _new_pilot_client_session,
+    _participant_attestation_window,
     _reviews_from_receipts,
     _stop_processes,
     _wait_for_relay_task_acceptance,
     _wait_for_relay_node_connections,
     run_pilot_phases,
 )
+
+
+def test_participant_attestation_window_is_anchor_bound_and_bounded() -> None:
+    issued_at, valid_until = _participant_attestation_window("100")
+
+    assert issued_at == "100"
+    assert valid_until == "3700"
 
 
 def test_restart_carries_full_process_local_metrics() -> None:
