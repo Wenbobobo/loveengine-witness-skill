@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from loveengine_witness.cli import build_parser
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -57,6 +59,17 @@ def test_lan_pilot_exposes_explicit_run_id_binding() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "--run-id" in result.stdout
+
+
+def test_pilot_soak_defaults_to_engineering_acceptance_profile() -> None:
+    args = build_parser().parse_args(
+        ["pilot", "soak", "--output", "candidate-soak"]
+    )
+
+    assert args.duration_seconds == 900
+    assert args.events == 30
+    assert args.observers == 10
+    assert args.stage == "core"
 
 
 def test_version_reports_runtime_source() -> None:

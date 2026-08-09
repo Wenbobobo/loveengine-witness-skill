@@ -94,8 +94,8 @@ def add_pilot_parser(commands: Any) -> None:
     prune.add_argument("--older-than-days", type=int, default=30)
 
     soak = pilot_commands.add_parser("soak")
-    soak.add_argument("--duration-seconds", type=float, default=14400)
-    soak.add_argument("--events", type=int, default=240)
+    soak.add_argument("--duration-seconds", type=float, default=900)
+    soak.add_argument("--events", type=int, default=30)
     soak.add_argument("--observers", type=int, default=10)
     soak.add_argument("--stage", choices=("core", "governance"), default="core")
     soak.add_argument("--output", type=Path, required=True)

@@ -23,15 +23,27 @@ transcripts remain verifiable.
 | Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
 | ProposalGate and verifiable core transcript | Implemented locally |
 | WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
-| Shared Linux preflight and key-only remote lab tooling | Implemented; prior ARM64 short acceptance is historical evidence |
+| Shared Linux preflight and key-only remote lab tooling | Implemented; exact-candidate ARM64 acceptance passed |
 | Company livestream adapter and autonomous discovery | Not implemented |
 | Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
 
-The local tests and the 2026-07-27 shared ARM64 Linux short acceptance of
-candidate baseline `2fd3a29` demonstrate protocol separation, tamper detection,
-cross-platform repeatability, and the public-node SSH tunnel path. They do not
-demonstrate independent real-world organizations, statement truth, public
-deployment, or long-term artifact availability.
+The complete local gate, one four-hour local core run, and the 2026-08-04
+shared ARM64 Linux acceptance of candidate `9e5058e` demonstrate protocol
+separation, tamper detection, cross-platform repeatability, recovery, and the
+public-node SSH tunnel path. They do not demonstrate independent real-world
+organizations, statement truth, public deployment, or long-term artifact
+availability. Future candidate engineering acceptance uses a 900-second,
+30-event, ten-observer run; that shorter gate is not durability evidence.
+
+Run that exact-commit gate from a clean worktree:
+
+```powershell
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
+
+The runner executes the complete release gate first, then binds the terminal
+core-soak state, manifest package hash, empty runtime diagnostics, secret scan,
+and independent offline transcript verification in one machine-readable report.
 
 ## Core Flow
 
@@ -204,19 +216,19 @@ startup SSH connection attempts cleanup only after recovering that owned,
 identity-bound launch record; otherwise the bounded guardian remains the
 fail-closed cleanup mechanism.
 
-The latest accepted short cross-host run used merged commit
-`76b7163fc2a72c503db6a1b34fd2670b5b9ab580`. It produced three observation
+The latest accepted short cross-host run used candidate commit
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824`. It produced three observation
 receipts, three review receipts, Gate ready, and passing recovery checks. The
 downloaded transcript verified as `offline_integrity` with `trust_bound:false`;
 the tunnel started three public node CLI processes, each received a
 post-connection evidence-verified task and returned its own bound receipt.
 Relay recorded `acked:3` and `receipt_confirmed:3`, and the post-run read-only
-gate found no related process left behind. These are simulated profiles and
-processes, not proof of socially independent witnesses. The historical
-foreground 30-minute local core soak predates the current run-ID and fault
-evidence fixes, so it is baseline evidence only, not acceptance evidence for
-the current candidate. Remote 30-minute and current-candidate four-hour soak
-evidence remain deferred.
+gate found no related process left behind. The exact same candidate also
+completed a four-hour local core run with 240 events, ten read-only observers,
+restart/reconnect recovery, all report checks true, zero secret findings, empty
+stderr, and independent offline transcript verification. These are simulated
+profiles and processes, not proof of socially independent witnesses or a
+promise of production availability.
 
 ## Roles
 

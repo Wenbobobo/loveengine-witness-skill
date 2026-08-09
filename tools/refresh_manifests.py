@@ -96,6 +96,7 @@ RELEASE_ROOT_REFS = [
     "tools/check.py",
     "tools/scan_secrets.py",
     "tools/run_release_checks.ps1",
+    "tools/run_engineering_acceptance.py",
     "tools/run_core_experiments.ps1",
     "tools/run_core_experiments.py",
     "tools/remote_host_preflight.py",
@@ -218,7 +219,8 @@ def refresh_current() -> None:
             "pilot_demo": "loveengine demo lan-pilot --stage core --events 12 --observers 10",
             "governance_demo": "loveengine demo lan-pilot --stage governance --events 12 --observers 10",
             "pilot_transcript_verify": "loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]",
-            "pilot_soak": "loveengine pilot soak --stage core --duration-seconds 14400 --events 240 --observers 10",
+            "pilot_soak": "loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10",
+            "engineering_acceptance": "uv run python tools/run_engineering_acceptance.py --output <dir>",
             "core_experiment": "uv run python tools/run_core_experiments.py",
             "remote_lab": "uv run python tools/run_remote_lab.py preflight|run",
         }

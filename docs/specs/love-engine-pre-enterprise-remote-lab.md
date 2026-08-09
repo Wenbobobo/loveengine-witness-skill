@@ -1,9 +1,9 @@
 # LoveEngine Pre-enterprise Remote Lab SPEC
 
-状态：short remote acceptance verified; long soak deferred
+状态：exact-candidate local and remote acceptance verified
 目标版本：0.6.1-contract-public-pilot
 协议：loveengine-witness-net/0.6
-更新日期：2026-07-27
+更新日期：2026-08-09
 
 ## 目标
 
@@ -151,11 +151,13 @@ runner 会主动停止持久 Quickstart 进程组；正常清理后 watchdog 必
 timeout 验证其存活；任何一次失败都不得继续
 进入或完成 task submission。
 
-### 5. 长时间门
+### 5. Candidate 工程验收门
 
-30 分钟 smoke 和 4 小时 soak 只在主机空闲窗口执行。当前共享主机存在重要任务，
-所以短 core E2E 通过不自动触发 soak。长时间门必须重新 preflight，并单独保存
-CPU、内存、磁盘、ACK 和恢复报告。内存报告必须区分根进程 HWM 与本次拥有的 CLI
+后续 candidate 的正式工程门固定为 900 秒、30 个事件和 10 个只读观察者，并覆盖
+一次 Pilot 重启、一次 Anvil 重启和节点断线恢复。它必须单独保存 CPU、内存、磁盘、
+ACK 和恢复报告。该门用于发现回归和验证恢复，不构成四小时或生产长期可用性证明。
+共享主机存在重要任务时仍须重新 preflight，短 core E2E 通过不自动触发 900 秒门。
+内存报告必须区分根进程 HWM 与本次拥有的 CLI
 加递归子进程树采样 sum-RSS 峰值，并保存样本数、采样周期、最大进程数、可用性和稳定失败码；
 只有后者可用作整套 lab 的 512 MiB 采样门，且至少要观察到根进程和三个预期子进程。该采样
 不等于物理瞬时内存上界，不测量、不预留也不得挤占共享主机上其他任务的资源。
@@ -195,6 +197,28 @@ CPU、内存、磁盘、ACK 和恢复报告。内存报告必须区分根进程 
 
 ## 实测记录
 
+2026-08-04，精确 candidate
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824` 完成当前增强路径：
+
+- 本机四小时 core run 使用 run ID `ee4baec07ebb4753adeed7a3fbc98bc3`，处理
+  240 个事件和 10 个只读观察者；18 项报告检查全部为 true，failure 为 null，
+  secret finding 为零，stderr 为空；独立离线 transcript 复验为
+  `offline_integrity`、`trust_bound:false`；
+- 共享 ARM64 Linux 报告状态为 passed，source commit 精确匹配；dependency bundle
+  837 个文件完整绑定，本机/远端 archive、manifest、树摘要、文件数和字节数一致；
+- core 得到 3 个 observation receipt、3 个 review receipt、Gate ready，并通过
+  restart/snapshot 恢复；tunnel 在任务入队前连接 3 个公开 node CLI，得到 3 个
+  evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation；
+- Pilot/Anvil 始终 loopback-only，key-only SSH、pinned known_hosts、watchdog 和
+  postflight cleanup 均通过。报告 SHA-256 为
+  `c646d1bd20cf3aa64dd3e20d7b4ef0f99cdf703af79091020108ce71cb276010`，下载
+  transcript SHA-256 为
+  `889464abf89e3233b04490cc1a38337f9caf12198de8584a0f123eaf890c5b42`。
+
+上述证据绑定 `9e5058e`，不自动接受后续文档或代码提交。每个新 candidate 仍须运行
+完整发布门、900 秒工程验收和精确 source commit 的短远端 lab。四小时结果保留为
+该历史 candidate 的额外运行证据，不再作为后续候选的强制门。
+
 2026-07-27，candidate baseline `2fd3a29` 在共享 ARM64 Linux 主机上通过短验收。
 本机保留报告的 SHA-256 为
 `0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`：
@@ -226,4 +250,5 @@ release 的 ARM64 归档、SHA-256 和 GitHub attestation，以原子方式放�
 - 多副本 artifact、生产监控、异地备份和 HA；
 - CorporateSink 多场排期与链上强制 ProposalGate。
 
-完成本规格表示“共享远程 Linux 核心实验可重复”，不表示生产部署完成。
+完成本规格表示“共享远程 Linux 核心实验可重复”，不表示生产部署完成；900 秒
+工程门也不等于长期稳定性或可用性证明。

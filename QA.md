@@ -191,13 +191,12 @@ dispute 是否已 `dismissed`。通过后返回 proposal plan；失败则给出�
 **当前已证明：** 开发成员可在 Python 3.11+、uv 和固定 Foundry 1.7.1 环境中
 执行分层实验：包信任、Relay/receipt、证据/finalize、争议/Gate，以及可选的
 治理合约流程。每层都有机器可读结果和自动测试；远端 runner 还会用公开
-`node connect` 经 SSH tunnel 验证连接后任务和绑定 receipt。2026-07-27 保留的
-candidate baseline `2fd3a29` 已完成该短验收；其机器报告 SHA-256 为
-`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
-当前 runner 又要求节点实际复算 tunnel evidence，并对失败写出 postflight 报告。
-增强报告还必须在任务入队前同时连上 3 个公开 node 进程，得到 3 个分别绑定的
+`node connect` 经 SSH tunnel 验证连接后任务和绑定 receipt。2026-08-04 的精确
+candidate `9e5058e` 已完成当前增强短验收；机器报告 SHA-256 为
+`c646d1bd20cf3aa64dd3e20d7b4ef0f99cdf703af79091020108ce71cb276010`。
+报告在任务入队前同时连上 3 个公开 node 进程，得到 3 个分别绑定的
 evidence-verified receipt，并证明 Relay 已记录 3 个 ACK 和 3 个 receipt
-confirmation，而不只记录单个 stored ACK。
+confirmation；core 侧还有 3 个观察回执、3 个复核回执、Gate ready 和恢复通过。
 
 从干净 checkout 开始时，开发者先运行 `uv run loveengine pilot contracts prepare`；
 它验证 Forge/Anvil 1.7.1、dependency lock、五份部署 artifact 和本地 attestation。
@@ -208,7 +207,8 @@ quickstart、demo 和 soak 故意不在计时或后台流程中隐式下载/编�
 
 **当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；
 `0.6.1-contract-public-pilot` 仍是 candidate，不是已发布版本。一次共享主机
-短验收不等于公网、公共测试网、TLS、生产身份、HA 或长期 soak 已通过。
+短验收不等于公网、公共测试网、TLS、生产身份、HA 或长期可用性已通过。后续
+candidate 使用 900 秒、30 事件、10 观察者的工程门；它也不是长期稳定性证明。
 
 **验证入口：** [开发实验指南](docs/development/integration-guide.md)、
 [中文 README](README.zh-CN.md)。
@@ -239,16 +239,18 @@ key-only SSH 编排。它固定 host key、拒绝 password 参数、要求干净
 组有独立、身份绑定的 watchdog；runner 会在继续等待或入队前检查其存活，并在
 清理后验证其退出。短实验还覆盖
 持久 Anvil 重启、Quickstart Relay、snapshot 恢复，以及公开 node CLI 经 SSH
-tunnel 收到连接后任务并返回绑定 receipt。2026-07-29 的合并 commit
-`76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短时跨主机门：3 个
+tunnel 收到连接后任务并返回绑定 receipt。2026-08-04 的 candidate commit
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824` 已通过当前增强短时跨主机门：3 个
 公开 node 进程先全部连接，各自完成 1 个 evidence-bound review task；core 得到
 3 个观察回执、3 个复核回执、Gate ready 和恢复测试通过，tunnel 得到 3 个
 evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation，owned process
 清理验证与独立 postflight 均通过。
 
-**当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验；远端
-30 分钟和全部 4 小时 soak 尚未执行；此前本机前台 30 分钟 core soak 早于当前 run ID
-与故障证据修复，因此只保留为历史 baseline，不能接受当前 candidate。它仍
+同一 candidate 还完成一次 240 事件、10 只读观察者的四小时本机 core run；全部
+报告门、零秘密发现、空 stderr 与独立 transcript 复验均通过。
+
+**当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验和一台
+Windows 主机上的四小时运行。它仍
 不证明生产 signer、TLS、HA、公共测试网、现实见证者独立性、事实真实性或企业
 系统已经接入。三个本机进程和三个实验 profile 也不能替代三个现实组织。
 

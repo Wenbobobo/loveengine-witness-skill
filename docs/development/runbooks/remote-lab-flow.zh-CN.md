@@ -189,15 +189,17 @@ Pilot 配置改成 `0.0.0.0`。
 这证明相同 commit 能在受约束 Linux 主机上复跑，不证明现实事实、组织独立性、
 公网可用性、生产密钥安全或企业系统已经接入。
 
-30 分钟/4 小时 soak 只在单独确认的空闲窗口执行，短实验不会自动启动它们。
-未来长运行验收必须同时保留 `passed:true` 的最终报告、进程树内存采样的峰值/样本数/
+后续 candidate 的正式工程验收固定为 900 秒、30 个事件和 10 个只读观察者；只有
+资源门通过时才运行，短实验不会自动启动它。验收必须同时保留 `passed:true` 的最终报告、
+进程树内存采样的峰值/样本数/
 采样周期/可用性，以及失败时的稳定 `failure.code`；不能只看终端退出码、根进程 RSS
 或局部 artifact。该峰值是本次拥有的 lab 进程树的采样 sum-RSS，且至少须观察到根进程和
 三个预期子进程；它不代表物理瞬时内存上界或共享主机整体资源使用。
 
-2026-07-27 的 candidate baseline `2fd3a29` 已满足旧版短实验字段，机器报告
-SHA-256 为
-`0d701ca1b56b5cb4d37ba75cdb92b311eaff405906a3f025cd5e7f671d25d075`。
-当前 runner 又增加了 evidence 实际复算、receipt ACK-loss 恢复、精确 dependency
-commit、三公开节点短时跨主机门和失败/postflight 报告；增强路径始终以最新报告中的精确
-`source_commit` 和完整验收字段为准。长 soak 仍未执行。
+2026-08-04 的精确 candidate `9e5058e` 已通过当前增强路径：3 个 observation
+receipt、3 个 review receipt、Gate ready、恢复测试、3 个公开 node 的
+evidence-verified tunnel 回执、3 个 ACK、3 个 receipt confirmation 和完整清理。
+机器报告 SHA-256 为
+`c646d1bd20cf3aa64dd3e20d7b4ef0f99cdf703af79091020108ce71cb276010`。
+同一 candidate 的四小时本机结果只作为额外历史运行证据；后续 candidate 改用
+900 秒工程门。任何结果始终以报告中的精确 `source_commit` 和完整验收字段为准。

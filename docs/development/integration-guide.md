@@ -153,6 +153,18 @@ uv run loveengine pilot soak --stage core --duration-seconds 1 --events 12 --obs
 uv run loveengine pilot soak --stage governance --duration-seconds 1 --events 12 --observers 10 --output .\governance-soak
 ```
 
+新 candidate 的正式工程验收使用 900 秒、30 个事件和 10 个只读观察者：
+
+```powershell
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
+
+脚本先执行完整发布门，再启动固定为 900 秒、30 个事件、10 个只读观察者的 core
+soak。只有生命周期和最终 report 同时为 passed、run ID 一致、子进程已退出、全部
+检查为 true、secret finding 为零、运行时 stderr 为空且 transcript 独立离线复验
+通过，才构成工程门。机器报告同时绑定精确 commit 与 manifest package hash。900 秒
+不证明长期稳定性。
+
 ## 实验 5：共享 Linux remote lab
 
 先配置独立 SSH key 和已经旁路核对的 known_hosts。runner 不接受密码：
@@ -183,17 +195,18 @@ PID/start tick/PGID/SID/命令约束的 watchdog，runner 在 core 等待和任�
 路径能否经安全 tunnel 完成连接后任务和 receipt。
 不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
 
-2026-07-27 的 candidate baseline `2fd3a29` 已通过旧版短实验；它只提供单节点
-tunnel 的历史证据。2026-07-29 的合并 commit
-`76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短实验：3 个
+2026-08-04 的精确 candidate
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824` 已通过当前增强实验：3 个
 observation receipt、3 个 review receipt、Gate ready、恢复测试通过，下载
 transcript 为 `offline_integrity` / `trust_bound:false`；3 个公开 node 分别得到
 evidence-verified 绑定 receipt，Relay 精确记录 `acked:3` 和
-`receipt_confirmed:3`，postflight 未发现相关残留进程。增强后的 runner 仍必须以
+`receipt_confirmed:3`，postflight 未发现相关残留进程。报告 SHA-256 为
+`c646d1bd20cf3aa64dd3e20d7b4ef0f99cdf703af79091020108ce71cb276010`。
+同一 candidate 的四小时本机 core run 也已通过，但只作为该提交的额外历史运行
+证据。增强后的 runner 仍必须以
 每次报告中的精确 source_commit、三节点/三回执、`evidence_verified`、
-`relay_receipt_confirmed` 和 postflight 字段逐次验收。此前本机前台 30 分钟 core
-soak 是早于当前证据绑定修复的历史 baseline，不能用于接受当前 candidate；远端 30 分钟
-和当前 candidate 的全部 4 小时 soak 仍延期。
+`relay_receipt_confirmed` 和 postflight 字段逐次验收；后续 candidate 使用 900 秒
+工程门，不继承 `9e5058e` 的通过结论。
 
 ## 变更验收
 

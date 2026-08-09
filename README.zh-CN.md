@@ -20,14 +20,24 @@ loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验�
 | package/Registry 信任、签名任务/回执、证据和争议复核 | 已在本机实现 |
 | ProposalGate 和可验证核心 transcript | 已在本机实现 |
 | WitnessDAO、显式投票和 PublicSink | 可选治理实验 |
-| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；既有 ARM64 短验收仅作历史证据 |
+| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；精确 candidate 的 ARM64 验收已通过 |
 | 公司直播 adapter 和自动发现 | 未实现 |
 | Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
 
-本机测试和 2026-07-27 的共享 ARM64 Linux 短验收（candidate baseline
-`2fd3a29`）
-证明协议分权、篡改检测、跨平台复跑和 SSH tunnel 公共节点路径；它们不证明现实
-中的组织彼此独立、发言内容为真、已经公开部署或 artifact 能长期可用。
+完整本机门、一次四小时本机 core 运行，以及 2026-08-04 对 candidate `9e5058e`
+的共享 ARM64 Linux 验收，证明协议分权、篡改检测、跨平台复跑、恢复和 SSH tunnel
+公共节点路径；它们不证明现实组织彼此独立、发言内容为真、已经公开部署或 artifact
+能长期可用。后续 candidate 的工程验收统一使用 900 秒、30 个事件和 10 个只读观察者；
+该短门不构成长周期稳定性证据。
+
+在干净工作树中执行唯一的精确提交验收入口：
+
+```powershell
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
+
+该脚本先执行完整发布门，再把终态 core soak、manifest package hash、空运行时
+诊断、秘密扫描和独立 transcript 离线复验绑定到一份机器可读报告中。
 
 ## 核心流程
 
@@ -159,15 +169,15 @@ guardian 已消失，并且只下载唯一 deployment 目录下的 canonical 文
 时，runner 只有恢复到该受管、身份绑定的 launch record 后才会尝试清理；否则由有期限的
 guardian 作为 fail-closed 清理机制。
 
-最新一次已验收的短时跨主机实验使用合并后的 commit
-`76b7163fc2a72c503db6a1b34fd2670b5b9ab580`。它得到 3 个观察回执、3 个复核
+最新一次已验收的短时跨主机实验使用 candidate commit
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824`。它得到 3 个观察回执、3 个复核
 回执、Gate ready 和恢复测试通过；下载 transcript 为 `offline_integrity` /
 `trust_bound:false`。tunnel 启动 3 个公开 node CLI 进程，三者各自在连接后收到
 一份 evidence-verified 任务并返回自己的绑定回执；Relay 记录 `acked:3` 和
-`receipt_confirmed:3`，实验后的只读门禁未发现相关残留进程。三个 profile/进程
-仍是模拟 actor，不代表现实社会独立性。此前本机前台 30 分钟 core soak 早于当前
-run ID 与故障证据修复，只是历史 baseline，不能接受当前 candidate；远端 30 分钟和
-当前 candidate 的全部 4 小时 soak 证据仍待独立空闲窗口执行。
+`receipt_confirmed:3`，实验后的只读门禁未发现相关残留进程。同一 candidate 还完成
+了 240 个事件、10 个只读观察者的四小时本机 core 运行；重启/重连恢复、全部报告门、
+零秘密发现、空 stderr 和独立离线 transcript 复验均通过。三个 profile/进程仍是
+模拟 actor，这些结果不代表现实社会独立性或生产长期可用性。
 
 ## 角色
 

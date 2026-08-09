@@ -219,7 +219,7 @@ loveengine pilot snapshot prune --output <dir> --older-than-days 30
 loveengine witness vote approve --proposal-plan <path> --rpc-url <url> --address <address>
 loveengine demo lan-pilot --stage core|governance --events 12 --observers 10 --output <dir>
 loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]
-loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir> [--background]
+loveengine pilot soak --duration-seconds 900 --events 30 --observers 10 --output <dir> [--background]
 loveengine pilot soak-status <dir>/pilot-soak-run.json
 ```
 

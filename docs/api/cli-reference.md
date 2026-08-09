@@ -198,16 +198,22 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 
 脚本覆盖仓库/hash、非集成 pytest、Foundry、M2-M6 E2E、确定性双构建、
 core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak 可用
-`--stage governance` 单独运行；四小时墙钟 soak 需单独运行
-并保存报告。发布门与跨平台 core runner 都把 `pilot contracts prepare` 作为其显式、
+`--stage governance` 单独运行；candidate 的正式工程门另运行 900 秒并保存报告。
+该门不证明长期稳定性。发布门与跨平台 core runner 都把 `pilot contracts prepare` 作为其显式、
 已记录的第一个合约阶段；不再依赖早先 `forge test` 偶然留下的 `contracts/out`。
+
+推荐通过统一 runner 执行完整发布门和 15 分钟验收：
+
+```powershell
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
 
 后台运行时使用：在新的、干净的 worktree 中，必须先显式执行 `uv sync --frozen`
 和 `uv run loveengine pilot contracts prepare`，并确认后者返回 `prepared: true`。准备阶段不计入
 soak 时长；`pilot soak` 只复验已 attested 的产物，缺失时会失败关闭。
 
 ```powershell
-uv run loveengine pilot soak --stage core --duration-seconds 1800 --events 30 --observers 10 --output .\pilot-soak --background
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --output .\pilot-soak --background
 uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 ```
 
