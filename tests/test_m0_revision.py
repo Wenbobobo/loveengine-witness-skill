@@ -63,7 +63,7 @@ def test_current_manifest_is_contract_public_pilot() -> None:
     manifest = load(MANIFEST)
 
     assert manifest["schema_version"] == "loveengine.skill-manifest/0.3"
-    assert manifest["version"] == "0.6.1-contract-public-pilot"
+    assert manifest["version"] == "0.7.0-invited-public-pilot"
     assert manifest["registry_binding"]["chain_id"] == "31337"
     assert manifest["network"]["task_types"] == [
         "observe_live_text",

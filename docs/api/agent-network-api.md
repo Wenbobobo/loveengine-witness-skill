@@ -1,11 +1,58 @@
 # LoveEngine Agent Network API
 
-状态：M3 V1 历史兼容；0.6.1 candidate 使用 V2 + NodeTrustPolicyV1
+状态：M3 V1 历史兼容；0.7.0-invited-public-pilot candidate 使用 V2、
+NodeTrustPolicyV1、PilotInviteV2、ExternalSignerConfigV1 与双 RPC
 M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）。
 
 本文先保留 M3 V1 wire format，再说明当前共用 Relay 行为。V2 的 signed profile、
 bootstrap、task 和 receipt 使用 EIP-712 domain version 2；当前 V2 只执行
 `observe_live_text` 和 `review_dispute`。P2P 和节点直连未实现。
+
+0.7 candidate 叠加在尚未人工合并的 0.6.1 PR #11 上，协议版本仍为
+`loveengine-witness-net/0.6`。本节所述新 schema/adapter 已在本机实现并测试；当前
+没有真实 Clef 1.17.3、Sepolia、Tailscale Serve 或受邀远端节点证据。
+
+## 0. 0.7 邀请与 signer 边界
+
+`PilotInviteV2` 只提供连接发现和公开 release hint：
+
+```json
+{
+  "schema_version": "loveengine.pilot-invite/2",
+  "participant_url": "https://pilot.example.ts.net",
+  "dashboard_url": "https://pilot.example.ts.net/demo/",
+  "relay_url": "wss://pilot.example.ts.net/v1/ws",
+  "chain_id": "11155111",
+  "registry": "0x...",
+  "publisher": "0x...",
+  "skill_id": "loveengine-witness",
+  "version": "0.7.0-invited-public-pilot",
+  "package_hash": "0x...",
+  "issued_at": "...",
+  "expires_at": "..."
+}
+```
+
+Sepolia invite 的三个 URL 必须是 HTTPS/WSS `*.ts.net`；invite 不含 manifest hash、
+allowed issuer、admin URL、token、RPC credential 或 signer endpoint。manifest hash
+与 allowed issuers 来自另行可信分发的 NodeTrustPolicyV1。节点拒绝 InviteV2/policy/
+profile/package/Registry 任一不一致或过期的组合。
+
+Sepolia node connect 要求两个不同的 RPC endpoint，并从权限受限文件读取。两个 RPC
+在 transcript 记录的 safe block 对 release/code/receipt 一致但没有 policy，只得到
+`chain_consistency`、`chain_verified:false`、`trust_bound:false`；两者再匹配 policy
+才得到 `chain_verified` 与 `trust_bound:true`。
+
+`ExternalSignerConfigV1` 固定 kind、role、address、chain、transport/endpoint、
+approval mode、timeout、rules/attestation hash、允许的 EIP-712 domain/primary type，
+以及 Publisher 精确批准的 transaction request hash。Anvil 只允许 chain 31337 的
+`unlocked_test`；Clef 只允许 IPC/loopback HTTP 和 `manual_confirm`。首轮兼容目标是
+Geth/Clef 1.17.3；Geth 1.17.4 已移除内置 Clef，1.17.5 不能当作 Clef 升级。
+
+`signer inspect` 依次验证 static config、rules/attestation evidence、指定 binary 的
+SHA-256 与精确版本、只读 live external-API probe。后层必须以前层证据为前提；probe
+不签名。raw private key、Clef seed/password、RPC credential 不得进入任务、普通日志
+或 transcript。
 
 ## 1. SkillRegistry
 
@@ -162,6 +209,16 @@ TaskReceipt(
 
 ## 6. Relay Hub
 
+0.7 PilotConfigV2 在两个独立 loopback listener 上挂载同一底层状态：
+
+- admin surface：Operator UI、全部鉴权 POST、`/v1/relay/tasks`、metrics 和运维；
+- participant surface：严格 allowlist 的 health、demo、bootstrap/release/package、
+  session/events/SSE/evidence/artifact、dashboard read model 和 `/v1/ws`；
+- participant 对所有 POST、token 解析、Operator UI、metrics、snapshot、RPC 和 signer
+  路由失败关闭。Tailscale Serve 只能反代该 participant listener。
+
+当前已实现本机双入口和 Serve preflight/恢复，没有真实 Tailscale 运行报告。
+
 HTTP：
 
 ```text
@@ -242,17 +299,28 @@ GET /v1/ws
 - 当前 live connect 还必须取得独立 `NodeTrustPolicyV1`，绑定 chain ID、
   Registry、Publisher、skill/version、ZIP/manifest hash 和 allowed issuers。
   invite 只负责连接，不是信任根。
+- Sepolia InviteV2 connect 还要求 `--signer-config`、`--rpc-url-file` 和
+  `--secondary-rpc-url-file`。两个 RPC 必须不同；signer role/address/chain 必须与
+  profile/policy 一致。当前只有本机 contract tests，没有受邀远端 receipt 证据。
 
 ## 7. CLI
 
 ```text
 loveengine registry publish --input <release> --dry-run
 loveengine registry verify --rpc-url <url> --artifact <zip> --chain-id <id> --registry <address> --publisher <address>
+loveengine signer inspect --config <file> [--ruleset-file <file> --rules-attestation-file <file>] [--clef-binary <file> --expected-binary-sha256 <sha256>] [--probe]
+loveengine registry transaction deploy-plan --artifact <artifact> ...
+loveengine registry transaction publish-plan --release <release> ...
+loveengine registry transaction sign --plan <plan> --signer-config <file> --ruleset-file <file> --rules-attestation-file <file> --clef-binary <file> --expected-binary-sha256 <sha256> --output <file>
+loveengine registry transaction submit --plan <plan> --signed <file> --rpc-url-file <file>
 loveengine node profile sign
 loveengine bootstrap build
 loveengine bootstrap verify
 loveengine relay serve
 loveengine node connect --invite <file> --trust-policy <policy> --package <zip> --profile <profile> --rpc-url <url> --address <node> --reconnect-attempts 3 --idle-timeout-seconds 60
+loveengine node connect --invite <invite-v2> --trust-policy <policy> --package <zip> --profile <profile> --rpc-url-file <primary> --secondary-rpc-url-file <secondary> --signer-config <file> --ruleset-file <file> --rules-attestation-file <file> --clef-binary <file> --expected-binary-sha256 <sha256>
+loveengine network task sign --input <file> --signer-config <file> --trust-policy <policy> --bootstrap <bootstrap> --ruleset-file <file> --rules-attestation-file <file> --clef-binary <file> --expected-binary-sha256 <sha256> --output <file>
+loveengine participant attest --input <file> --signer-config <file> --trust-policy <policy> --bootstrap <bootstrap> --invite <invite-v2> --assignment-task <task> --service-config <config> --ruleset-file <file> --rules-attestation-file <file> --clef-binary <file> --expected-binary-sha256 <sha256> --output <file>
 loveengine network demo --nodes 3
 loveengine network transcript verify <path>
 ```

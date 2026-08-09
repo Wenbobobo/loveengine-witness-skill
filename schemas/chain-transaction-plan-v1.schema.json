@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/chain-transaction-plan-v1.schema.json",
+  "title": "ChainTransactionPlanV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "operation",
+    "created_at",
+    "expires_at",
+    "transaction",
+    "request_hash",
+    "method_signature",
+    "artifact_evidence",
+    "release_evidence",
+    "plan_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "loveengine.chain-transaction-plan/1"},
+    "operation": {"enum": ["deploy_skill_registry", "publish_release"]},
+    "created_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "expires_at": {"type": "string", "pattern": "^[0-9]+$"},
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "chainId",
+        "from",
+        "to",
+        "gas",
+        "maxFeePerGas",
+        "maxPriorityFeePerGas",
+        "value",
+        "nonce",
+        "data"
+      ],
+      "properties": {
+        "type": {"const": "0x2"},
+        "chainId": {"const": "0xaa36a7"},
+        "from": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
+        "to": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"}
+          ]
+        },
+        "gas": {"$ref": "#/$defs/quantity"},
+        "maxFeePerGas": {"$ref": "#/$defs/quantity"},
+        "maxPriorityFeePerGas": {"$ref": "#/$defs/quantity"},
+        "value": {"const": "0x0"},
+        "nonce": {"$ref": "#/$defs/quantity"},
+        "data": {"type": "string", "pattern": "^0x(?:[0-9a-fA-F]{2})+$"}
+      }
+    },
+    "request_hash": {"$ref": "#/$defs/sha256"},
+    "method_signature": {"type": ["string", "null"], "minLength": 1},
+    "artifact_evidence": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract",
+            "artifact_sha256",
+            "init_code_keccak256",
+            "runtime_code_keccak256"
+          ],
+          "properties": {
+            "contract": {"const": "SkillRegistry"},
+            "artifact_sha256": {"$ref": "#/$defs/sha256"},
+            "init_code_keccak256": {"$ref": "#/$defs/bytes32"},
+            "runtime_code_keccak256": {"$ref": "#/$defs/bytes32"}
+          }
+        }
+      ]
+    },
+    "release_evidence": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registry",
+            "publisher",
+            "skill_id",
+            "version",
+            "package_hash",
+            "manifest_hash",
+            "previous_version_hash"
+          ],
+          "properties": {
+            "registry": {"$ref": "#/$defs/address"},
+            "publisher": {"$ref": "#/$defs/address"},
+            "skill_id": {"type": "string", "minLength": 1},
+            "version": {"type": "string", "minLength": 1},
+            "package_hash": {"$ref": "#/$defs/bytes32"},
+            "manifest_hash": {"$ref": "#/$defs/bytes32"},
+            "previous_version_hash": {"$ref": "#/$defs/bytes32"}
+          }
+        }
+      ]
+    },
+    "plan_hash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "quantity": {"type": "string", "pattern": "^0x(?:0|[1-9a-f][0-9a-f]*)$"},
+    "address": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
+    "bytes32": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

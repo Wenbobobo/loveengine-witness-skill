@@ -782,16 +782,16 @@ def _verify_batch_vote_logs(
 
 
 def verify_release_anchor_rpc(
-    value: dict[str, Any], rpc_url: str
+    value: dict[str, Any], rpc_url: str, *, web3: Any | None = None
 ) -> tuple[Web3, int]:
     """Verify the release at the transcript's immutable historical block."""
 
     chain = value["chain"]
     release = value["release_anchor"]
-    w3 = Web3(HTTPProvider(rpc_url, request_kwargs={"timeout": 5}))
+    w3 = web3 or Web3(HTTPProvider(rpc_url, request_kwargs={"timeout": 5}))
     try:
-        if not w3.is_connected():
-            raise LoveEngineError("rpc_unavailable", rpc_url, 4)
+        if web3 is None and not w3.is_connected():
+            raise LoveEngineError("rpc_unavailable", "configured RPC endpoint", 4)
         _same(str(w3.eth.chain_id), chain["chain_id"], "RPC chain id")
         anchor = value["verification_anchor"]
         anchor_number = int(anchor["block_number"])
@@ -818,7 +818,9 @@ def verify_release_anchor_rpc(
     except LoveEngineError:
         raise
     except Exception as exc:
-        raise LoveEngineError("chain_verification_failed", str(exc), 4) from exc
+        raise LoveEngineError(
+            "chain_verification_failed", exc.__class__.__name__, 4
+        ) from exc
 
 
 def _verify_rpc(value: dict[str, Any], rpc_url: str, vote_signers: set[str]) -> None:
@@ -917,7 +919,9 @@ def _verify_rpc(value: dict[str, Any], rpc_url: str, vote_signers: set[str]) -> 
     except LoveEngineError:
         raise
     except Exception as exc:
-        raise LoveEngineError("chain_verification_failed", str(exc), 4) from exc
+        raise LoveEngineError(
+            "chain_verification_failed", exc.__class__.__name__, 4
+        ) from exc
 
 
 def _uses_legacy_review_payload(value: dict[str, Any]) -> bool:

@@ -24,9 +24,13 @@ def _terminal_evidence() -> tuple[dict, dict, dict]:
         "passed": True,
         "failure": None,
         "requested_duration_seconds": 900,
+        "elapsed_seconds": 900.0,
         "event_count": 30,
         "observer_count": 10,
-        "checks": {"all": True},
+        "core_transcript_version": 2,
+        "checks": {
+            name: True for name in acceptance.V2_REQUIRED_SOAK_CHECKS
+        },
         "secret_leaks": [],
     }
     verification = {
@@ -39,6 +43,10 @@ def _terminal_evidence() -> tuple[dict, dict, dict]:
         "observation_receipts": 3,
         "review_receipts": 3,
         "gate_ready": True,
+        "participant_claims_verified": True,
+        "nodes": 3,
+        "declared_operator_groups": 2,
+        "declared_network_groups": 2,
     }
     return status, report, verification
 
@@ -53,6 +61,7 @@ def test_engineering_acceptance_profile_is_fixed_and_honest() -> None:
     assert report["duration_seconds"] == 900
     assert report["event_count"] == 30
     assert report["observer_count"] == 10
+    assert report["core_transcript_version"] == 2
     assert report["long_term_availability_verified"] is False
     assert report["production_ready"] is False
     assert report["environment"] == "local_anvil"
@@ -106,6 +115,27 @@ def test_terminal_evidence_accepts_complete_profile() -> None:
             "transcript_verify": 0,
         },
     )
+
+
+def test_terminal_evidence_rejects_missing_check_or_short_elapsed() -> None:
+    status, report, verification = _terminal_evidence()
+    report["checks"].pop("v2_wall_clock_duration_met")
+
+    with pytest.raises(
+        acceptance.AcceptanceError, match="soak_check_inventory_incomplete"
+    ):
+        acceptance._validate_terminal_evidence(
+            status, report, verification, diagnostic_sizes={"soak_process": 0}
+        )
+
+    status, report, verification = _terminal_evidence()
+    report["elapsed_seconds"] = 899.999
+    with pytest.raises(
+        acceptance.AcceptanceError, match="soak_wall_clock_duration_not_met"
+    ):
+        acceptance._validate_terminal_evidence(
+            status, report, verification, diagnostic_sizes={"soak_process": 0}
+        )
 
 
 def test_cleanup_refuses_mismatched_run_without_touching_process(

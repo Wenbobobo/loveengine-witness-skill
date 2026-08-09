@@ -4,15 +4,24 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from time import time
+from types import SimpleNamespace
 
 import pytest
 from eth_account import Account
 from eth_account.messages import encode_typed_data
 from jsonschema import Draft202012Validator
 
+import loveengine_witness.cli as cli_module
+
 from loveengine_witness.canonical import canonical_json_bytes
 from loveengine_witness.hashes import sha256_prefixed
 from loveengine_witness.network_protocol import build_node_profile
+from loveengine_witness.m4_network import build_node_profile_v2
+from loveengine_witness.m4_typed_data import (
+    build_bootstrap_v2_typed_data,
+    build_node_profile_v2_typed_data,
+)
 from loveengine_witness.network_typed_data import build_node_profile_typed_data
 
 
@@ -40,7 +49,7 @@ def test_manifest_verify_accepts_current_network_pilot_package() -> None:
     assert result.returncode == 0, result.stderr
     output = json.loads(result.stdout)
     assert output["valid"] is True
-    assert output["version"] == "0.6.1-contract-public-pilot"
+    assert output["version"] == "0.7.0-invited-public-pilot"
 
 
 def test_node_declare_generates_schema_valid_profile(tmp_path: Path) -> None:
@@ -87,6 +96,202 @@ def test_fixture_generate_creates_requested_nodes_without_secrets(tmp_path: Path
         assert "private_key" not in profile
         assert "mnemonic" not in profile
         assert profile["private_key_available_to_agent"] is False
+
+
+def test_onboarding_commands_emit_and_verify_v2_protocol_objects(
+    tmp_path: Path,
+) -> None:
+    node = Account.create()
+    publisher = Account.create()
+    registry = "0x" + "12" * 20
+    valid_until = str(int(time()) + 3600)
+    profile = build_node_profile_v2(
+        node.address,
+        ["observe_live_text", "review_dispute"],
+        "1",
+        valid_until,
+    )
+    signed_profile = {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "11155111",
+        "registry": registry,
+        "profile": profile,
+        "signature": "0x"
+        + Account.sign_message(
+            encode_typed_data(
+                full_message=build_node_profile_v2_typed_data(
+                    "11155111", registry, profile
+                )
+            ),
+            node.key,
+        ).signature.hex(),
+    }
+    profile_path = tmp_path / "profile.json"
+    profile_path.write_text(json.dumps(signed_profile), encoding="utf-8")
+
+    profile_result = run_cli(
+        "node", "profile", "sign", "--input", str(profile_path)
+    )
+
+    assert profile_result.returncode == 0, profile_result.stderr
+    assert json.loads(profile_result.stdout)["typed_data"]["primaryType"] == (
+        "NodeProfileV2"
+    )
+
+    bootstrap_input = tmp_path / "bootstrap-input.json"
+    bootstrap_output = tmp_path / "bootstrap.json"
+    bootstrap_input.write_text(
+        json.dumps(
+            {
+                "schema_version": "loveengine.bootstrap-bundle/2",
+                "chain_id": "11155111",
+                "registry": registry,
+                "publisher": publisher.address,
+                "nodes": [signed_profile],
+                "sequence": "1",
+                "valid_until": valid_until,
+            }
+        ),
+        encoding="utf-8",
+    )
+    build_result = run_cli(
+        "bootstrap",
+        "build",
+        "--input",
+        str(bootstrap_input),
+        "--output",
+        str(bootstrap_output),
+    )
+
+    assert build_result.returncode == 0, build_result.stderr
+    build_stdout = json.loads(build_result.stdout)
+    assert build_stdout["typed_data"]["primaryType"] == "BootstrapV2"
+    bootstrap = json.loads(bootstrap_output.read_text(encoding="utf-8"))
+    bootstrap["signature"] = "0x" + Account.sign_message(
+        encode_typed_data(
+            full_message=build_bootstrap_v2_typed_data(bootstrap)
+        ),
+        publisher.key,
+    ).signature.hex()
+    bootstrap_output.write_text(json.dumps(bootstrap), encoding="utf-8")
+
+    verify_result = run_cli(
+        "bootstrap",
+        "verify",
+        str(bootstrap_output),
+        "--chain-id",
+        "11155111",
+        "--registry",
+        registry,
+    )
+
+    assert verify_result.returncode == 0, verify_result.stderr
+    assert json.loads(verify_result.stdout)["valid"] is True
+
+
+def test_v2_onboarding_commands_use_verified_signer_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    node = Account.create()
+    publisher = Account.create()
+    registry = "0x" + "12" * 20
+    valid_until = str(int(time()) + 3600)
+    profile = build_node_profile_v2(
+        node.address, ["observe_live_text"], "1", valid_until
+    )
+    unsigned_profile = {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "11155111",
+        "registry": registry,
+        "profile": profile,
+        "signature": "0x",
+    }
+    profile_input = tmp_path / "profile-input.json"
+    profile_output = tmp_path / "profile-signed.json"
+    profile_config = tmp_path / "node-signer.json"
+    profile_input.write_text(json.dumps(unsigned_profile), encoding="utf-8")
+
+    accounts = {node.address: node, publisher.address: publisher}
+
+    def load_config(path: Path) -> SimpleNamespace:
+        account = node if path == profile_config else publisher
+        return SimpleNamespace(
+            role="observation_node" if account is node else "publisher",
+            chain_id="11155111",
+            address=account.address,
+        )
+
+    class Signer:
+        def __init__(self, account: object) -> None:
+            self.account = account
+
+        def sign_typed_data(self, typed_data: dict) -> str:
+            return "0x" + Account.sign_message(
+                encode_typed_data(full_message=typed_data), self.account.key
+            ).signature.hex()
+
+    monkeypatch.setattr(cli_module, "load_external_signer_config", load_config)
+    monkeypatch.setattr(
+        cli_module,
+        "_build_cli_signer",
+        lambda config, _args: (Signer(accounts[config.address]), None),
+    )
+    profile_args = cli_module.build_parser().parse_args(
+        [
+            "node",
+            "profile",
+            "sign",
+            "--input",
+            str(profile_input),
+            "--signer-config",
+            str(profile_config),
+            "--output",
+            str(profile_output),
+        ]
+    )
+
+    profile_result = cli_module.dispatch(profile_args)
+
+    assert profile_result["signed"] is True
+    signed_profile = json.loads(profile_output.read_text(encoding="utf-8"))
+    assert signed_profile["signature"] != "0x"
+
+    bootstrap_input = tmp_path / "bootstrap-input.json"
+    bootstrap_output = tmp_path / "bootstrap-signed.json"
+    publisher_config = tmp_path / "publisher-signer.json"
+    bootstrap_input.write_text(
+        json.dumps(
+            {
+                "schema_version": "loveengine.bootstrap-bundle/2",
+                "chain_id": "11155111",
+                "registry": registry,
+                "publisher": publisher.address,
+                "nodes": [signed_profile],
+                "sequence": "1",
+                "valid_until": valid_until,
+            }
+        ),
+        encoding="utf-8",
+    )
+    bootstrap_args = cli_module.build_parser().parse_args(
+        [
+            "bootstrap",
+            "build",
+            "--input",
+            str(bootstrap_input),
+            "--signer-config",
+            str(publisher_config),
+            "--output",
+            str(bootstrap_output),
+        ]
+    )
+
+    bootstrap_result = cli_module.dispatch(bootstrap_args)
+
+    assert bootstrap_result["signed"] is True
+    assert json.loads(bootstrap_output.read_text(encoding="utf-8"))[
+        "signature"
+    ] != "0x"
 
 
 def test_evidence_build_generates_stable_dual_hashes(tmp_path: Path) -> None:
@@ -345,7 +550,7 @@ def test_package_cli_build_verify_install_and_self_check(tmp_path: Path) -> None
         "--expected-package-hash", package_hash,
     )
     assert check.returncode == 0, check.stderr
-    assert json.loads(check.stdout)["version"] == "0.6.1-contract-public-pilot"
+    assert json.loads(check.stdout)["version"] == "0.7.0-invited-public-pilot"
 
 
 def test_pilot_cli_exposes_serve_and_status_commands(tmp_path: Path) -> None:
@@ -461,6 +666,118 @@ def test_node_connect_accepts_invite_file_for_relay_url(tmp_path: Path) -> None:
     assert output["url"] == invite["relay_url"]
     assert output["invite"]["dashboard_url"] == invite["dashboard_url"]
     assert output["node"] == account.address
+
+
+def test_node_connect_v2_dry_run_binds_external_signer_without_exposing_endpoint(
+    tmp_path: Path,
+) -> None:
+    account = Account.create()
+    registry = "0x" + "12" * 20
+    profile_value = build_node_profile_v2(
+        account.address,
+        ["observe_live_text", "review_dispute"],
+        "1",
+        str(int(time()) + 3600),
+    )
+    signed_profile = {
+        "schema_version": "loveengine.signed-agent-node-profile/2",
+        "chain_id": "11155111",
+        "registry": registry,
+        "profile": profile_value,
+        "signature": "0x"
+        + Account.sign_message(
+            encode_typed_data(
+                full_message=build_node_profile_v2_typed_data(
+                    "11155111", registry, profile_value
+                )
+            ),
+            account.key,
+        ).signature.hex(),
+    }
+    now = int(time())
+    invite = {
+        "schema_version": "loveengine.pilot-invite/2",
+        "participant_url": "https://witness.example-tailnet.ts.net",
+        "dashboard_url": "https://witness.example-tailnet.ts.net/demo/",
+        "relay_url": "wss://witness.example-tailnet.ts.net/v1/ws",
+        "chain_id": "11155111",
+        "registry": registry,
+        "publisher": "0x" + "34" * 20,
+        "skill_id": "loveengine-witness",
+        "version": "0.7.0-invited-public-pilot",
+        "package_hash": "0x" + "56" * 32,
+        "issued_at": str(now - 1),
+        "expires_at": str(now + 900),
+    }
+    signer = {
+        "schema_version": "loveengine.external-signer-config/1",
+        "kind": "clef",
+        "role": "observation_node",
+        "address": account.address,
+        "chain_id": "11155111",
+        "approval_mode": "manual_confirm",
+        "request_timeout_seconds": 180,
+        "transport": "ipc",
+        "endpoint": str((tmp_path / "clef.ipc").resolve()),
+        "ruleset_sha256": "sha256:" + "11" * 32,
+        "rules_attestation_sha256": "sha256:" + "22" * 32,
+        "allowed_typed_data": [
+            {
+                "domain_name": "LoveEngine Agent Network",
+                "domain_version": "2",
+                "verifying_contract": registry,
+                "primary_type": primary_type,
+            }
+            for primary_type in (
+                "NodeProfileV2",
+                "TaskReceiptV2",
+                "ParticipantAttestationV1",
+            )
+        ],
+        "approved_transaction_request_hashes": [],
+    }
+    profile_path = tmp_path / "profile.json"
+    invite_path = tmp_path / "invite.json"
+    signer_path = tmp_path / "signer.json"
+    for path, value in (
+        (profile_path, signed_profile),
+        (invite_path, invite),
+        (signer_path, signer),
+    ):
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    result = run_cli(
+        "node",
+        "connect",
+        "--invite",
+        str(invite_path),
+        "--profile",
+        str(profile_path),
+        "--signer-config",
+        str(signer_path),
+        "--dry-run",
+    )
+    assert result.returncode == 0, result.stderr
+    output = json.loads(result.stdout)
+    assert output["signer"]["kind"] == "clef"
+    assert output["signer"]["address"] == account.address
+    assert "endpoint" not in json.dumps(output).lower()
+
+    invite["expires_at"] = str(now)
+    invite_path.write_text(json.dumps(invite), encoding="utf-8")
+    expired = run_cli(
+        "node",
+        "connect",
+        "--invite",
+        str(invite_path),
+        "--profile",
+        str(profile_path),
+        "--signer-config",
+        str(signer_path),
+        "--dry-run",
+    )
+    assert expired.returncode == 2
+    assert json.loads(expired.stderr)["error"]["code"] == "pilot_invite_expired"
 
 
 def test_pilot_chain_and_explicit_vote_commands_are_machine_readable(

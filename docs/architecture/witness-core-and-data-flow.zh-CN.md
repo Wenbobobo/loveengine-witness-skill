@@ -1,6 +1,6 @@
 # LoveEngine Witness 核心与数据流
 
-状态：0.6.1-contract-public-pilot candidate
+状态：0.7.0-invited-public-pilot candidate，叠加在尚未人工合并的 0.6.1 PR #11
 协议：loveengine-witness-net/0.6
 定位：开发成员理解和复核当前实现的规范性架构说明
 
@@ -14,14 +14,18 @@ WitnessDAO、投票和 PublicSink 属于可选治理实验。
 | Skill 文档 | 告诉 Agent 何时调用哪些受约束接口 | 独立运行的服务或信任根 |
 | Witness runtime | 校验发布、节点、任务、证据、争议和 transcript | 事实裁判或自动投票者 |
 | Relay | 持久化并至少一次投递任务，接收 ACK/receipt | 签名者或 release 信任根 |
-| Operator / Viewer UI | 本机输入和只读观察 adapter | 直播产品或 Gate 执行器 |
+| Admin surface | 独立 loopback listener；Operator UI、metrics、鉴权写入和运维 | Tailscale/参与者入口 |
+| Participant surface | 独立 loopback listener；严格 allowlist 的 GET/SSE/artifact/WebSocket | token、POST、admin/RPC/signer 入口 |
 | SkillRegistry | 锚定 Publisher release 的 ZIP/manifest hash 与状态 | 保存完整 ZIP 或证据原文 |
 | 治理实验 | 演示显式投票和 UTO 公共记账 | Witness Skill 的默认完成条件 |
 
-公司直播 adapter、自动发现、长期 scheduler、公网、测试网、生产身份、TLS、HA
-和多副本证据存储当前都未实现。共享 Linux SSH 短实验已在 ARM64 主机上通过，
-但它只运行 loopback Anvil/Pilot、core/recovery 和 tunnel 节点验证，不是远程
-生产服务。
+0.7 candidate 已在本机实现双入口、PilotInviteV2、外部 signer adapter、Sepolia
+交易计划、双 RPC 校验契约、WitnessCoreTranscriptV2 和 Tailscale Serve 的失败关闭
+preflight/自有配置恢复。尚未产生真实 Clef 1.17.3、Sepolia 交易、Tailscale Serve
+或受邀远程参与者的证据。公司直播 adapter、自动发现、长期 scheduler、生产身份、
+TLS、HA 和多副本证据存储也未实现。既有 ARM64 共享 Linux SSH 验收属于 0.6.1
+历史 candidate，只运行 loopback Anvil/Pilot、core/recovery 和 tunnel 节点验证，
+不能接受 0.7 candidate。
 
 ## 组件与角色
 
@@ -32,10 +36,11 @@ flowchart LR
     Policy["NodeTrustPolicyV1 via trusted side channel"] --> Node["Observation Agent"]
     Package --> Node
     Registry --> Node
-    Operator["Operator"] -->|authenticated HTTP POST| Server["Pilot Server"]
-    Server --> Store["SQLite + artifact store + audit log"]
-    Server -->|SSE / artifact HTTP| Node
-    Server --> Relay["outbound WebSocket Relay"]
+    Operator["Operator"] -->|authenticated HTTP POST| Admin["Admin loopback surface"]
+    Admin --> Store["SQLite + artifact store + audit log"]
+    Participant["Participant loopback surface"] -->|allowlisted GET / SSE / artifacts| Node
+    Participant --> Relay["signed WebSocket Relay"]
+    Store --> Participant
     Relay --> Node
     Node -->|ACK + signed receipt + receipt confirmation| Relay
     Store --> Review["dispute aggregation"]
@@ -44,12 +49,21 @@ flowchart LR
     DAO -.-> Sink["CorporateSink / StreamingEngine / PublicSink"]
 ~~~
 
-- Publisher 构建发布包并通过外部 signer 发布 Registry release；仓库 CLI 只生成
-  发布交易计划和执行只读验证。
+- Publisher 构建发布包，生成精确 Sepolia transaction plan，经外部 signer 人工
+  确认后签名，并由 CLI 在重新校验 plan/raw transaction 后广播；当前尚无真实
+  Clef 或 Sepolia 提交证据。
 - Operator 持有 Pilot 写 token，创建/关闭 session、写事件并显式 finalize。
-- Observation Agent 使用自己的外部 signer 身份，只签任务回执，不签投票。
+- Observation Agent 使用自己的外部 signer 身份，只签任务回执，不签投票；0.7
+  首轮 Clef 只允许 `manual_confirm`。
 - Voting Witness 只在治理实验中显式审阅并批准 vote typed data。
 - Public Viewer 无 token、无钱包，只读查看 session/evidence；页面不是信任根。
+
+外部 signer 的检查不是单一布尔值。`signer inspect` 依次区分 static config、
+ruleset/attestation evidence、指定 Clef binary 的 SHA-256/版本，以及只读 live API
+probe。后层依赖前层；probe 不签名。首轮只允许 `manual_confirm`，兼容目标固定为
+Geth/Clef 1.17.3。Geth 1.17.4 移除内置 Clef 后，Geth 1.17.5 不能充当 Clef 的
+升级证据。真实 signing 还要把同一 evidence、人工确认结果、恢复地址和链上 receipt
+绑定起来；当前没有这份外部报告。
 
 ## 核心时序
 
@@ -84,6 +98,12 @@ invite 只提供连接位置和方便核对的公开元数据，不是信任根�
 必须通过可信旁路获得，并固定 chain ID、Registry、Publisher、skill/version、ZIP
 hash、manifest hash 和允许的 issuer。Relay 或任务即使自洽地伪造另一套 invite，
 也不能改变 policy。
+
+Sepolia 模式使用 PilotInviteV2：`participant_url`/dashboard 必须是 HTTPS `*.ts.net`，
+Relay 必须是 WSS；invite 不含 token、admin URL、RPC credential 或 signer endpoint。
+节点从受限文件读取两个不同的 Sepolia RPC URL，并同时验证 InviteV2、独立 policy、
+profile、package、Registry release 和 allowed issuer。两个 RPC 一致但没有 policy
+仍只构成 chain consistency，不形成 trust binding。
 
 ### 2. 事件、证据与争议
 
@@ -148,6 +168,10 @@ sequenceDiagram
 | 文字原文 bytes | artifacts/sha256/[prefix]/[digest] | 内容寻址；存在性仍依赖单机磁盘 |
 | 关键写入和拒绝 | audit.jsonl | hash-linked append log |
 | Anvil deployment/state、交易和 code hash | Pilot chain root | 本机实验链；不是公共测试网 |
+| PilotInviteV2、NodeTrustPolicyV1、participant attestation | 独立文件/终态 transcript | invite 只发现；policy 才是信任输入；attestation 绑定 assignment/invite/policy/service/group，但不是事实裁决 |
+| ExternalSignerConfigV1、rules/binary/live-probe evidence | 受限配置与 transcript 摘要 | raw key、credential、endpoint secret 不进入 transcript |
+| Sepolia transaction plan、signed envelope、receipt | Publisher 工作目录与 transcript | 精确 EIP-1559 请求绑定；当前尚无真实 Sepolia receipt |
+| Tailscale Serve preflight/owned restore | Pilot 运行报告 | 只管理 participant 映射；当前尚无真实 Serve 报告 |
 | Foundry dependency/cache 与 deployment artifacts | `contracts/lib`、`contracts/cache`、`contracts/out` | 被 Git 忽略的显式准备产物；报告保留摘要，不是发布信任根 |
 | ZIP/manifest hash 和 release 状态 | SkillRegistry | 链上 hash/状态，不存 ZIP bytes |
 | proposal、vote、UTO 会计 | 四个治理实验合约 | 可选层，只存结构化值和 hash |
@@ -194,6 +218,16 @@ closed。该本地 attestation 只能发现未经重新准备的后续改动，�
 | event hash | Keccak-256 of canonical event without its own hash | 构建事件连续链 |
 | payload/bundle/proposal hash | Keccak-256 of canonical structured data | 跨阶段引用和 EIP-712 绑定 |
 | code hash | Keccak-256 of deployed runtime bytecode | transcript/RPC 合约身份复核 |
+| invite/policy hash | Keccak-256 of canonical InviteV2/NodeTrustPolicyV1 | 分别绑定连接发现和可信 release context，不把 invite 升格为信任根 |
+| transaction request/plan hash | Keccak-256 of canonical EIP-1559 request / complete plan | signer allowlist、签名结果和广播前复核 |
+| signer evidence hash | SHA-256 of exact config/rules/attestation/binary bytes | 当前为未签名运行声明；把证据文件绑定到报告，但不证明运行进程确实加载了它们 |
+| Serve owned-config hash | SHA-256 of canonical owned Tailscale Serve state | 只证明工具管理的映射与恢复目标，不证明 ACL/身份正确 |
+
+V2 verifier 会校验任务、回执、profile、bootstrap 和 participant attestation 的真实
+签名地址，但 signer evidence 中的 backend/rules/audit hashes 尚未由同一 signer 单独
+签名绑定。因此结果显式返回 `signer_backend_evidence_verified:false`，并在
+`does_not_prove` 中保留 `signer_backend_or_rules_enforcement`。这避免把 Clef 配置文件
+存在误写成运行时规则已生效。
 
 ## 传输、重试与失败模式
 
@@ -248,13 +282,18 @@ closed。该本地 attestation 只能发现未经重新准备的后续改动，�
 | PilotTranscriptV1 | 历史字段一致性 | 发布信任或链事实；返回 legacy_consistency |
 | WitnessCoreTranscriptV1 offline | 核心阶段的 hash、签名、成员、quorum 与引用一致 | Registry/链事实；trust_bound:false |
 | WitnessCoreTranscriptV1 RPC + policy | 核心 release anchor 与记录区块的链事实 | 现实陈述真实性、成员社会独立性 |
+| WitnessCoreTranscriptV2 offline | InviteV2、签名、成员、证据、Gate 与 900 秒验收字段的内部一致性 | 外部链和参与者信任；offline_integrity、trust_bound:false |
+| WitnessCoreTranscriptV2 双 RPC，无 policy | 两个独立 RPC 对记录区块的 Sepolia 事实一致 | 谁授权该 release；chain_consistency、chain_verified:false |
+| WitnessCoreTranscriptV2 双 RPC + policy | policy、Registry、交易、区块/code 与 release anchor 一致 | 内容真实性、社会独立性、服务耐久性；chain_verified、trust_bound:true |
 | PilotTranscriptV2 legacy review payload | 历史签名与字段一致性 | release/chain 信任；返回 legacy_consistency |
 | PilotTranscriptV2 current offline | 完整 review 证据绑定和治理实验内部一致性 | 外部信任绑定；返回 offline_integrity |
 | PilotTranscriptV2 current RPC, no policy | 记录区块的链状态一致 | 谁授权这套 release；返回 chain_consistency |
 | PilotTranscriptV2 current RPC + policy | policy、Registry、交易、区块、code 与最终状态一致 | 公共网络部署或现实事实；返回 chain_verified |
 
-RPC verifier 读取 transcript 记录的最终区块号，并核对区块 hash 和 timestamp；
-链继续出块不会让旧 transcript 因“当前状态变化”失效。
+V2 verifier 要求两个不同的 RPC URL 要么同时提供、要么都不提供。它读取 transcript
+记录的最终区块号，并核对区块 hash 和 timestamp；链继续出块不会让旧 transcript
+因“当前状态变化”失效。邀请试点 environment 固定为
+`sepolia_invited_pilot`；本机 V2 仍为 `local_anvil` 和模拟 actor。
 
 ## 合约权限与返回值
 

@@ -5,13 +5,17 @@ import json
 import os
 from pathlib import Path
 
+import pytest
+from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
+from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.live_store import LocalArtifactStore
 from loveengine_witness.pilot_server import (
     AuditLog,
     create_pilot_app,
     load_pilot_config,
+    pilot_status,
     verify_audit_log,
 )
 
@@ -245,6 +249,37 @@ def test_pilot_evidence_finalize_requires_auth_and_get_does_not_write(
             assert (await fetched.json())["event_count"] == "0"
         finally:
             await client.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("readiness_status", [200, 503])
+def test_pilot_status_fails_closed_when_readiness_is_not_true(
+    readiness_status: int,
+) -> None:
+    async def scenario() -> None:
+        async def health(request: web.Request) -> web.Response:
+            return web.json_response({"status": "ok"})
+
+        async def readiness(request: web.Request) -> web.Response:
+            return web.json_response(
+                {"ready": False, "checks": {"publication": False}},
+                status=readiness_status,
+            )
+
+        app = web.Application()
+        app.add_routes(
+            [web.get("/healthz", health), web.get("/readyz", readiness)]
+        )
+        server = TestServer(app)
+        await server.start_server()
+        try:
+            with pytest.raises(LoveEngineError) as caught:
+                await pilot_status(str(server.make_url("/")), include_metrics=False)
+            assert caught.value.code == "pilot_not_ready"
+            assert caught.value.exit_code == 4
+        finally:
+            await server.close()
 
     asyncio.run(scenario())
 

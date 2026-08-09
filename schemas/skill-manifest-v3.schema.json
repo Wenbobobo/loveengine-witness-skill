@@ -25,7 +25,7 @@
   "properties": {
     "schema_version": {"const": "loveengine.skill-manifest/0.3"},
     "skill_id": {"const": "loveengine-witness"},
-    "version": {"enum": ["0.3.0-network-pilot", "0.3.1-demo-ready", "0.4.0-live-evidence-pilot", "0.5.0-lan-pilot", "0.6.0-contract-public-pilot", "0.6.1-contract-public-pilot"]},
+    "version": {"enum": ["0.3.0-network-pilot", "0.3.1-demo-ready", "0.4.0-live-evidence-pilot", "0.5.0-lan-pilot", "0.6.0-contract-public-pilot", "0.6.1-contract-public-pilot", "0.7.0-invited-public-pilot"]},
     "status": {"const": "pilot"},
     "protocol": {"enum": ["loveengine-witness-net/0.3", "loveengine-witness-net/0.4", "loveengine-witness-net/0.5", "loveengine-witness-net/0.6"]},
     "source_refs": {

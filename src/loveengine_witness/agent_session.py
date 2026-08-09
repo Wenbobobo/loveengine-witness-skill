@@ -10,7 +10,7 @@ from pathlib import Path
 from time import time
 from typing import Any, Awaitable, Callable
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, WSMsgType
 from eth_utils import to_checksum_address
 
 from .errors import LoveEngineError
@@ -33,6 +33,34 @@ _RELAY_CHALLENGE_KEYS = {
     "nonce",
 }
 _RELAY_NONCE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class _RetryableWebSocketClosed(Exception):
+    pass
+
+
+async def _receive_json(ws: Any, *, timeout: float) -> dict[str, Any]:
+    """Decode one message while preserving close frames as reconnect signals."""
+
+    # Unit-test transports implement only receive_json. Real aiohttp sockets
+    # expose receive(), which lets us distinguish a close frame from malformed
+    # JSON instead of collapsing both into TypeError.
+    if not hasattr(ws, "receive"):
+        return await ws.receive_json(timeout=timeout)
+    message = await ws.receive(timeout=timeout)
+    if message.type == WSMsgType.TEXT:
+        try:
+            value = json.loads(message.data)
+        except (TypeError, ValueError) as exc:
+            raise LoveEngineError("invalid_relay_json", str(exc)) from exc
+        if not isinstance(value, dict):
+            raise LoveEngineError("invalid_relay_json", "message must be an object")
+        return value
+    if message.type in {WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR}:
+        raise _RetryableWebSocketClosed(
+            f"type={int(message.type)} code={message.data}"
+        )
+    raise LoveEngineError("invalid_relay_message_type", str(int(message.type)))
 
 
 class AgentTaskJournal:
@@ -280,7 +308,7 @@ async def run_with_keepalive(
     try:
         while not task.done():
             try:
-                message = await ws.receive_json(timeout=interval)
+                message = await _receive_json(ws, timeout=interval)
             except TimeoutError:
                 await ws.send_json({"type": "heartbeat"})
                 continue
@@ -393,7 +421,7 @@ async def _confirm_relay_receipt(
         }
     )
     while True:
-        response = await ws.receive_json(timeout=idle_timeout_seconds)
+        response = await _receive_json(ws, timeout=idle_timeout_seconds)
         if (
             response.get("type") == "ack"
             and response.get("status") == "receipt_confirmed"
@@ -435,7 +463,7 @@ async def _run_authenticated_session(
     rejected = 0
     async with ClientSession() as session:
         async with session.ws_connect(url) as ws:
-            challenge = await ws.receive_json(timeout=idle_timeout_seconds)
+            challenge = await _receive_json(ws, timeout=idle_timeout_seconds)
             verify_relay_challenge(
                 challenge,
                 expected_chain_id=signed_profile["chain_id"],
@@ -448,9 +476,7 @@ async def _run_authenticated_session(
                     "challenge_signature": sign_challenge(challenge),
                 }
             )
-            authenticated = await ws.receive_json(
-                timeout=idle_timeout_seconds
-            )
+            authenticated = await _receive_json(ws, timeout=idle_timeout_seconds)
             if authenticated.get("status") != "authenticated":
                 raise LoveEngineError("relay_authentication_failed", json.dumps(authenticated))
             receipt_state_count = authenticated.get("receipt_state_count", 0)
@@ -468,7 +494,7 @@ async def _run_authenticated_session(
                 message = (
                     pending.pop(0)
                     if pending
-                    else await ws.receive_json(timeout=idle_timeout_seconds)
+                    else await _receive_json(ws, timeout=idle_timeout_seconds)
                 )
                 if message.get("type") != "receipt_state":
                     raise LoveEngineError(
@@ -496,7 +522,7 @@ async def _run_authenticated_session(
                 message = (
                     pending.pop(0)
                     if pending
-                    else await ws.receive_json(timeout=idle_timeout_seconds)
+                    else await _receive_json(ws, timeout=idle_timeout_seconds)
                 )
                 if message.get("type") == "receipt_state":
                     receipt = message.get("receipt")
@@ -594,8 +620,8 @@ async def _run_authenticated_session(
                 journal.save_receipt(task["task_id"], receipt)
                 await ws.send_json({"type": "receipt", "receipt": receipt})
                 while True:
-                    response = await ws.receive_json(
-                        timeout=idle_timeout_seconds
+                    response = await _receive_json(
+                        ws, timeout=idle_timeout_seconds
                     )
                     if (
                         response.get("type") == "ack"
@@ -695,7 +721,7 @@ async def run_agent_session(
                 idle_timeout_seconds=idle_timeout_seconds,
             )
             break
-        except (ClientError, TimeoutError, OSError) as exc:
+        except (ClientError, TimeoutError, OSError, _RetryableWebSocketClosed) as exc:
             if connection_attempts > reconnect_attempts:
                 raise LoveEngineError(
                     "relay_session_unavailable", type(exc).__name__, 4

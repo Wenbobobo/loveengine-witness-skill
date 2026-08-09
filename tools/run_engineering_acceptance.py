@@ -18,6 +18,8 @@ from typing import Any
 
 import psutil
 
+from loveengine_witness.pilot_soak import SOAK_SUCCESS_CHECK_KEYS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_VERSION = "loveengine.engineering-acceptance-report/1"
@@ -27,6 +29,11 @@ OBSERVER_COUNT = 10
 POLL_SECONDS = 5
 COMPLETION_GRACE_SECONDS = 300
 REPORT_FILENAME = "engineering-acceptance-report.json"
+V2_REQUIRED_SOAK_CHECKS = SOAK_SUCCESS_CHECK_KEYS | {
+    "v2_wall_clock_duration_met",
+    "v2_participant_claims",
+    "v2_standalone_evidence_honest",
+}
 
 
 class AcceptanceError(RuntimeError):
@@ -60,6 +67,7 @@ def _run(
     stdout_path: Path,
     stderr_path: Path,
     check: bool = True,
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         command,
@@ -67,6 +75,7 @@ def _run(
         text=True,
         capture_output=True,
         check=False,
+        env=env,
     )
     stdout_path.write_text(result.stdout, encoding="utf-8")
     stderr_path.write_text(result.stderr, encoding="utf-8")
@@ -191,6 +200,73 @@ def _cleanup_owned_soak(
     return cleanup
 
 
+def _sample_owned_process_tree(
+    root_pid: int, observed: dict[str, dict[str, Any]]
+) -> None:
+    try:
+        root = psutil.Process(root_pid)
+        processes = [root, *root.children(recursive=True)]
+    except psutil.NoSuchProcess:
+        return
+    except psutil.Error as exc:
+        raise AcceptanceError(
+            f"process_tree_sampling_failed:{exc.__class__.__name__}"
+        ) from exc
+    for process in processes:
+        try:
+            observed[str(process.pid)] = {
+                "pid": process.pid,
+                "create_time": process.create_time(),
+                "name": process.name(),
+            }
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as exc:
+            raise AcceptanceError(
+                f"process_tree_sampling_failed:{exc.__class__.__name__}"
+            ) from exc
+
+
+def _matching_live_processes(
+    observed: dict[str, dict[str, Any]],
+) -> list[psutil.Process]:
+    alive: list[psutil.Process] = []
+    for item in observed.values():
+        try:
+            process = psutil.Process(int(item["pid"]))
+            if abs(process.create_time() - float(item["create_time"])) > 0.01:
+                continue
+            if process.is_running() and process.status() != psutil.STATUS_ZOMBIE:
+                alive.append(process)
+        except psutil.NoSuchProcess:
+            continue
+        except (KeyError, TypeError, ValueError, psutil.Error) as exc:
+            raise AcceptanceError(
+                f"process_tree_verification_failed:{exc.__class__.__name__}"
+            ) from exc
+    return alive
+
+
+def _cleanup_observed_processes(
+    observed: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result = {"attempted": True, "stopped": False, "error": None}
+    try:
+        alive = _matching_live_processes(observed)
+        for process in reversed(alive):
+            process.terminate()
+        _, alive = psutil.wait_procs(alive, timeout=10)
+        for process in alive:
+            process.kill()
+        _, alive = psutil.wait_procs(alive, timeout=5)
+        result["stopped"] = not alive
+        if alive:
+            result["error"] = "owned_processes_still_alive"
+    except (AcceptanceError, psutil.Error) as exc:
+        result["error"] = str(exc)
+    return result
+
+
 def _validate_terminal_evidence(
     status: dict[str, Any],
     report: dict[str, Any],
@@ -206,12 +282,22 @@ def _validate_terminal_evidence(
         raise AcceptanceError("soak_report_failed")
     if report.get("requested_duration_seconds") != DURATION_SECONDS:
         raise AcceptanceError("soak_duration_mismatch")
+    try:
+        elapsed_seconds = float(report["elapsed_seconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AcceptanceError("soak_elapsed_invalid") from exc
+    if elapsed_seconds < DURATION_SECONDS:
+        raise AcceptanceError("soak_wall_clock_duration_not_met")
     if report.get("event_count") != EVENT_COUNT:
         raise AcceptanceError("soak_event_count_mismatch")
     if report.get("observer_count") != OBSERVER_COUNT:
         raise AcceptanceError("soak_observer_count_mismatch")
+    if report.get("core_transcript_version") != 2:
+        raise AcceptanceError("core_transcript_version_mismatch")
     checks = report.get("checks")
-    if not isinstance(checks, dict) or not checks or any(value is not True for value in checks.values()):
+    if not isinstance(checks, dict) or not V2_REQUIRED_SOAK_CHECKS.issubset(checks):
+        raise AcceptanceError("soak_check_inventory_incomplete")
+    if any(value is not True for value in checks.values()):
         raise AcceptanceError("soak_checks_failed")
     if report.get("secret_leaks") != []:
         raise AcceptanceError("soak_secret_findings")
@@ -231,6 +317,10 @@ def _validate_terminal_evidence(
         "observation_receipts": 3,
         "review_receipts": 3,
         "gate_ready": True,
+        "participant_claims_verified": True,
+        "nodes": 3,
+        "declared_operator_groups": 2,
+        "declared_network_groups": 2,
     }
     for key, expected in expected_verification.items():
         if verification.get(key) != expected:
@@ -255,6 +345,7 @@ def _initial_report(
         "duration_seconds": DURATION_SECONDS,
         "event_count": EVENT_COUNT,
         "observer_count": OBSERVER_COUNT,
+        "core_transcript_version": 2,
         "environment": "local_anvil",
         "actors_simulated": True,
         "long_term_availability_verified": False,
@@ -267,6 +358,10 @@ def _initial_report(
 
 def run(output: Path) -> dict[str, Any]:
     git_context = _require_clean_commit()
+    acceptance_env = {
+        **os.environ,
+        "LOVEENGINE_EXPECTED_SOURCE_COMMIT": git_context["commit"],
+    }
     manifest = json.loads(
         (ROOT / "skills" / "loveengine-witness" / "skill-manifest.json").read_text(
             encoding="utf-8"
@@ -286,6 +381,7 @@ def run(output: Path) -> dict[str, Any]:
     result = _initial_report(git_context, manifest_package_hash)
     _write_json(report_path, result)
     owned_soak: tuple[dict[str, Any], Path, Path] | None = None
+    observed_processes: dict[str, dict[str, Any]] = {}
 
     try:
         release_stdout = output / "release-gate.stdout.log"
@@ -294,6 +390,7 @@ def run(output: Path) -> dict[str, Any]:
             _powershell_command(),
             stdout_path=release_stdout,
             stderr_path=release_stderr,
+            env=acceptance_env,
         )
         result["checks"]["complete_release_gate"] = True
 
@@ -313,16 +410,23 @@ def run(output: Path) -> dict[str, Any]:
                 str(EVENT_COUNT),
                 "--observers",
                 str(OBSERVER_COUNT),
+                "--core-transcript-version",
+                "2",
                 "--output",
                 str(soak_output),
                 "--background",
             ],
             stdout_path=output / "soak-launch.stdout.json",
             stderr_path=output / "soak-launch.stderr.log",
+            env=acceptance_env,
         )
         launch_value = _parse_json_output(launch, "soak_launch")
         state_path = Path(str(launch_value["state_path"])).resolve()
         owned_soak = (launch_value, state_path, soak_output.resolve())
+        worker_pid = int(launch_value.get("pid") or 0)
+        if worker_pid <= 0:
+            raise AcceptanceError("soak_worker_pid_missing")
+        _sample_owned_process_tree(worker_pid, observed_processes)
         deadline = time.monotonic() + DURATION_SECONDS + COMPLETION_GRACE_SECONDS
         status_log = output / "soak-status.jsonl"
         status: dict[str, Any] = launch_value
@@ -331,6 +435,7 @@ def run(output: Path) -> dict[str, Any]:
                 if time.monotonic() >= deadline:
                     raise AcceptanceError("soak_completion_timeout")
                 time.sleep(POLL_SECONDS)
+                _sample_owned_process_tree(worker_pid, observed_processes)
                 poll = subprocess.run(
                     [
                         sys.executable,
@@ -344,6 +449,7 @@ def run(output: Path) -> dict[str, Any]:
                     text=True,
                     capture_output=True,
                     check=False,
+                    env=acceptance_env,
                 )
                 if poll.returncode != 0:
                     raise AcceptanceError("soak_status_failed")
@@ -351,9 +457,28 @@ def run(output: Path) -> dict[str, Any]:
                 log.write(json.dumps(status, ensure_ascii=False, sort_keys=True) + "\n")
                 log.flush()
 
+        live_processes = _matching_live_processes(observed_processes)
+        process_tree_evidence = {
+            "root_pid": worker_pid,
+            "sampled_processes": sorted(
+                observed_processes.values(), key=lambda item: int(item["pid"])
+            ),
+            "sample_count": len(observed_processes),
+            "alive_after_worker_exit": [process.pid for process in live_processes],
+            "complete_process_tree_cleanup_verified": not live_processes,
+        }
+        process_tree_path = output / "process-tree-evidence.json"
+        _write_json(process_tree_path, process_tree_evidence)
+        if live_processes:
+            raise AcceptanceError("owned_descendant_process_still_alive")
+        result["checks"]["complete_process_tree_cleanup"] = True
+
         soak_report_path = soak_output / "pilot-soak-report.json"
         soak_report = json.loads(soak_report_path.read_text(encoding="utf-8"))
         transcript_path = Path(str(soak_report["transcript_path"])).resolve()
+        transcript = json.loads(transcript_path.read_text(encoding="utf-8"))
+        if transcript.get("source_commit") != git_context["commit"]:
+            raise AcceptanceError("transcript_source_commit_mismatch")
         verification_result = _run(
             [
                 sys.executable,
@@ -366,6 +491,7 @@ def run(output: Path) -> dict[str, Any]:
             ],
             stdout_path=output / "transcript-verify.stdout.json",
             stderr_path=output / "transcript-verify.stderr.log",
+            env=acceptance_env,
         )
         verification = _parse_json_output(verification_result, "transcript_verify")
         launch_stderr = output / "soak-launch.stderr.log"
@@ -406,6 +532,7 @@ def run(output: Path) -> dict[str, Any]:
                 stdout_path=output / "tamper-check.stdout.log",
                 stderr_path=output / "tamper-check.stderr.log",
                 check=False,
+                env=acceptance_env,
             )
             if tamper.returncode == 0:
                 raise AcceptanceError("tampered_transcript_accepted")
@@ -415,16 +542,20 @@ def run(output: Path) -> dict[str, Any]:
             [sys.executable, str(ROOT / "tools" / "scan_secrets.py")],
             stdout_path=output / "final-secret-scan.stdout.log",
             stderr_path=output / "final-secret-scan.stderr.log",
+            env=acceptance_env,
         )
         _run(
             ["git", "diff", "--check"],
             stdout_path=output / "final-diff-check.stdout.log",
             stderr_path=output / "final-diff-check.stderr.log",
+            env=acceptance_env,
         )
         result["checks"]["final_secret_scan"] = True
         result["checks"]["final_diff_check"] = True
         if _git("status", "--porcelain=v1", "--untracked-files=all"):
             raise AcceptanceError("worktree_changed_during_acceptance")
+        if _git("rev-parse", "HEAD") != git_context["commit"]:
+            raise AcceptanceError("source_commit_changed_during_acceptance")
         result["checks"]["worktree_remained_clean"] = True
 
         result["run_id"] = soak_report["run_id"]
@@ -438,6 +569,7 @@ def run(output: Path) -> dict[str, Any]:
             "transcript_verify_stderr": verification_stderr,
             "release_gate_stdout": release_stdout,
             "release_gate_stderr": release_stderr,
+            "process_tree_evidence": process_tree_path,
         }.items():
             result["artifacts"][label] = {
                 "path": str(path),
@@ -453,6 +585,9 @@ def run(output: Path) -> dict[str, Any]:
         }
     if result["status"] != "passed" and owned_soak is not None:
         result["cleanup"] = _cleanup_owned_soak(*owned_soak)
+        result["descendant_cleanup"] = _cleanup_observed_processes(
+            observed_processes
+        )
     result["completed_at"] = _utc_now()
     result["passed"] = result["status"] == "passed"
     _write_json(report_path, result)

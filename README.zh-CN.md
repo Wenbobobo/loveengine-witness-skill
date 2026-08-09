@@ -11,24 +11,36 @@
 
 ## 当前状态
 
-最新 Git tag 是 v0.6.0-contract-public-pilot。工作目标
-0.6.1-contract-public-pilot 是 candidate，不是已发布 release。线协议继续使用
-loveengine-witness-net/0.6，因此 M0-M6 schema 和历史 transcript 仍可验证。
+最新 Git tag 是 `v0.6.0-contract-public-pilot`。当前 candidate 是
+`0.7.0-invited-public-pilot`，它叠加在尚未合并的 0.6.1 PR #11 上。该分支可以先
+定义并测试 0.7 接口，但不是已发布 release；在 PR #11 经人工 review 和 merge 前，
+也不能描述为“从已发布 0.6.1 升级”。线协议继续使用
+`loveengine-witness-net/0.6`，因此 M0-M6 schema 和历史 transcript 仍可验证。
 
 | 范围 | 状态 |
 | --- | --- |
 | package/Registry 信任、签名任务/回执、证据和争议复核 | 已在本机实现 |
-| ProposalGate 和可验证核心 transcript | 已在本机实现 |
+| ProposalGate、WitnessCoreTranscriptV1 与本机 WitnessCoreTranscriptV2 | 已在本机实现 |
+| admin/participant 双入口与 InviteV2/trust policy 分离 | 已在本机实现并测试 |
+| 外部 signer adapter、signer inspect 和 Sepolia 交易计划 | 已在本机实现并测试；没有真实 Clef/Sepolia 证据 |
+| Tailscale Serve 编排 | 已实现失败关闭的 preflight 和自有配置恢复；没有真实 Serve 证据 |
 | WitnessDAO、显式投票和 PublicSink | 可选治理实验 |
-| 共享 Linux 资源门和 key-only 远程实验工具 | 已实现；精确 candidate 的 ARM64 验收已通过 |
+| 0.6.1 共享 Linux 资源门和 key-only 远程实验工具 | 历史精确 candidate 的 ARM64 验收已通过 |
 | 公司直播 adapter 和自动发现 | 未实现 |
-| Tailscale 直接服务、公网/测试网、生产身份、TLS 和 HA | 未完成 |
+| 真实受邀参与者、生产身份、TLS/HA 和企业衔接 | 未完成 |
 
 完整本机门、一次四小时本机 core 运行，以及 2026-08-04 对 candidate `9e5058e`
 的共享 ARM64 Linux 验收，证明协议分权、篡改检测、跨平台复跑、恢复和 SSH tunnel
 公共节点路径；它们不证明现实组织彼此独立、发言内容为真、已经公开部署或 artifact
 能长期可用。后续 candidate 的工程验收统一使用 900 秒、30 个事件和 10 个只读观察者；
 该短门不构成长周期稳定性证据。
+
+0.7 代码现在具备受邀 Sepolia 试点所需的本地接口：两个独立 RPC 观察、
+`PilotInviteV2`、独立分发的 trust policy、分离的 loopback listener、外部 signer
+adapter、精确交易计划，以及固定 900 秒的 V2 验收形状。但当前还没有来自真实
+Clef 1.17.3 进程、Sepolia 交易、Tailscale Serve 会话或三个受邀远程操作者的证据。
+Geth 1.17.4 已移除内置 Clef 分发，因此不能把 Geth 1.17.5 当作 Clef 1.17.3 的
+替代或自动升级。首轮试点只允许 `manual_confirm`。
 
 在干净工作树中执行唯一的精确提交验收入口：
 
@@ -61,6 +73,11 @@ invite 告诉节点连接到哪里；通过可信旁路获得的独立 NodeTrust
 chain ID、Registry、Publisher、skill/version、ZIP hash、manifest hash 和允许
 issuer。节点不会把 invite、Relay 或任务自报的值当信任根。
 
+0.7 的 participant surface 只开放严格 allowlist 的读取和 WebSocket；admin/write
+surface 保持在另一 loopback listener。`PilotInviteV2` 只含参与者发现信息，不含
+write token、admin/RPC/signer endpoint。Sepolia 节点除 trust policy 外还要求两个
+不同的 RPC endpoint 和外部 signer 配置。
+
 ## 本机实验
 
 需要 Python 3.11+、uv 和固定 Foundry 1.7.1。
@@ -71,6 +88,16 @@ uv run loveengine manifest verify
 uv run loveengine pilot contracts prepare
 uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\pilot-output
 ```
+
+用固定短门验证本机 V2 contract：
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --core-transcript-version 2 --output .\pilot-v2-acceptance
+uv run loveengine pilot transcript verify .\pilot-v2-acceptance\witness-core.fixture.json
+```
+
+该结果仍是 `environment: local_anvil` 和模拟 actor，只证明 V2 schema 与跨阶段绑定，
+不能代替外部受邀试点证据。
 
 `pilot contracts prepare` 是真实本机 Pilot 的显式前置步骤。它确认 Forge 和 Anvil
 均精确为 `1.7.1`，核验版本化的 `contracts/dependency-lock.json`，执行
@@ -119,9 +146,10 @@ Quickstart 同时生成 pilot-invite.json 和 pilot-trust-policy.json；它不�
 uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 ```
 
-## 共享远程实验
+## 0.6.1 历史共享远程实验
 
-企业衔接前的 remote lab 让 Pilot 和 Anvil 继续只监听远端 loopback。它固定 SSH
+该企业衔接前 remote lab 只保留为 0.6.1 历史证据。它让 Pilot 和 Anvil 继续只
+监听远端 loopback，并固定 SSH
 host key，只接受 public-key 认证，先执行只读资源门，再把一个干净 commit 部署到
 唯一目录；实验始终为既有任务保留一颗 CPU（2 vCPU 主机只绑定 1 核，否则最多
 绑定 2 核），并降低调度优先级，最后下载报告和 transcript，
@@ -187,7 +215,7 @@ guardian 作为 fail-closed 清理机制。
 | 观察 Agent | 验证 release、任务和证据，签任务回执；绝不投票 |
 | 投票见证者 | 只参加可选治理实验，通过外部 RPC signer 显式批准 |
 | 只读观察者 | 只读查看 session/evidence；UI 不是信任根 |
-| 发布者 | 构建包、生成未签名 publish plan、执行 Registry 只读验证 |
+| 发布者 | 构建包、审阅精确交易计划、经外部 signer 人工确认、重验后提交并验证 Registry 状态 |
 
 ## 安全边界
 
@@ -217,7 +245,8 @@ guardian 作为 fail-closed 清理机制。
 - [CLI 参考](docs/api/cli-reference.md)
 - [合约 API](docs/api/loveengine-contract-api.md)
 - [工程总规划](docs/specs/love-engine-master-plan.md)
-- [活动远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)
+- [0.7 受邀公开试点规格](docs/specs/love-engine-invited-public-pilot.md)
+- [0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [完整文档索引](docs/README.md)
 

@@ -7,8 +7,8 @@
   "min_required_nodes": 1,
   "expires_at": null,
   "manifest_ref": "skills/loveengine-witness/skill-manifest.m0.json",
-  "manifest_hash": "sha256:0bd6198baff3c01dff622d3e8e8b335f069b7e9cbb5b4807b2e32668e4cb88cf",
-  "payload_hash": "sha256:0bd6198baff3c01dff622d3e8e8b335f069b7e9cbb5b4807b2e32668e4cb88cf",
+  "manifest_hash": "sha256:330840d3993c8738775b12e751338ef863376871158223a512ea257e8eae2b8d",
+  "payload_hash": "sha256:330840d3993c8738775b12e751338ef863376871158223a512ea257e8eae2b8d",
   "required_capabilities": [
     "manifest_verification",
     "skill_propagation"

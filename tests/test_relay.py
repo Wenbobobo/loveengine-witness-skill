@@ -275,7 +275,10 @@ def test_agent_reconnects_and_recovers_a_receipt_when_relay_ack_is_lost(
                 )
                 assert (await ws.receive_json())["status"] == "accepted"
                 state["receipt"] = (await ws.receive_json())["receipt"]
-                await asyncio.sleep(1.2)
+                await ws.close(
+                    code=1012,
+                    message=b"injected receipt confirmation ack loss",
+                )
             else:
                 await ws.send_json(
                     {

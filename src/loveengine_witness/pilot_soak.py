@@ -32,6 +32,9 @@ SOAK_SUCCESS_CHECK_KEYS = frozenset(
         "server_restart",
         "anvil_restart",
         "three_agent_disconnects",
+        "receipt_ack_loss_recovered",
+        "all_receipts_confirmed",
+        "system_snapshot_restore",
         "recovery_under_30s",
         "ack_p95_under_2s",
         "ack_max_under_5s",
@@ -90,6 +93,40 @@ def _has_verified_disconnect_proofs(faults: object) -> bool:
             or not node
             or proof.get("accepted") is not True
             or proof.get("connection_closed") is not True
+        ):
+            return False
+        task_ids.add(task_id)
+        nodes.add(node.lower())
+    return len(task_ids) == 3 and len(nodes) == 3
+
+
+def _has_verified_receipt_ack_loss_proofs(faults: object) -> bool:
+    if not isinstance(faults, dict):
+        return False
+    proofs = faults.get("receipt_ack_loss_proofs")
+    if not isinstance(proofs, list) or len(proofs) != 3:
+        return False
+    task_ids: set[str] = set()
+    nodes: set[str] = set()
+    for proof in proofs:
+        if not isinstance(proof, dict):
+            return False
+        task_id = proof.get("task_id")
+        node = proof.get("node")
+        if (
+            not isinstance(task_id, str)
+            or not task_id
+            or not isinstance(node, str)
+            or not node
+            or any(
+                proof.get(field) is not True
+                for field in (
+                    "receipt_stored",
+                    "confirmation_ack_dropped",
+                    "receipt_state_recovered",
+                    "receipt_confirmed",
+                )
+            )
         ):
             return False
         task_ids.add(task_id)
@@ -295,6 +332,42 @@ def _scan_token_leak(root: Path, token_file: Path) -> list[str]:
     return leaks
 
 
+def _v2_standalone_evidence_is_honest(
+    transcript: dict[str, Any],
+    result: dict[str, Any],
+    secret_leaks: list[str],
+) -> bool:
+    """Require standalone output to abstain from external acceptance claims."""
+
+    acceptance = transcript.get("acceptance")
+    evidence = result.get("acceptance_evidence")
+    if not isinstance(acceptance, dict) or not isinstance(evidence, dict):
+        return False
+    return (
+        acceptance
+        == {
+            "duration_seconds": 900,
+            "event_count": 30,
+            "observer_count": 10,
+            "restart_verified": True,
+            "reconnect_verified": True,
+            "cleanup_verified": False,
+            "secret_findings": len(secret_leaks),
+            "stderr_empty": False,
+        }
+        and result.get("acceptance_verified") is False
+        and result.get("offline_verification") == "standalone_unverified"
+        and result.get("integrity_verification") == "offline_integrity"
+        and evidence.get("verification_scope") == "standalone_process"
+        and evidence.get("reason") == "external_process_evidence_required"
+        and evidence.get("pilot_write_token_scan_completed") is True
+        and evidence.get("pilot_write_token_findings") == len(secret_leaks)
+        and evidence.get("chain_process_exited") is True
+        and evidence.get("complete_process_tree_cleanup_verified") is False
+        and evidence.get("outer_process_stderr_observed") is False
+    )
+
+
 def _memory_report(
     runtime_tree: dict[str, Any], root_peak_rss_bytes: int | None
 ) -> dict[str, Any]:
@@ -431,6 +504,7 @@ def _minimal_failure_report(
     event_count: int,
     observers: int,
     run_id: str | None,
+    core_transcript_version: int,
     error: BaseException,
 ) -> dict[str, Any]:
     return {
@@ -442,6 +516,7 @@ def _minimal_failure_report(
         "event_count": event_count,
         "observer_count": observers,
         "run_id": run_id,
+        "core_transcript_version": core_transcript_version,
         "disk_bytes": None,
         "peak_rss_bytes": None,
         "peak_rss_bytes_scope": "root_process_os_peak",
@@ -465,10 +540,25 @@ def run_pilot_soak(
     observers: int = 10,
     stage: str = "core",
     run_id: str | None = None,
+    core_transcript_version: int = 1,
 ) -> dict[str, Any]:
     validate_pilot_soak_args(
         duration_seconds, event_count, observers, stage
     )
+    if core_transcript_version not in {1, 2}:
+        raise LoveEngineError(
+            "unsupported_core_transcript_version", str(core_transcript_version)
+        )
+    if core_transcript_version == 2 and (
+        stage != "core"
+        or duration_seconds != 900
+        or event_count != 30
+        or observers != 10
+    ):
+        raise LoveEngineError(
+            "invalid_v2_acceptance_profile",
+            "V2 soak requires core/900 seconds/30 events/10 observers",
+        )
     formal = duration_seconds >= 4 * 3600
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -492,6 +582,10 @@ def run_pilot_soak(
             observer_count=observers,
             event_interval=duration_seconds / event_count,
             simulate_faults=True,
+            core_transcript_version=core_transcript_version,
+            acceptance_duration_seconds=(
+                900 if core_transcript_version == 2 else None
+            ),
         )
         transcript = result["transcript"]
         verification = (
@@ -514,6 +608,7 @@ def run_pilot_soak(
             event_count=event_count,
             observers=observers,
             run_id=run_id,
+            core_transcript_version=core_transcript_version,
             error=error,
         )
         _write_report_best_effort(output, report)
@@ -559,6 +654,16 @@ def run_pilot_soak(
         "three_agent_disconnects": _has_verified_disconnect_proofs(
             result["faults"]
         ),
+        "receipt_ack_loss_recovered": _has_verified_receipt_ack_loss_proofs(
+            result["faults"]
+        ),
+        "all_receipts_confirmed": (
+            int(relay.get("acked", -1)) == 6
+            and int(relay.get("receipt_confirmed", -1)) == 6
+        ),
+        "system_snapshot_restore": (
+            result.get("snapshot_restore_verified") is True
+        ),
         "recovery_under_30s": result["faults"]["recovery_seconds"] < 30,
         "ack_p95_under_2s": latency["p95"] < 2000,
         "ack_max_under_5s": latency["max"] < 5000,
@@ -577,6 +682,17 @@ def run_pilot_soak(
         ),
         "workflow_evidence_complete": workflow_evidence_complete,
     }
+    if core_transcript_version == 2:
+        checks["v2_wall_clock_duration_met"] = elapsed >= duration_seconds
+        checks["v2_participant_claims"] = (
+            verification.get("participant_claims_verified") is True
+            and verification.get("nodes") == 3
+            and verification.get("declared_operator_groups") == 2
+            and verification.get("declared_network_groups") == 2
+        )
+        checks["v2_standalone_evidence_honest"] = (
+            _v2_standalone_evidence_is_honest(transcript, result, leaks)
+        )
     passed = all(checks.values())
     report = {
         "schema_version": "loveengine.pilot-soak-report/1",
@@ -587,6 +703,7 @@ def run_pilot_soak(
         "event_count": event_count,
         "observer_count": observers,
         "run_id": run_id,
+        "core_transcript_version": core_transcript_version,
         "disk_bytes": disk,
         "peak_rss_bytes": memory["root_process_peak_rss_bytes"],
         "peak_rss_bytes_scope": "root_process_os_peak",
@@ -595,6 +712,11 @@ def run_pilot_soak(
         "ack_latency_ms": latency,
         "completion_latency_ms": relay["completion_latency_ms"],
         "secret_leaks": leaks,
+        "acceptance_evidence": (
+            result.get("acceptance_evidence")
+            if core_transcript_version == 2
+            else None
+        ),
         "checks": checks,
         "failure": (
             None

@@ -55,11 +55,17 @@ def _install_memory_stubs(
 def _successful_demo(output: Path, **kwargs: object) -> dict[str, object]:
     (output / "operator.token").write_text("test-write-token", encoding="utf-8")
     run_id = str(kwargs.get("run_id") or "lan-pilot-e2e-001")
-    return {
+    event_count = int(kwargs.get("event_count") or 1)
+    result: dict[str, object] = {
         "transcript": {
             "run_id": run_id,
-            "events": [{"sequence": 1}],
+            "events": [
+                {"sequence": sequence}
+                for sequence in range(1, event_count + 1)
+            ],
             "metrics": {
+                "acked": 6,
+                "receipt_confirmed": 6,
                 "latency_ms": {"p95": 10, "max": 20},
                 "completion_latency_ms": {"count": 6},
             },
@@ -82,9 +88,49 @@ def _successful_demo(output: Path, **kwargs: object) -> dict[str, object]:
                 }
                 for index in range(1, 4)
             ],
+            "receipt_ack_loss_proofs": [
+                {
+                    "node": f"0x{index:040x}",
+                    "task_id": f"observe:pilot:{index}",
+                    "receipt_stored": True,
+                    "confirmation_ack_dropped": True,
+                    "receipt_state_recovered": True,
+                    "receipt_confirmed": True,
+                }
+                for index in range(1, 4)
+            ],
             "recovery_seconds": 1.0,
         },
+        "snapshot_restore_verified": True,
     }
+    if kwargs.get("core_transcript_version") == 2:
+        result["transcript"]["acceptance"] = {
+            "duration_seconds": 900,
+            "event_count": 30,
+            "observer_count": 10,
+            "restart_verified": True,
+            "reconnect_verified": True,
+            "cleanup_verified": False,
+            "secret_findings": 0,
+            "stderr_empty": False,
+        }
+        result.update(
+            {
+                "acceptance_verified": False,
+                "offline_verification": "standalone_unverified",
+                "integrity_verification": "offline_integrity",
+                "acceptance_evidence": {
+                    "verification_scope": "standalone_process",
+                    "reason": "external_process_evidence_required",
+                    "pilot_write_token_scan_completed": True,
+                    "pilot_write_token_findings": 0,
+                    "chain_process_exited": True,
+                    "complete_process_tree_cleanup_verified": False,
+                    "outer_process_stderr_observed": False,
+                },
+            }
+        )
+    return result
 
 
 def _valid_core_verification(transcript: dict[str, object]) -> dict[str, object]:
@@ -98,6 +144,10 @@ def _valid_core_verification(transcript: dict[str, object]) -> dict[str, object]
         "observation_receipts": 3,
         "review_receipts": 3,
         "gate_ready": True,
+        "participant_claims_verified": True,
+        "nodes": 3,
+        "declared_operator_groups": 2,
+        "declared_network_groups": 2,
     }
 
 
@@ -151,6 +201,144 @@ def test_pilot_soak_reports_runtime_tree_metrics(
         (tmp_path / "pilot-soak-report.json").read_text(encoding="utf-8")
     )
     assert written == report
+
+
+def test_v2_standalone_evidence_requires_explicit_abstention() -> None:
+    acceptance = {
+        "duration_seconds": 900,
+        "event_count": 30,
+        "observer_count": 10,
+        "restart_verified": True,
+        "reconnect_verified": True,
+        "cleanup_verified": False,
+        "secret_findings": 0,
+        "stderr_empty": False,
+    }
+    transcript = {"acceptance": acceptance}
+    result = {
+        "acceptance_verified": False,
+        "offline_verification": "standalone_unverified",
+        "integrity_verification": "offline_integrity",
+        "acceptance_evidence": {
+            "verification_scope": "standalone_process",
+            "reason": "external_process_evidence_required",
+            "pilot_write_token_scan_completed": True,
+            "pilot_write_token_findings": 0,
+            "chain_process_exited": True,
+            "complete_process_tree_cleanup_verified": False,
+            "outer_process_stderr_observed": False,
+        },
+    }
+
+    assert pilot_soak._v2_standalone_evidence_is_honest(
+        transcript, result, []
+    ) is True
+
+    acceptance["cleanup_verified"] = True
+    assert pilot_soak._v2_standalone_evidence_is_honest(
+        transcript, result, []
+    ) is False
+    acceptance["cleanup_verified"] = False
+
+    acceptance["stderr_empty"] = True
+    assert pilot_soak._v2_standalone_evidence_is_honest(
+        transcript, result, []
+    ) is False
+
+
+def test_v2_standalone_evidence_binds_actual_secret_findings() -> None:
+    transcript = {
+        "acceptance": {
+            "duration_seconds": 900,
+            "event_count": 30,
+            "observer_count": 10,
+            "restart_verified": True,
+            "reconnect_verified": True,
+            "cleanup_verified": False,
+            "secret_findings": 0,
+            "stderr_empty": False,
+        }
+    }
+    result = {
+        "acceptance_verified": False,
+        "offline_verification": "standalone_unverified",
+        "integrity_verification": "offline_integrity",
+        "acceptance_evidence": {
+            "verification_scope": "standalone_process",
+            "reason": "external_process_evidence_required",
+            "pilot_write_token_scan_completed": True,
+            "pilot_write_token_findings": 0,
+            "complete_process_tree_cleanup_verified": False,
+            "outer_process_stderr_observed": False,
+        },
+    }
+
+    assert pilot_soak._v2_standalone_evidence_is_honest(
+        transcript, result, ["leak.txt"]
+    ) is False
+
+
+def test_v2_soak_accepts_honest_standalone_abstention(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_memory_stubs(monkeypatch)
+    monkeypatch.setattr(pilot_soak, "run_pilot_demo", _successful_demo)
+    monkeypatch.setattr(
+        pilot_soak, "verify_core_transcript", _valid_core_verification
+    )
+    monotonic_values = iter((100.0, 1_000.0))
+    monkeypatch.setattr(
+        pilot_soak.time, "monotonic", lambda: next(monotonic_values)
+    )
+
+    report = pilot_soak.run_pilot_soak(
+        tmp_path,
+        duration_seconds=900,
+        event_count=30,
+        observers=10,
+        run_id="v2-standalone-test",
+        core_transcript_version=2,
+    )
+
+    assert report["passed"] is True
+    assert report["checks"]["v2_participant_claims"] is True
+    assert report["checks"]["v2_standalone_evidence_honest"] is True
+    assert report["checks"]["v2_wall_clock_duration_met"] is True
+    assert report["acceptance_evidence"][
+        "complete_process_tree_cleanup_verified"
+    ] is False
+    assert report["acceptance_evidence"]["outer_process_stderr_observed"] is False
+
+
+def test_v2_soak_rejects_short_wall_clock_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_memory_stubs(monkeypatch)
+    monkeypatch.setattr(pilot_soak, "run_pilot_demo", _successful_demo)
+    monkeypatch.setattr(
+        pilot_soak, "verify_core_transcript", _valid_core_verification
+    )
+    monotonic_values = iter((100.0, 999.0))
+    monkeypatch.setattr(
+        pilot_soak.time, "monotonic", lambda: next(monotonic_values)
+    )
+
+    with pytest.raises(LoveEngineError) as error:
+        pilot_soak.run_pilot_soak(
+            tmp_path,
+            duration_seconds=900,
+            event_count=30,
+            observers=10,
+            run_id="v2-short-wall-clock-test",
+            core_transcript_version=2,
+        )
+
+    assert error.value.code == "pilot_soak_failed"
+    report = json.loads(
+        (tmp_path / "pilot-soak-report.json").read_text(encoding="utf-8")
+    )
+    assert report["passed"] is False
+    assert report["checks"]["v2_wall_clock_duration_met"] is False
 
 
 def test_pilot_soak_failure_writes_machine_readable_report(

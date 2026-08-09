@@ -26,6 +26,7 @@ def test_witness_core_pilot_stops_at_gate(tmp_path: Path) -> None:
     assert result["observation_receipts"] == 3
     assert result["review_receipts"] == 3
     assert result["gate_ready"] is True
+    assert result["snapshot_restore_verified"] is True
     assert result["environment"] == "local_anvil"
     assert result["actors_simulated"] is True
     assert result["chain_verification"] == "chain_consistency"
@@ -75,6 +76,15 @@ def test_witness_core_pilot_replays_delayed_observer_after_fault(tmp_path: Path)
     assert all(
         proof["accepted"] is True and proof["connection_closed"] is True
         for proof in proofs
+    )
+    receipt_ack_loss = result["faults"]["receipt_ack_loss_proofs"]
+    assert len(receipt_ack_loss) == 3
+    assert all(
+        proof["receipt_stored"] is True
+        and proof["confirmation_ack_dropped"] is True
+        and proof["receipt_state_recovered"] is True
+        and proof["receipt_confirmed"] is True
+        for proof in receipt_ack_loss
     )
     assert len(transcript["observation_receipts"]) == 3
     assert delayed_receipt["status"] == "completed"

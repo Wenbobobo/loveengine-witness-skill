@@ -55,6 +55,9 @@ class RelayStore:
             )
         self.connection.commit()
 
+    def close(self) -> None:
+        self.connection.close()
+
     def enqueue(
         self,
         recipient: str,
@@ -172,7 +175,8 @@ class RelayStore:
     def task_state(self, recipient: str, task_id: str) -> dict[str, object] | None:
         row = self.connection.execute(
             """
-            SELECT issuer, nonce, payload, accepted, acked, receipt
+            SELECT issuer, nonce, payload, accepted, acked, receipt,
+                   receipt_confirmed
             FROM messages
             WHERE recipient = ? AND task_id = ?
             """,
@@ -187,6 +191,7 @@ class RelayStore:
             "accepted": bool(row[3]),
             "acked": bool(row[4]),
             "receipt": row[5],
+            "receipt_confirmed": bool(row[6]),
         }
 
     def metrics(self) -> dict[str, int]:
