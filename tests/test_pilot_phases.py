@@ -8,12 +8,219 @@ import pytest
 import loveengine_witness.pilot_phases as pilot_phases
 from loveengine_witness.errors import LoveEngineError
 from loveengine_witness.pilot_phases import (
+    _carry_restart_metrics,
     _new_pilot_client_session,
+    _participant_attestation_window,
     _reviews_from_receipts,
     _stop_processes,
     _wait_for_relay_task_acceptance,
     _wait_for_relay_node_connections,
+    run_pilot_phases,
 )
+
+
+def test_participant_attestation_window_is_anchor_bound_and_bounded() -> None:
+    issued_at, valid_until = _participant_attestation_window("100")
+
+    assert issued_at == "100"
+    assert valid_until == "3700"
+
+
+def test_restart_carries_full_process_local_metrics() -> None:
+    previous_hub = SimpleNamespace(
+        receipts=[{"task_id": "before-restart"}],
+        rejected=2,
+        acceptance_latencies_ms=[10.0, 20.0],
+        completion_latencies_ms=[30.0],
+        receipt_ack_drops=["before-restart"],
+        drop_receipt_ack_once_for={"pending-after-restart"},
+    )
+    previous_metrics = SimpleNamespace(
+        started_at=100.0,
+        accepted_requests=17,
+        rejected_requests=3,
+        recoveries=0,
+        sse_clients=1,
+    )
+    next_hub = SimpleNamespace(
+        receipts=[],
+        rejected=0,
+        acceptance_latencies_ms=[],
+        completion_latencies_ms=[],
+        receipt_ack_drops=[],
+        drop_receipt_ack_once_for=set(),
+    )
+    next_metrics = SimpleNamespace(
+        started_at=200.0,
+        accepted_requests=0,
+        rejected_requests=0,
+        recoveries=0,
+        sse_clients=0,
+    )
+
+    _carry_restart_metrics(
+        previous_hub, previous_metrics, next_hub, next_metrics
+    )
+
+    assert next_hub.receipts == [{"task_id": "before-restart"}]
+    assert next_hub.rejected == 2
+    assert next_hub.acceptance_latencies_ms == [10.0, 20.0]
+    assert next_hub.completion_latencies_ms == [30.0]
+    assert next_hub.receipt_ack_drops == ["before-restart"]
+    assert next_hub.drop_receipt_ack_once_for == {"pending-after-restart"}
+    assert next_metrics.started_at == 100.0
+    assert next_metrics.accepted_requests == 17
+    assert next_metrics.rejected_requests == 3
+    assert next_metrics.recoveries == 1
+    assert next_metrics.sse_clients == 0
+
+
+def test_prepare_failure_stops_started_dual_surface(tmp_path, monkeypatch) -> None:
+    accounts = [f"0x{index:040x}" for index in range(1, 8)]
+    w3 = SimpleNamespace(
+        eth=SimpleNamespace(chain_id=31337, accounts=accounts)
+    )
+    deployment = {
+        "deployer": accounts[0],
+        "corporate_admin": accounts[1],
+        "witnesses": accounts[2:5],
+        "relayer": accounts[5],
+    }
+    archive = tmp_path / "release.zip"
+    archive.write_bytes(b"release")
+    runtime = SimpleNamespace(
+        info={"release_transactions": []},
+        package=SimpleNamespace(
+            archive=archive,
+            keccak256="0x" + "11" * 32,
+        ),
+        bootstrap={},
+        release_key="publisher/skill/0.7",
+        release={"version": "0.7.0-invited-public-pilot"},
+        invite={"server_url": "http://127.0.0.1:8780"},
+        config=SimpleNamespace(
+            run_id="prepare-cleanup",
+            host="127.0.0.1",
+            port=8780,
+            database=tmp_path / "pilot.sqlite",
+            relay_database=tmp_path / "relay.sqlite",
+            artifact_root=tmp_path / "artifacts",
+            audit_log=tmp_path / "audit.jsonl",
+            token_file=tmp_path / "operator.token",
+            bootstrap_file=tmp_path / "bootstrap.json",
+            release_file=tmp_path / "release.json",
+            package_archive=archive,
+            rpc_url="http://127.0.0.1:8545",
+            chain_id="31337",
+            write_token="test-token",
+        ),
+    )
+    lifecycle: list[str] = []
+
+    class SurfaceServer:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        async def start(self) -> None:
+            lifecycle.append("started")
+
+        async def stop(self) -> None:
+            lifecycle.append("stopped")
+
+    monkeypatch.setattr(
+        pilot_phases,
+        "_contract",
+        lambda *_args: SimpleNamespace(address="0x" + "aa" * 20),
+    )
+    monkeypatch.setattr(
+        pilot_phases,
+        "create_pilot_surfaces",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            admin=object(), relay=object(), metrics=object()
+        ),
+    )
+    monkeypatch.setattr(pilot_phases, "PilotSurfaceServer", SurfaceServer)
+    monkeypatch.setattr(
+        pilot_phases, "build_pilot_invite_v2", lambda **_kwargs: {}
+    )
+    monkeypatch.setattr(
+        pilot_phases,
+        "write_json",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+
+    with pytest.raises(OSError, match="disk full"):
+        asyncio.run(
+            pilot_phases._prepare_environment(
+                tmp_path,
+                w3,
+                deployment,
+                runtime,
+                stage="core",
+                core_transcript_version=2,
+                participant_port=8781,
+            )
+        )
+
+    assert lifecycle == ["started", "stopped"]
+
+
+def test_run_pilot_phases_routes_acceptance_profile_to_acceptance_only(
+    tmp_path, monkeypatch
+) -> None:
+    environment = SimpleNamespace(output=tmp_path, all_processes=[])
+    observation = SimpleNamespace()
+    evidence = SimpleNamespace()
+    expected_profile = {"duration_seconds": 900}
+    seen: dict[str, object] = {}
+
+    async def prepare(*_args, **_kwargs):
+        return environment
+
+    async def observe(*_args, **kwargs):
+        assert "acceptance_profile" not in kwargs
+        return observation
+
+    async def build_evidence(*_args, **_kwargs):
+        return evidence
+
+    def accept(*_args, **kwargs):
+        seen["acceptance_profile"] = kwargs["acceptance_profile"]
+        return {"passed": True}
+
+    async def stop(*_args, **_kwargs):
+        return None
+
+    async def restore(*_args, **_kwargs):
+        seen["snapshot_restore"] = True
+
+    monkeypatch.setattr(pilot_phases, "_prepare_environment", prepare)
+    monkeypatch.setattr(pilot_phases, "_run_observation_phase", observe)
+    monkeypatch.setattr(pilot_phases, "_run_evidence_phase", build_evidence)
+    monkeypatch.setattr(pilot_phases, "_run_acceptance_phase", accept)
+    monkeypatch.setattr(pilot_phases, "_exercise_system_snapshot_restore", restore)
+    monkeypatch.setattr(pilot_phases, "_stop_processes", stop)
+    monkeypatch.setattr(pilot_phases, "_stop_pilot_server", stop)
+
+    result = asyncio.run(
+        run_pilot_phases(
+            tmp_path,
+            SimpleNamespace(),
+            {},
+            SimpleNamespace(),
+            event_count=30,
+            observer_count=10,
+            event_interval=30,
+            restart_chain=stop,
+            simulate_faults=True,
+            core_transcript_version=2,
+            acceptance_profile=expected_profile,
+        )
+    )
+
+    assert result == {"passed": True}
+    assert seen["acceptance_profile"] is expected_profile
+    assert seen["snapshot_restore"] is True
 
 
 def test_pilot_http_sessions_do_not_reuse_connections_across_restart() -> None:

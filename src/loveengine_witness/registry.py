@@ -119,14 +119,14 @@ def verify_onchain_release(
         registry_address = to_checksum_address(registry)
         publisher_address = to_checksum_address(publisher)
     except (TypeError, ValueError) as exc:
-        raise LoveEngineError("invalid_registry_query", str(exc)) from exc
+        raise LoveEngineError("invalid_registry_query", "address") from exc
     if not skill_id or not version:
         raise LoveEngineError("invalid_registry_query", "skill_id and version are required")
 
     chain = web3 or Web3(HTTPProvider(rpc_url, request_kwargs={"timeout": 3}))
     try:
         if web3 is None and not chain.is_connected():
-            raise LoveEngineError("rpc_unavailable", rpc_url, 3)
+            raise LoveEngineError("rpc_unavailable", "configured RPC endpoint", 3)
         actual_chain_id = str(chain.eth.chain_id)
         if actual_chain_id != str(expected_chain_id):
             raise LoveEngineError("wrong_chain_id", "RPC chainId mismatch")
@@ -145,7 +145,9 @@ def verify_onchain_release(
     except LoveEngineError:
         raise
     except Exception as exc:
-        raise LoveEngineError("registry_query_failed", str(exc), 3) from exc
+        raise LoveEngineError(
+            "registry_query_failed", exc.__class__.__name__, 3
+        ) from exc
 
     if not isinstance(raw_release, (list, tuple)) or len(raw_release) != 6:
         raise LoveEngineError("registry_query_failed", "invalid getRelease response", 3)

@@ -1,5 +1,245 @@
 [
   {
+    "id": "invited-public-pilot-spec",
+    "title": "LoveEngine 0.7 invited public pilot specification",
+    "path": "docs/specs/love-engine-invited-public-pilot.md",
+    "source_group": "docs/specs",
+    "layer": "specification",
+    "domain_tags": [
+      "0.7",
+      "invited pilot",
+      "Sepolia"
+    ],
+    "status": "candidate",
+    "canonical_role": "Current 0.7 candidate scope and exit gates",
+    "summary": "Defines the external signer, Sepolia, dual-surface, InviteV2, transcript V2, fixed 900-second acceptance and invited-remote evidence boundaries."
+  },
+  {
+    "id": "external-signer-runtime",
+    "title": "External signer runtime",
+    "path": "src/loveengine_witness/signer_client.py",
+    "source_group": "runtime",
+    "layer": "signing",
+    "domain_tags": [
+      "Clef",
+      "manual confirmation",
+      "signer inspection"
+    ],
+    "status": "candidate",
+    "canonical_role": "External signer validation and adapter boundary",
+    "summary": "Implements Anvil and Clef adapters, typed-data and transaction scope checks, signature recovery, exact Clef 1.17.3 inspection and read-only live probing."
+  },
+  {
+    "id": "registry-transaction-runtime",
+    "title": "Registry transaction planning runtime",
+    "path": "src/loveengine_witness/registry_transactions.py",
+    "source_group": "runtime",
+    "layer": "registry",
+    "domain_tags": [
+      "Sepolia",
+      "EIP-1559",
+      "transaction plan"
+    ],
+    "status": "candidate",
+    "canonical_role": "Exact Registry deployment and release transaction plans",
+    "summary": "Builds, signs, decodes, revalidates and submits exact chain-11155111 deployment or release plans without accepting raw private keys."
+  },
+  {
+    "id": "pilot-dual-surface-runtime",
+    "title": "Pilot dual-surface runtime",
+    "path": "src/loveengine_witness/pilot_surfaces.py",
+    "source_group": "runtime",
+    "layer": "pilot",
+    "domain_tags": [
+      "admin surface",
+      "participant surface",
+      "route allowlist"
+    ],
+    "status": "candidate",
+    "canonical_role": "Separated admin/write and participant/read listeners",
+    "summary": "Runs two loopback applications over shared state while keeping POST, tokens, operator routes and metrics off the participant allowlist."
+  },
+  {
+    "id": "tailscale-serve-runtime",
+    "title": "Tailscale Serve lifecycle runtime",
+    "path": "src/loveengine_witness/tailscale_serve.py",
+    "source_group": "runtime",
+    "layer": "transport",
+    "domain_tags": [
+      "Tailscale Serve",
+      "preflight",
+      "restoration"
+    ],
+    "status": "candidate",
+    "canonical_role": "Fail-closed participant-surface Serve orchestration",
+    "summary": "Checks login, Funnel and configuration conflicts, owns one participant mapping and restores the exact pre-run Serve state without calling tailscale up."
+  },
+  {
+    "id": "invited-operator-runtime",
+    "title": "Invited operator signing runtime",
+    "path": "src/loveengine_witness/invited_operator.py",
+    "source_group": "runtime",
+    "layer": "network",
+    "domain_tags": [
+      "task issuer",
+      "participant attestation",
+      "cross validation"
+    ],
+    "status": "candidate",
+    "canonical_role": "Policy-bound task and participant signing boundary",
+    "summary": "Cross-checks unsigned tasks or participant declarations against policy, bootstrap membership, InviteV2, assignments, service config and verified Clef evidence before signing."
+  },
+  {
+    "id": "dual-rpc-endpoint-runtime",
+    "title": "Restricted dual RPC endpoint runtime",
+    "path": "src/loveengine_witness/rpc_endpoints.py",
+    "source_group": "runtime",
+    "layer": "verification",
+    "domain_tags": [
+      "dual RPC",
+      "restricted file",
+      "Sepolia"
+    ],
+    "status": "candidate",
+    "canonical_role": "Fail-closed Sepolia RPC input boundary",
+    "summary": "Loads credentialed Sepolia RPC URLs from restricted files, rejects ambiguous direct/file inputs and enforces two distinct endpoints for invited chain checks."
+  },
+  {
+    "id": "witness-core-transcript-runtime",
+    "title": "Witness core transcript verifier runtime",
+    "path": "src/loveengine_witness/core_transcript.py",
+    "source_group": "runtime",
+    "layer": "verification",
+    "domain_tags": [
+      "transcript V2",
+      "safe block",
+      "trust policy"
+    ],
+    "status": "candidate",
+    "canonical_role": "Shared V1/V2 offline and chain verification",
+    "summary": "Verifies transcript integrity, participant assignments and declarations, service/signer evidence, two historical RPC observations and optional trust-policy binding without changing V1 semantics."
+  },
+  {
+    "id": "witness-core-transcript-v2-schema",
+    "title": "Witness core transcript V2 schema",
+    "path": "schemas/witness-core-transcript-v2.schema.json",
+    "source_group": "schemas",
+    "layer": "verification",
+    "domain_tags": [
+      "transcript V2",
+      "dual RPC",
+      "invited pilot"
+    ],
+    "status": "candidate",
+    "canonical_role": "Machine-readable 0.7 core evidence contract",
+    "summary": "Binds release, InviteV2, policy, signer and participant evidence, tasks, artifacts, Gate, safe-block observations and the fixed 900-second acceptance profile."
+  },
+  {
+    "id": "pilot-config-v2-schema",
+    "title": "Pilot configuration V2 schema",
+    "path": "schemas/pilot-config-v2.schema.json",
+    "source_group": "schemas",
+    "layer": "pilot",
+    "domain_tags": [
+      "Pilot V2",
+      "dual listener",
+      "loopback"
+    ],
+    "status": "candidate",
+    "canonical_role": "Dual-surface Pilot configuration contract",
+    "summary": "Separates admin and participant loopback listeners and constrains Sepolia participant public URLs to HTTPS ts.net names."
+  },
+  {
+    "id": "pilot-invite-v2-schema",
+    "title": "Pilot invite V2 schema",
+    "path": "schemas/pilot-invite-v2.schema.json",
+    "source_group": "schemas",
+    "layer": "network",
+    "domain_tags": [
+      "InviteV2",
+      "discovery",
+      "Tailscale"
+    ],
+    "status": "candidate",
+    "canonical_role": "Secret-free participant discovery contract",
+    "summary": "Carries participant, dashboard and Relay URLs plus public release hints while leaving manifest, issuers, tokens, RPC and signer endpoints outside the invite."
+  },
+  {
+    "id": "external-signer-config-v1-schema",
+    "title": "External signer configuration V1 schema",
+    "path": "schemas/external-signer-config-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "signing",
+    "domain_tags": [
+      "external signer",
+      "Clef",
+      "allowlist"
+    ],
+    "status": "candidate",
+    "canonical_role": "Role-scoped signer configuration contract",
+    "summary": "Binds signer identity, chain, manual-confirm transport, rule hashes, typed-data scopes and exact approved Publisher transaction request hashes."
+  },
+  {
+    "id": "participant-attestation-v1-schema",
+    "title": "Participant attestation V1 schema",
+    "path": "schemas/participant-attestation-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "identity",
+    "domain_tags": [
+      "participant",
+      "attestation",
+      "operator group"
+    ],
+    "status": "candidate",
+    "canonical_role": "Signed invited-participant responsibility statement",
+    "summary": "Binds a node and role to one run, assignment, InviteV2, trust policy, release, service, signer rules and opaque operator/network grouping without claiming factual or social independence proof."
+  },
+  {
+    "id": "invited-pilot-service-config-v1-schema",
+    "title": "Invited pilot service configuration V1 schema",
+    "path": "schemas/invited-pilot-service-config-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "transport",
+    "domain_tags": [
+      "participant service",
+      "Tailscale Serve",
+      "route allowlist"
+    ],
+    "status": "candidate",
+    "canonical_role": "Hashable invited-participant service contract",
+    "summary": "Binds participant origin, Relay URL, tailnet-only transport, explicit route allowlist, admin loopback boundary and owned Serve restoration state for participant attestations and transcript V2."
+  },
+  {
+    "id": "chain-transaction-plan-v1-schema",
+    "title": "Chain transaction plan V1 schema",
+    "path": "schemas/chain-transaction-plan-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "registry",
+    "domain_tags": [
+      "transaction plan",
+      "Sepolia",
+      "EIP-1559"
+    ],
+    "status": "candidate",
+    "canonical_role": "Unsigned exact transaction approval contract",
+    "summary": "Binds chain, sender, nonce, target or creation code, zero value, calldata, gas and fee caps, expiry and release references before external signing."
+  },
+  {
+    "id": "signed-chain-transaction-v1-schema",
+    "title": "Signed chain transaction V1 schema",
+    "path": "schemas/signed-chain-transaction-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "registry",
+    "domain_tags": [
+      "signed transaction",
+      "request hash",
+      "external signer"
+    ],
+    "status": "candidate",
+    "canonical_role": "Plan-bound signed transaction envelope",
+    "summary": "Binds one signed raw transaction and recovered signer to the exact plan and request hashes used for pre-broadcast validation."
+  },
+  {
     "id": "engineering-acceptance-runner",
     "title": "Engineering acceptance runner",
     "path": "tools/run_engineering_acceptance.py",

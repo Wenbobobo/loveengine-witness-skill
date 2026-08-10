@@ -12,14 +12,20 @@
 ## Active authority
 
 1. [Engineering master plan](specs/love-engine-master-plan.md)
-2. [Pre-enterprise Remote Lab SPEC](specs/love-engine-pre-enterprise-remote-lab.md)
-3. [API documents](api/README.md)
-4. [Role runbooks](development/participant-runbook.zh-CN.md)
+2. [0.7 Invited Public Pilot SPEC](specs/love-engine-invited-public-pilot.md)
+3. [0.6.1 Remote Lab SPEC (historical evidence)](specs/love-engine-pre-enterprise-remote-lab.md)
+4. [API documents](api/README.md)
+5. [Role runbooks](development/participant-runbook.zh-CN.md)
 
-0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。精确
-candidate `9e5058e` 的本机四小时和共享 Linux remote lab 已通过；后续候选改用
-900 秒工程验收。公司直播、Tailscale 直接服务、公网和测试网仍不属于 0.6.1
-已完成能力。
+最新发布 tag 仍是 v0.6.0-contract-public-pilot。精确 0.6.1 candidate `9e5058e`
+的本机四小时和共享 Linux remote lab 已通过，但 PR #11 仍需人工 review/merge；
+0.7 分支可以并行设计和实现，不能据此把 0.6.1 或 0.7 表述为已发布。
+
+0.7 candidate 已实现本机 WitnessCoreTranscriptV2、外部 signer adapter、Sepolia
+transaction plan、双 RPC 契约、分离的管理/参与者入口和 Tailscale Serve preflight；
+真实 Clef 1.17.3、Sepolia、Serve 和受邀远端证据仍缺失。后续 candidate 使用
+900 秒工程验收。公司直播、Tailscale Funnel、公共互联网、治理合约测试网部署和
+生产可用性不属于本轮目标。
 
 ## Development and operations
 

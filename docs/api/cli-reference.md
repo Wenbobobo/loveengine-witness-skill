@@ -1,7 +1,7 @@
 # LoveEngine CLI and operations reference
 
-状态：`0.6.1-contract-public-pilot` candidate；最新 tag 为
-`v0.6.0-contract-public-pilot`
+状态：`0.7.0-invited-public-pilot` candidate，叠加在尚未人工合并的 0.6.1
+PR #11；最新 tag 为 `v0.6.0-contract-public-pilot`
 协议：`loveengine-witness-net/0.6`
 输出：成功写 stdout JSON；失败写 stderr JSON 和稳定错误码。
 
@@ -49,7 +49,41 @@ uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 ```
 
 Dry-run 只返回步骤和目标路径，不创建 root，不写 token、invite 或运行状态。
-`0.6.1` 不把此命令描述为 Tailscale、公网、测试网或生产部署入口。
+该兼容 quickstart 不把自身描述为 Tailscale、Sepolia 或生产部署入口。
+
+### 2.1 V2 dual surfaces
+
+`pilot serve` 读取 PilotConfigV1 或 V2。V2 启动两个独立 loopback listener：
+
+```powershell
+uv run loveengine pilot serve --config .\pilot-config-v2.json
+uv run loveengine pilot status --url <admin-loopback-url> --surface admin
+uv run loveengine pilot status --url <participant-loopback-url> --surface participant
+uv run loveengine pilot task enqueue --input .\signed-task.json --admin-url <admin-loopback-url> --origin <allowed-origin> --token-file .\secrets\pilot-write-token.txt
+```
+
+`pilot status` 不接受调用方自报的 surface 名称：它会同时核对 `/healthz` 与
+`/readyz` 返回的服务端入口身份。把 participant URL 当作 admin（或反向混用）会以
+`pilot_surface_mismatch` 失败关闭。
+
+Sepolia task issuer 先用独立 signer 对与 policy/bootstrap 一致的 NetworkTaskV2
+人工确认签名，再通过 admin surface 入队：
+
+```powershell
+uv run loveengine network task sign --input .\task.unsigned.json --signer-config .\secrets\task-issuer.json --trust-policy .\pilot-trust-policy.json --bootstrap .\bootstrap.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\signed-task.json
+```
+
+participant surface 只开放 allowlist 的 GET/SSE/artifact/WebSocket；所有 POST、token、
+Operator UI、snapshot、task ingress 和 metrics 都只在 admin surface。若操作者已旁路
+确认目标机登录正确 tailnet、无 Funnel/冲突且 ACL 正确，可显式运行：
+
+```powershell
+uv run loveengine pilot serve --config .\pilot-config-v2.json --tailscale-serve
+```
+
+该模式固定运行 900 秒，只把 participant loopback 映射到 HTTPS `*.ts.net`，并恢复
+工具接管前的自有 Serve 状态；它不运行 `tailscale up`，不映射 admin/RPC/Clef，且
+当前尚无真实 Tailscale Serve 运行证据。
 
 ## 3. Package trust modes
 
@@ -76,16 +110,52 @@ uv run loveengine package verify <archive.zip> --integrity-only
 
 ## 4. Publisher and Registry
 
-当前 Publisher CLI 不提交交易。它只生成可交给外部 signer 的调用计划：
+历史计划入口继续保留：
 
 ```powershell
 uv run loveengine registry publish --input .\release.json --dry-run
 ```
 
-外部 signer 提交并确认后，使用只读 RPC 校验活动 release、ZIP 和 manifest：
+0.7 的 Sepolia 路径生成精确 EIP-1559 plan、经外部 signer 签名，并在再次复核后
+提交。plan 命令固定 chain ID 11155111，`value` 必须为零：
 
 ```powershell
-uv run loveengine registry verify --rpc-url http://127.0.0.1:8545 --artifact <archive.zip> --chain-id 31337 --registry <registry-address> --publisher <publisher-address> --skill-id loveengine-witness --version 0.6.1-contract-public-pilot
+uv run loveengine registry transaction deploy-plan --artifact <SkillRegistry-artifact.json> --sender <publisher> --nonce <nonce> --gas <gas-limit> --max-fee-per-gas <wei> --max-priority-fee-per-gas <wei> --created-at <unix> --expires-at <unix> --output .\plans\deploy.json
+uv run loveengine registry transaction publish-plan --release .\release.json --sender <publisher> --nonce <nonce> --gas <gas-limit> --max-fee-per-gas <wei> --max-priority-fee-per-gas <wei> --created-at <unix> --expires-at <unix> --output .\plans\publish.json
+uv run loveengine registry transaction sign --plan .\plans\publish.json --signer-config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\plans\publish.signed.json
+uv run loveengine registry transaction submit --plan .\plans\publish.json --signed .\plans\publish.signed.json --rpc-url-file .\secrets\sepolia-primary-rpc.txt
+```
+
+`sign` 要求 Publisher role、allowlist 中的精确 request hash 和 `manual_confirm`，并
+重验恢复地址和解码后的 raw transaction；首轮 plan 只接受空 `accessList`。
+`submit` 再校验 plan/envelope 和当前 nonce，
+只广播同一 raw transaction。Sepolia RPC 必须从权限受限文件读取。当前没有真实
+Clef/Sepolia receipt，所以这些接口已实现不等于 release 已发布。
+
+`expires_at` 是 LoveEngine `sign/submit` 的客户端拒绝门，不是以太坊 type-2 raw
+transaction 的链上字段。过期 raw transaction 若被导出，外部工具仍可能广播；因此
+过期 plan 与 signed envelope 必须废弃，不能把该字段描述成链上 deadline。需要链上
+强制过期语义时，应另用带 deadline 的智能账户或合约入口。
+
+外部 signer 检查分四个累积层级：
+
+```powershell
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256>
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --probe
+```
+
+四层依次为 static config、rules/attestation evidence、binary/SHA+version、只读 live
+API probe。可选参数必须成对完整，probe 要求前两类外部证据均已提供。兼容目标是
+Geth/Clef 1.17.3；Geth 1.17.4 已移除内置 Clef，不能把 1.17.5 当作 Clef 升级。
+`--expected-binary-sha256` 使用 `sha256:<64 lowercase hex>` 格式。首轮只允许
+`manual_confirm`；probe 不会签名。
+
+交易确认后，使用只读 RPC 校验活动 release、ZIP 和 manifest：
+
+```powershell
+uv run loveengine registry verify --rpc-url-file .\secrets\sepolia-primary-rpc.txt --artifact <archive.zip> --chain-id 11155111 --registry <registry-address> --publisher <publisher-address> --skill-id loveengine-witness --version 0.7.0-invited-public-pilot
 ```
 
 历史本地 release-file 一致性入口继续保留，但明确不绑定链上信任：
@@ -98,9 +168,20 @@ uv run loveengine registry verify --release .\release.json --artifact <archive.z
 
 ## 5. Observation node
 
-正式连接必须携带 invite、可信旁路取得的 trust policy、可信 ZIP、RPC signer
-地址和 signed profile。CLI 在连接前查询 Registry，并比较 policy、invite、
-profile、actual ZIP 与 release；不会从 Relay 或收到的任务反推信任值。
+正式连接必须携带 invite、可信旁路取得的 trust policy、可信 ZIP、signed profile
+和签名身份。CLI 在连接前查询 Registry，并比较 policy、invite、profile、actual
+ZIP 与 release；不会从 Relay 或收到的任务反推信任值。本机兼容路径使用 Anvil
+RPC signer：
+
+V2 profile/bootstrap 不带 signer 参数时只输出供人工审阅的 EIP-712 typed data；带
+完整 signer/runtime evidence 和 `--output` 时，才经受验证的 signer 路径生成并立即
+复核签名结果：
+
+```powershell
+uv run loveengine node profile sign --input .\node-profile-v2.unsigned.json --signer-config .\secrets\node-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\signed-profile.json
+uv run loveengine bootstrap build --input .\bootstrap-v2.unsigned.json --signer-config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\bootstrap.json
+uv run loveengine bootstrap verify .\bootstrap.json --chain-id 11155111 --registry <registry-address>
+```
 
 ```powershell
 uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --reconnect-attempts 3 --idle-timeout-seconds 60 --output .\receipts.json
@@ -119,6 +200,34 @@ WebSocket，不需要公网入站端口。断线后复用 durable cursor 与 tas
 默认值分别为 3 和 60。重连会重验 Registry release。signed receipt 在发送前
 落盘，Relay ACK 丢失时通过 `receipt_state`/`receipt_ack` 恢复；Relay 返回
 `receipt_confirmed` 后握手才闭合，不重复执行任务。
+
+Sepolia InviteV2 路径必须使用外部 signer config 和两个不同的受限 RPC URL 文件；
+不能同时用同一 URL，也不能把 URL/credential 写入普通参数或 transcript：
+
+```powershell
+uv run loveengine node connect --invite .\pilot-invite-v2.json --trust-policy .\pilot-trust-policy.json --package <archive.zip> --profile .\signed-profile.json --rpc-url-file .\secrets\sepolia-primary-rpc.txt --secondary-rpc-url-file .\secrets\sepolia-secondary-rpc.txt --signer-config .\secrets\node-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --cursor-db .\node.cursor.sqlite --expected-tasks 1 --reconnect-attempts 3 --idle-timeout-seconds 60 --output .\receipts.json
+```
+
+InviteV2 的 HTTPS/WSS `*.ts.net` 地址只负责连接发现；policy 固定 chain ID 11155111、
+Registry/Publisher、skill/version、ZIP/manifest hash 和 allowed issuers。两个 RPC
+一致但没有 policy 只构成 chain consistency。观察节点 signer role 必须为
+`observation_node`，地址/chain 必须与 profile/policy 一致，首轮 Clef 仍是
+`manual_confirm`。
+
+现实参与者可另签一份不包含秘密的参与声明：
+
+```powershell
+uv run loveengine participant attest --input .\participant-attestation.unsigned.json --signer-config .\secrets\participant-signer.json --trust-policy .\pilot-trust-policy.json --bootstrap .\bootstrap.json --invite .\pilot-invite-v2.json --assignment-task .\signed-assignment-task.json --service-config .\participant-service-config.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\participant-attestation.json
+```
+
+命令先与 policy、bootstrap、InviteV2、节点 assignment task、service config 和 Clef
+evidence 交叉核对；输出绑定 run/role/node/profile、package/manifest/service-config、
+assignment task/payload、InviteV2/trust-policy、ruleset/rules-attestation、opaque
+operator/network group 和时间范围，不证明事件内容为真或参与者社会独立。
+transcript 会验证这些声明的签名与交叉引用，但当前 Clef backend、ruleset 与 audit hash
+仍是未签名的运行声明，因此验证结果固定返回
+`signer_backend_evidence_verified:false`；真实签名地址有效不等于已证明 Clef 确实加载
+了指定 rules。
 
 ## 6. Evidence and authorization
 
@@ -145,6 +254,13 @@ uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 -
 uv run loveengine pilot transcript verify .\governance-output\pilot.fixture.json
 ```
 
+0.7 本机 V2 使用固定 900 秒 profile：
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --core-transcript-version 2 --output .\v2-acceptance
+uv run loveengine pilot transcript verify .\v2-acceptance\witness-core.fixture.json
+```
+
 自动化 runner 可以传入非敏感的 `--run-id`，使其报告、Pilot runtime 和生成的
 transcript 绑定到同一次运行；普通本机 demo 不指定时保留固定的演示 ID。
 
@@ -152,13 +268,25 @@ transcript 绑定到同一次运行；普通本机 demo 不指定时保留固定
 verification level 写入机器输出，随后关闭该链。链关闭后只能使用上面的离线命令；
 手工传 `--rpc-url` 时必须保证它仍是 transcript 记录的同一条链。
 
-V1 和含旧式最小 review payload 的 V2 都返回 `legacy_consistency`。只有带完整
+V1 和含旧式最小 review payload 的历史 transcript 都返回 `legacy_consistency`。
+WitnessCoreTranscriptV2 带完整
 review payload、跨字段 evidence binding 和 `evidence_verified:true` receipt 的
-Core/当前 V2，离线才返回 `offline_integrity` 和 `trust_bound: false`；只有 RPC
-返回 `chain_consistency`，仍不代表调用方认可该 Publisher；RPC 加外部 trust policy
-才返回 `chain_verified` 与
-`trust_bound: true`。RPC 查询固定在 transcript 的 final block，并核对区块
-hash/timestamp、Registry、交易、code 和相应最终状态。
+Core 路径，离线返回 `offline_integrity`、`chain_verified:false` 和
+`trust_bound:false`。
+
+V2 链校验要求两个 RPC 要么同时提供、要么都不提供，并拒绝相同 URL：
+
+```powershell
+uv run loveengine pilot transcript verify .\witness-core-v2.json --rpc-url-file .\secrets\sepolia-primary-rpc.txt --secondary-rpc-url-file .\secrets\sepolia-secondary-rpc.txt
+uv run loveengine pilot transcript verify .\witness-core-v2.json --rpc-url-file .\secrets\sepolia-primary-rpc.txt --secondary-rpc-url-file .\secrets\sepolia-secondary-rpc.txt --trust-policy .\pilot-trust-policy.json
+```
+
+双 RPC 无 policy 返回 `chain_consistency`、`chain_verified:false`、
+`trust_bound:false`；双 RPC 加外部 policy 才返回 `chain_verified`、
+`chain_verified:true`、`trust_bound:true`。查询固定在 transcript 的 final block，并
+核对区块 hash/timestamp、Registry、交易、code 和 release。邀请试点 environment
+必须是 `sepolia_invited_pilot`；本机 V2 是 `local_anvil`。当前没有真实 Sepolia V2
+transcript。
 
 ## 8. Explicit witness vote
 
@@ -213,7 +341,7 @@ uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-a
 soak 时长；`pilot soak` 只复验已 attested 的产物，缺失时会失败关闭。
 
 ```powershell
-uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --output .\pilot-soak --background
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --core-transcript-version 2 --output .\pilot-soak --background
 uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 ```
 
@@ -262,7 +390,7 @@ uv run python .\tools\run_core_experiments.py
 
 PowerShell wrapper 调用同一 Python runner，不维护第二份流程。
 
-## 11. Shared remote lab tools
+## 11. Historical 0.6.1 shared remote lab tools
 
 remote lab 是 repository tool，不增加 LoveEngine 协议命令。它固定 host key，
 只接受 SSH public key，并在部署前执行只读资源门：
@@ -294,6 +422,10 @@ password、sudo、systemd、public bind 或远端文件自动清理选项。资�
 
 ```text
 version  manifest  node  fixture  evidence  transcript
-eip712  relayer  registry  bootstrap  relay  network
-live  dispute  review  proposal  package  pilot  witness  demo
+eip712  relayer  registry  signer  bootstrap  relay  network
+participant  live  dispute  review  proposal  package  pilot  witness  demo
 ```
+
+0.7 的 signer、dual-surface、transaction-plan 和 V2 命令已实现并有本机测试；
+以上 0.6.1 remote lab 报告不能接受 0.7 candidate。真实 Clef 1.17.3、Sepolia、
+Tailscale Serve 和受邀远端运行仍是发布前缺失证据。

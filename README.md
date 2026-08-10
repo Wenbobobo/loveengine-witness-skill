@@ -13,19 +13,25 @@ act, vote, or decide real-world truth for people.
 
 ## Status
 
-The latest Git tag is v0.6.0-contract-public-pilot. The working target
-0.6.1-contract-public-pilot is a candidate, not a published release. The wire
-protocol remains loveengine-witness-net/0.6 so M0-M6 schemas and historical
-transcripts remain verifiable.
+The latest Git tag is `v0.6.0-contract-public-pilot`. The current candidate is
+`0.7.0-invited-public-pilot`, stacked on the still-unmerged 0.6.1 PR #11. This
+branch can define and test 0.7 interfaces, but it is not a published release and
+cannot be described as an upgrade from a released 0.6.1 until that PR is
+reviewed and merged manually. The wire protocol remains
+`loveengine-witness-net/0.6`, so M0-M6 schemas and historical transcripts remain
+verifiable.
 
 | Area | Status |
 | --- | --- |
 | Package/Registry trust, signed task/receipt, evidence and dispute review | Implemented locally |
-| ProposalGate and verifiable core transcript | Implemented locally |
+| ProposalGate, WitnessCoreTranscriptV1 and local WitnessCoreTranscriptV2 | Implemented locally |
+| Dual admin/participant surfaces and InviteV2/trust-policy separation | Implemented and tested locally |
+| External signer adapter, signer inspection and Sepolia transaction plans | Implemented and tested locally; no real Clef/Sepolia evidence |
+| Tailscale Serve orchestration | Fail-closed preflight and owned restoration implemented; no real Serve evidence |
 | WitnessDAO, explicit votes and PublicSink | Optional governance experiment |
-| Shared Linux preflight and key-only remote lab tooling | Implemented; exact-candidate ARM64 acceptance passed |
+| 0.6.1 shared Linux preflight and key-only remote lab tooling | Historical exact-candidate ARM64 acceptance passed |
 | Company livestream adapter and autonomous discovery | Not implemented |
-| Direct Tailscale/public/testnet service, production identity, TLS and HA | Not completed |
+| Real invited participants, production identity, TLS/HA and enterprise integration | Not completed |
 
 The complete local gate, one four-hour local core run, and the 2026-08-04
 shared ARM64 Linux acceptance of candidate `9e5058e` demonstrate protocol
@@ -34,6 +40,15 @@ public-node SSH tunnel path. They do not demonstrate independent real-world
 organizations, statement truth, public deployment, or long-term artifact
 availability. Future candidate engineering acceptance uses a 900-second,
 30-event, ten-observer run; that shorter gate is not durability evidence.
+
+The 0.7 code now has the local contracts needed for an invited Sepolia pilot:
+two independent RPC observations, `PilotInviteV2`, a separately distributed
+trust policy, split loopback listeners, external signer adapters, exact
+transaction plans, and a fixed 900-second V2 acceptance shape. It has not yet
+produced evidence from an actual Clef 1.17.3 process, Sepolia transaction,
+Tailscale Serve session, or three invited remote operators. Geth 1.17.4 removed
+the built-in Clef distribution; Geth 1.17.5 is therefore not a valid substitute
+or automatic Clef upgrade. The first pilot permits `manual_confirm` only.
 
 Run that exact-commit gate from a clean worktree:
 
@@ -69,6 +84,12 @@ through a trusted side channel, fixes chain ID, Registry, Publisher,
 skill/version, ZIP hash, manifest hash, and allowed issuers. A node does not
 treat values reported by the invite, Relay, or task as trust anchors.
 
+For 0.7, the public participant surface is a strict read/WebSocket allowlist and
+the admin/write surface remains on a separate loopback listener. `PilotInviteV2`
+contains only participant discovery data; it never carries the write token or
+admin/RPC/signer endpoints. Sepolia nodes require two distinct RPC endpoints and
+an external signer configuration in addition to the trust policy.
+
 ## Local Experiment
 
 Requirements: Python 3.11+, uv, and pinned Foundry 1.7.1.
@@ -79,6 +100,16 @@ uv run loveengine manifest verify
 uv run loveengine pilot contracts prepare
 uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\pilot-output
 ```
+
+Exercise the local V2 contract with the fixed short acceptance shape:
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --core-transcript-version 2 --output .\pilot-v2-acceptance
+uv run loveengine pilot transcript verify .\pilot-v2-acceptance\witness-core.fixture.json
+```
+
+This still reports `environment: local_anvil` and simulated actors. It verifies
+the V2 schema and cross-stage bindings, not the external invited-pilot claims.
 
 `pilot contracts prepare` is an explicit prerequisite for real local Pilot
 work. It verifies both Forge and Anvil are exactly `1.7.1`, verifies the
@@ -138,9 +169,10 @@ state:
 uv run loveengine pilot quickstart --root .\pilot --dry-run --headless
 ```
 
-## Shared Remote Lab
+## Historical 0.6.1 Shared Remote Lab
 
-The pre-enterprise remote lab keeps Pilot and Anvil on the remote loopback
+This pre-enterprise remote lab is retained as 0.6.1 historical evidence. It
+keeps Pilot and Anvil on the remote loopback
 interface. It pins the SSH host key, requires public-key authentication, runs a
 read-only resource gate, deploys one clean commit to a unique directory, keeps
 one CPU reserved for existing work (one lab CPU on a two-vCPU host; otherwise
@@ -238,7 +270,7 @@ promise of production availability.
 | Observation Agent | Release/task/evidence verification and signed receipts; never votes |
 | Voting Witness | Optional governance lab only; explicitly approves through an external RPC signer |
 | Viewer | Read-only session/evidence view; UI is not a trust root |
-| Publisher | Builds packages, prepares an unsigned publish plan, and performs read-only Registry verification |
+| Publisher | Builds packages, reviews exact transaction plans, manually confirms through an external signer, submits after revalidation, and verifies Registry state |
 
 ## Safety Boundaries
 
@@ -273,7 +305,8 @@ promise of production availability.
 - [CLI reference](docs/api/cli-reference.md)
 - [Contract API](docs/api/loveengine-contract-api.md)
 - [Engineering master plan](docs/specs/love-engine-master-plan.md)
-- [Active remote lab specification](docs/specs/love-engine-pre-enterprise-remote-lab.md)
+- [0.7 invited public pilot specification](docs/specs/love-engine-invited-public-pilot.md)
+- [0.6.1 remote lab specification](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [Shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [Documentation index](docs/README.md)
 

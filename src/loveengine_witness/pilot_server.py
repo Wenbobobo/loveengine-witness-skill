@@ -13,8 +13,6 @@ from aiohttp import ClientError, ClientSession, ClientTimeout, web
 from web3 import HTTPProvider, Web3
 
 from .errors import LoveEngineError
-from .hashes import keccak256_hex
-from .jsonio import read_json
 from .live_gateway import (
     METADATA_KEY,
     SSE_COUNTER_KEY,
@@ -26,13 +24,14 @@ from .pilot_audit import AuditLog, verify_audit_log
 from .pilot_auth import build_pilot_boundary
 from .pilot_config import (
     PilotConfig,
+    PilotConfigV2,
     build_pilot_invite,
     default_pilot_readiness,
     load_pilot_config,
+    validate_pilot_publication,
 )
 from .pilot_task_ingress import enqueue_signed_task
 from .pilot_ui import localized_operator_html
-from .schema import validate_schema
 
 
 CONFIG_KEY = web.AppKey("pilot_config", object)
@@ -159,13 +158,23 @@ def create_pilot_app(
 
     async def health(request: web.Request) -> web.Response:
         return web.json_response(
-            {"status": "ok", "run_id": config.run_id, "uptime_seconds": int(time() - metrics.started_at)}
+            {
+                "status": "ok",
+                "surface": "combined",
+                "run_id": config.run_id,
+                "uptime_seconds": int(time() - metrics.started_at),
+            }
         )
 
     async def ready(request: web.Request) -> web.Response:
         is_ready, checks = app[READINESS_KEY]()
         return web.json_response(
-            {"ready": is_ready, "run_id": config.run_id, "checks": checks},
+            {
+                "ready": is_ready,
+                "surface": "combined",
+                "run_id": config.run_id,
+                "checks": checks,
+            },
             status=200 if is_ready else 503,
         )
 
@@ -239,21 +248,11 @@ def create_pilot_app(
     return app
 
 
-def serve_pilot(config: PilotConfig) -> None:
-    bootstrap = read_json(config.bootstrap_file)
-    release = read_json(config.release_file)
-    validate_schema(release, "skill-release-v1.schema.json")
-    try:
-        archive = config.package_archive.read_bytes()
-    except FileNotFoundError as exc:
-        raise LoveEngineError(
-            "package_archive_missing", str(config.package_archive), 3
-        ) from exc
-    actual_hash = keccak256_hex(archive)
-    if release["package_hash"].lower() != actual_hash.lower():
-        raise LoveEngineError(
-            "package_hash_mismatch", str(config.package_archive)
-        )
+def load_pilot_publication(
+    config: PilotConfig | PilotConfigV2,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, bytes]]:
+    bootstrap, release, archive = validate_pilot_publication(config)
+    actual_hash = release["package_hash"]
     key = "/".join(
         (
             release["publisher"].lower(),
@@ -261,31 +260,68 @@ def serve_pilot(config: PilotConfig) -> None:
             release["version"],
         )
     )
+    return bootstrap, {key: release}, {actual_hash.lower(): archive}
+
+
+def serve_pilot(config: PilotConfig) -> None:
+    bootstrap, releases, package_artifacts = load_pilot_publication(config)
     web.run_app(
         create_pilot_app(
             config,
             bootstrap=bootstrap,
-            releases={key: release},
-            package_artifacts={actual_hash.lower(): archive},
+            releases=releases,
+            package_artifacts=package_artifacts,
         ),
         host=config.host,
         port=config.port,
     )
 
 
-async def pilot_status(url: str) -> dict[str, Any]:
+async def pilot_status(
+    url: str,
+    *,
+    expected_surface: str | None = None,
+    include_metrics: bool = True,
+) -> dict[str, Any]:
     base = url.rstrip("/")
     try:
         async with ClientSession(timeout=ClientTimeout(total=3)) as session:
             values: dict[str, Any] = {}
-            for name, path in (
+            endpoints = [
                 ("health", "/healthz"),
                 ("readiness", "/readyz"),
-                ("metrics", "/v1/metrics"),
-            ):
+            ]
+            if include_metrics:
+                endpoints.append(("metrics", "/v1/metrics"))
+            for name, path in endpoints:
                 async with session.get(base + path) as response:
-                    values[name] = await response.json()
-                    values[name]["http_status"] = response.status
+                    value = await response.json()
+                    value["http_status"] = response.status
+                    values[name] = value
+                    if response.status != 200:
+                        code = (
+                            "pilot_not_ready"
+                            if name == "readiness"
+                            else "pilot_status_failed"
+                        )
+                        raise LoveEngineError(
+                            code, f"{base}{path}: HTTP {response.status}", 4
+                        )
+            if values["readiness"].get("ready") is not True:
+                raise LoveEngineError(
+                    "pilot_not_ready", f"{base}/readyz: ready is not true", 4
+                )
+            if expected_surface is not None:
+                reported = {
+                    values["health"].get("surface"),
+                    values["readiness"].get("surface"),
+                }
+                if reported != {expected_surface}:
+                    raise LoveEngineError(
+                        "pilot_surface_mismatch",
+                        f"expected {expected_surface}; reported {sorted(str(item) for item in reported)}",
+                        4,
+                    )
             return {"url": base, **values}
     except (ClientError, TimeoutError, OSError, ValueError) as exc:
         raise LoveEngineError("pilot_unavailable", f"{base}: {exc}", 4) from exc

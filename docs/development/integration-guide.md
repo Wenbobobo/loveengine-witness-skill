@@ -1,6 +1,6 @@
 # Developer experiment guide
 
-适用目标：0.6.1-contract-public-pilot candidate
+适用目标：0.7.0-invited-public-pilot candidate（叠加于尚未人工合并的 0.6.1 PR #11）
 最新发布 tag：v0.6.0-contract-public-pilot
 
 本指南按当前能力而不是 M1-M6 历史组织实验。默认验证路径在 ProposalGate 结束；
@@ -29,8 +29,9 @@ uv run loveengine pilot contracts prepare
 隐式执行该步骤，并会重新核验 attestation。
 
 依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
-[CLI 参考](../api/cli-reference.md)和
-[活动远程实验 SPEC](../specs/love-engine-pre-enterprise-remote-lab.md)。历史阶段报告只在
+[CLI 参考](../api/cli-reference.md)、
+[0.7 受邀试点 SPEC](../specs/love-engine-invited-public-pilot.md)和
+[0.6.1 远程实验 SPEC](../specs/love-engine-pre-enterprise-remote-lab.md)。历史阶段报告只在
 追查兼容性时阅读。
 
 ## 实验 0：package 与 Registry 信任
@@ -38,7 +39,7 @@ uv run loveengine pilot contracts prepare
 ```powershell
 uv run loveengine package build --output .\dist
 uv run loveengine package verify <archive.zip> --integrity-only
-uv run loveengine registry verify --rpc-url http://127.0.0.1:8545 --artifact <archive.zip> --chain-id 31337 --registry <registry-address> --publisher <publisher-address> --skill-id loveengine-witness --version 0.6.1-contract-public-pilot
+uv run loveengine registry verify --rpc-url http://127.0.0.1:8545 --artifact <archive.zip> --chain-id 31337 --registry <registry-address> --publisher <publisher-address> --skill-id loveengine-witness --version 0.7.0-invited-public-pilot
 ```
 
 观察：
@@ -61,7 +62,7 @@ uv run loveengine pilot quickstart --root .\pilot --headless
 ```
 
 ```powershell
-uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package .\pilot\release\loveengine-witness-0.6.1-contract-public-pilot.zip --profile .\pilot\profiles\node-1.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node-1.cursor.sqlite --expected-tasks 1
+uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package .\pilot\release\loveengine-witness-0.7.0-invited-public-pilot.zip --profile .\pilot\profiles\node-1.json --rpc-url http://127.0.0.1:8545 --address <node-address> --cursor-db .\node-1.cursor.sqlite --expected-tasks 1
 ```
 
 观察：节点先核对 policy、RPC release、ZIP 和 profile，再建立出站 WebSocket；任务
@@ -165,7 +166,7 @@ soak。只有生命周期和最终 report 同时为 passed、run ID 一致、子
 通过，才构成工程门。机器报告同时绑定精确 commit 与 manifest package hash。900 秒
 不证明长期稳定性。
 
-## 实验 5：共享 Linux remote lab
+## 实验 5：0.6.1 历史共享 Linux remote lab
 
 先配置独立 SSH key 和已经旁路核对的 known_hosts。runner 不接受密码：
 
@@ -207,6 +208,106 @@ evidence-verified 绑定 receipt，Relay 精确记录 `acked:3` 和
 每次报告中的精确 source_commit、三节点/三回执、`evidence_verified`、
 `relay_receipt_confirmed` 和 postflight 字段逐次验收；后续 candidate 使用 900 秒
 工程门，不继承 `9e5058e` 的通过结论。
+
+## 实验 6：本机 WitnessCoreTranscriptV2 固定门
+
+0.7 的本机 V2 只接受固定 profile：core、900 秒、30 events、10 个只读 observers。
+不要用缩短参数生成看似相同的 V2 证据：
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --core-transcript-version 2 --output .\v2-acceptance
+uv run loveengine pilot transcript verify .\v2-acceptance\witness-core.fixture.json
+```
+
+观察：transcript schema 为 `loveengine.witness-core-transcript/2`；本机输出必须写
+`environment: local_anvil`、模拟 actor、acceptance 参数、InviteV2/trust policy
+hash、双入口摘要和 Gate 结果。离线验证返回 `offline_integrity`、
+`chain_verified:false`、`trust_bound:false`。
+
+证明：V2 字段、签名、成员、证据、故障和 Gate 的跨阶段绑定在固定短门中可复核。
+不证明：Sepolia、Clef、Tailscale Serve、现实参与者或 15 分钟以上的耐久性。
+
+## 实验 7：外部 signer 四层检查
+
+`signer inspect` 的层级是累积的，不是四种等价模式：
+
+```powershell
+# 1. static config
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json
+
+# 2. config + evidence files
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json
+
+# 3. evidence + exact binary
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256>
+
+# 4. all prior evidence + read-only live API probe
+uv run loveengine signer inspect --config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --probe
+```
+
+首轮只允许 `manual_confirm`。兼容目标精确为 Geth/Clef 1.17.3；Geth 1.17.4 已
+移除内置 Clef，不能用 Geth 1.17.5 代替 Clef 1.17.3。live probe 只核对外部 API，
+不执行签名。ruleset/attestation、binary/SHA 参数缺一时失败关闭；配置、文件、
+binary 或 live endpoint 任一不匹配都不得降级为 unlocked RPC 或 raw key。
+expected binary digest 格式为 `sha256:<64 lowercase hex>`。
+
+证明：每一层声明的输入可被精确复核。
+不证明：直到真实 typed-data/transaction 经人工确认、签后恢复地址校验并由链事实
+确认前，不能声称 Clef signing path 已通过。
+
+## 实验 8：Sepolia transaction plan
+
+先在离线/本机环境生成并审阅精确 EIP-1559 plan：
+
+```powershell
+uv run loveengine registry transaction deploy-plan --artifact <SkillRegistry-artifact.json> --sender <publisher> --nonce <nonce> --gas <gas-limit> --max-fee-per-gas <wei> --max-priority-fee-per-gas <wei> --created-at <unix> --expires-at <unix> --output .\plans\deploy.json
+uv run loveengine registry transaction publish-plan --release <release.json> --sender <publisher> --nonce <nonce> --gas <gas-limit> --max-fee-per-gas <wei> --max-priority-fee-per-gas <wei> --created-at <unix> --expires-at <unix> --output .\plans\publish.json
+```
+
+只有操作者核对 chain ID 11155111、sender、nonce、calldata/init-code hash、零 value、
+gas/fee cap 和 expiry 后，才可让真实 Clef 人工确认：
+
+```powershell
+uv run loveengine registry transaction sign --plan .\plans\publish.json --signer-config .\secrets\publisher-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\plans\publish.signed.json
+uv run loveengine registry transaction submit --plan .\plans\publish.json --signed .\plans\publish.signed.json --rpc-url-file .\secrets\sepolia-primary-rpc.txt
+```
+
+`submit` 会重验 raw transaction、plan 和链上 nonce 后只向主 RPC 广播；随后应使用
+两个不同 RPC 在同一 safe block 读取 receipt/code/release。当前仓库只有 plan、
+sign/submit adapter 与本机测试，没有真实 Clef/Sepolia receipt；因此不要在普通开发
+验收中运行上述 sign/submit 两步，也不要把 plan 文件称为已发布 release。
+
+## 实验 9：双入口、InviteV2 与 Tailscale Serve preflight
+
+用 V2 config 启动本机双入口：
+
+```powershell
+uv run loveengine pilot serve --config .\pilot-config-v2.json
+uv run loveengine pilot status --url <admin-loopback-url> --surface admin
+uv run loveengine pilot status --url <participant-loopback-url> --surface participant
+```
+
+participant 入口必须只开放 allowlist 的 GET/SSE/artifact/WebSocket；所有 POST、token、
+operator UI、snapshot、task ingress、RPC 和 signer endpoint 都只能在 admin/本机边界。
+`PilotInviteV2` 只负责发现，NodeTrustPolicyV1 另行可信分发。Sepolia 节点命令从受限
+文件读取两个不同 RPC URL：
+
+```powershell
+uv run loveengine node connect --invite .\pilot-invite-v2.json --trust-policy .\pilot-trust-policy.json --package <archive.zip> --profile <profile.json> --rpc-url-file .\secrets\sepolia-primary-rpc.txt --secondary-rpc-url-file .\secrets\sepolia-secondary-rpc.txt --signer-config .\secrets\node-signer.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --cursor-db .\node.cursor.sqlite --expected-tasks 1
+```
+
+任务 issuer 也必须先将 unsigned task 与 policy/bootstrap/member/role 交叉核对，再经
+自己的 Clef 人工确认；Pilot 只接收已经签名的 task：
+
+```powershell
+uv run loveengine network task sign --input .\task.unsigned.json --signer-config .\secrets\task-issuer.json --trust-policy .\pilot-trust-policy.json --bootstrap .\bootstrap.json --ruleset-file .\clef\rules.js --rules-attestation-file .\clef\rules-attestation.json --clef-binary <clef-1.17.3-binary> --expected-binary-sha256 <sha256> --output .\task.signed.json
+uv run loveengine pilot task enqueue --input .\task.signed.json --admin-url <admin-loopback-url> --origin <allowed-origin> --token-file .\secrets\pilot-write-token.txt
+```
+
+只有在目标机已由操作者登录正确 tailnet、没有 Funnel/冲突且 ACL 已旁路确认时，才
+运行 `pilot serve --tailscale-serve`。工具只映射 participant loopback，固定 900 秒，
+并精确恢复自己接管前的 Serve 状态；它不执行 `tailscale up`，也不接管账号/ACL。
+当前尚无真实 Serve 或受邀节点报告。
 
 ## 变更验收
 

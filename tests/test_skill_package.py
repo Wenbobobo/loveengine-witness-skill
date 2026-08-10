@@ -87,7 +87,7 @@ def test_deterministic_package_build_verify_install_and_self_check(
     )
     assert verified["valid"] is True
     assert verified["trust_bound"] is True
-    assert verified["version"] == "0.6.1-contract-public-pilot"
+    assert verified["version"] == "0.7.0-invited-public-pilot"
     assert verified["file_count"] > 20
 
     target = tmp_path / "installed"

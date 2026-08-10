@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/invited-pilot-service-config-v1.schema.json",
+  "title": "InvitedPilotServiceConfigV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "transport", "participant_origin", "relay_url",
+    "tailnet_only", "funnel_enabled", "admin_surface",
+    "participant_allowlist_hash", "tailscale_serve_config_hash",
+    "restore_verified", "config_hash"
+  ],
+  "properties": {
+    "schema_version": {"const": "loveengine.invited-pilot-service-config/1"},
+    "transport": {"enum": ["loopback", "tailscale_serve"]},
+    "participant_origin": {"type": "string", "pattern": "^https?://"},
+    "relay_url": {"type": "string", "pattern": "^wss?://"},
+    "tailnet_only": {"type": "boolean"},
+    "funnel_enabled": {"const": false},
+    "admin_surface": {"const": "loopback_only"},
+    "participant_allowlist_hash": {"$ref": "#/$defs/bytes32"},
+    "tailscale_serve_config_hash": {"$ref": "#/$defs/bytes32"},
+    "restore_verified": {"type": "boolean"},
+    "config_hash": {"$ref": "#/$defs/bytes32"}
+  },
+  "$defs": {
+    "bytes32": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"}
+  }
+}

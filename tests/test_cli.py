@@ -77,7 +77,7 @@ def test_version_reports_runtime_source() -> None:
 
     assert result.returncode == 0, result.stderr
     value = __import__("json").loads(result.stdout)
-    assert value["package_version"] == "0.6.1"
-    assert value["skill_version"] == "0.6.1-contract-public-pilot"
+    assert value["package_version"] == "0.7.0"
+    assert value["skill_version"] == "0.7.0-invited-public-pilot"
     assert value["protocol"] == "loveengine-witness-net/0.6"
     assert Path(value["package_root"]).resolve() == ROOT

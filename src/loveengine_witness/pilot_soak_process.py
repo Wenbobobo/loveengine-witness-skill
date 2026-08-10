@@ -201,6 +201,10 @@ def _passed_report_issue(
         return "stage_invalid"
     if report.get("stage") != state.get("stage"):
         return "stage_mismatch"
+    if report.get("core_transcript_version", 1) != state.get(
+        "core_transcript_version", 1
+    ):
+        return "core_transcript_version_mismatch"
     if report.get("event_count") != state.get("event_count"):
         return "event_count_mismatch"
     if report.get("observer_count") != state.get("observer_count"):
@@ -402,10 +406,25 @@ def start_background_soak(
     event_count: int,
     observers: int,
     stage: str = "core",
+    core_transcript_version: int = 1,
 ) -> dict[str, Any]:
     validate_pilot_soak_args(
         duration_seconds, event_count, observers, stage
     )
+    if core_transcript_version not in {1, 2}:
+        raise LoveEngineError(
+            "unsupported_core_transcript_version", str(core_transcript_version)
+        )
+    if core_transcript_version == 2 and (
+        stage != "core"
+        or duration_seconds != 900
+        or event_count != 30
+        or observers != 10
+    ):
+        raise LoveEngineError(
+            "invalid_v2_acceptance_profile",
+            "V2 soak requires core/900 seconds/30 events/10 observers",
+        )
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     state_path = output / STATE_FILENAME
@@ -442,6 +461,8 @@ def start_background_soak(
         str(output),
         "--worker-run-id",
         run_id,
+        "--core-transcript-version",
+        str(core_transcript_version),
     ]
     state: dict[str, Any] = {
         "schema_version": "loveengine.pilot-soak-run/1",
@@ -457,6 +478,7 @@ def start_background_soak(
         "event_count": event_count,
         "observer_count": observers,
         "stage": stage,
+        "core_transcript_version": core_transcript_version,
         "run_id": run_id,
         "output": str(output),
         "stdout_path": str(stdout_path),

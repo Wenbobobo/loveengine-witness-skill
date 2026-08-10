@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -17,21 +18,44 @@ from aiohttp import ClientError, ClientSession, TCPConnector, web
 from hexbytes import HexBytes
 from web3 import Web3
 
-from .core_transcript import core_transcript_hash, verify_core_transcript
+from .core_transcript import (
+    core_transcript_hash,
+    observe_release_anchor_rpc,
+    public_service_config_hash,
+    verify_core_transcript,
+)
+from .canonical import canonical_json_bytes
 from .demo import artifact, sign_typed_data, tx_summary
 from .dispute import aggregate_reviews, build_dispute, build_proposal_plan, build_review
 from .errors import LoveEngineError
-from .hashes import keccak256_hex
+from .hashes import keccak256_hex, sha256_prefixed
 from .jsonio import read_json, write_json
 from .m4_network import build_task_v2
 from .m4_typed_data import build_task_v2_typed_data
+from .network_typed_data import payload_hash
 from .observation import aggregate_observations
-from .pilot_chain import snapshot_chain
+from .pilot_chain import restore_chain, snapshot_chain
 from .pilot_runtime import PilotRuntime
+from .pilot_config import (
+    PilotAdminSurfaceConfig,
+    PilotConfigV2,
+    PilotParticipantSurfaceConfig,
+    build_pilot_invite_v2,
+)
 from .pilot_server import METRICS_KEY, RELAY_KEY, create_pilot_app
-from .pilot_snapshot import create_system_snapshot
+from .pilot_surfaces import (
+    PARTICIPANT_ROUTE_ALLOWLIST,
+    PilotSurfaceServer,
+    create_pilot_surfaces,
+)
+from .pilot_snapshot import create_system_snapshot, restore_system_snapshot
 from .pilot_transcript import pilot_transcript_hash, verify_pilot_transcript
-from .release_identity import SKILL_VERSION
+from .release_identity import PROTOCOL_VERSION, SKILL_VERSION
+from .participant_attestation import (
+    MAX_ATTESTATION_TTL_SECONDS,
+    build_participant_attestation,
+    build_participant_attestation_typed_data,
+)
 from .review_evidence import require_verified_review_result
 from .typed_data import build_register_typed_data
 
@@ -65,10 +89,20 @@ class PilotEnvironment:
     deadline: str
     scheduled_at: int | None
     app: web.Application
-    runner: web.AppRunner
+    runner: web.AppRunner | None
+    surface_server: PilotSurfaceServer | None
+    v2_config: PilotConfigV2 | None
+    hub: Any
+    metrics: Any
+    admin_base: str
+    participant_base: str
+    invite_path: Path
+    core_transcript_version: int
     headers: dict[str, str]
     session_id: str = "lan-pilot-session-001"
     all_processes: list[subprocess.Popen[str]] = field(default_factory=list)
+    system_restore_verified: bool = False
+    system_snapshots: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -80,6 +114,7 @@ class ObservationPhase:
     observer_results: list[dict[str, int]]
     fault_recovery_seconds: float
     fault_disconnect_proofs: tuple[dict[str, object], ...]
+    receipt_ack_loss_proofs: tuple[dict[str, object], ...]
 
 
 @dataclass(frozen=True)
@@ -151,7 +186,7 @@ async def _collect(
             stdout, stderr = process.communicate()
             failures.append({"timeout": True, "stdout": stdout, "stderr": stderr})
             continue
-        if process.returncode != 0 or not result_path.is_file():
+        if process.returncode != 0 or stderr.strip() or not result_path.is_file():
             failures.append(
                 {
                     "returncode": process.returncode,
@@ -167,6 +202,235 @@ async def _collect(
             f"{label}_node_failed", json.dumps(failures, ensure_ascii=False), 4
         )
     return values
+
+
+def _exact_source_commit() -> str:
+    status = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    value = commit.stdout.strip().lower()
+    if status.returncode != 0 or status.stdout.strip():
+        raise LoveEngineError(
+            "transcript_source_not_clean",
+            "WitnessCoreTranscriptV2 requires a clean exact source commit",
+        )
+    if commit.returncode != 0 or len(value) != 40 or any(
+        character not in "0123456789abcdef" for character in value
+    ):
+        raise LoveEngineError("source_commit_unavailable", value or "git")
+    expected = os.environ.get("LOVEENGINE_EXPECTED_SOURCE_COMMIT")
+    if expected and value != expected.lower():
+        raise LoveEngineError(
+            "source_commit_changed",
+            f"expected {expected.lower()}, got {value}",
+            4,
+        )
+    return value
+
+
+def _signer_evidence_hash(kind: str, address: str, roles: list[str]) -> str:
+    return sha256_prefixed(
+        canonical_json_bytes(
+            {
+                "schema_version": "loveengine.local-signer-evidence/1",
+                "backend": "anvil-test",
+                "kind": kind,
+                "address": Web3.to_checksum_address(address),
+                "roles": roles,
+            }
+        )
+    )
+
+
+def _participant_attestation_window(anchor_timestamp: str) -> tuple[str, str]:
+    issued_at = int(anchor_timestamp)
+    return str(issued_at), str(issued_at + MAX_ATTESTATION_TTL_SECONDS)
+
+
+def _local_v2_transcript(
+    environment: PilotEnvironment,
+    common: dict[str, Any],
+    *,
+    acceptance: dict[str, Any],
+) -> dict[str, Any]:
+    if environment.v2_config is None:
+        raise LoveEngineError("pilot_v2_config_required", "local V2 transcript")
+    publish = next(
+        (
+            item
+            for item in environment.transactions
+            if item.get("action") == "publishRelease"
+        ),
+        None,
+    )
+    if publish is None:
+        raise LoveEngineError(
+            "release_transaction_missing", "local publishRelease transaction"
+        )
+    registry_deployment = environment.deployment["contracts"]["SkillRegistry"]
+    service = {
+        "schema_version": "loveengine.invited-pilot-service-config/1",
+        "transport": "loopback",
+        "participant_origin": environment.participant_base,
+        "relay_url": environment.participant_base.replace("http://", "ws://")
+        + "/v1/ws",
+        "tailnet_only": False,
+        "funnel_enabled": False,
+        "admin_surface": "loopback_only",
+        "participant_allowlist_hash": payload_hash(
+            [list(item) for item in PARTICIPANT_ROUTE_ALLOWLIST]
+        ),
+        "tailscale_serve_config_hash": payload_hash(
+            {"configured": False, "environment": "local_anvil"}
+        ),
+        "restore_verified": environment.system_restore_verified,
+    }
+    service["config_hash"] = public_service_config_hash(service)
+    audit_bytes = (
+        environment.runtime.config.audit_log.read_bytes()
+        if environment.runtime.config.audit_log.is_file()
+        else b""
+    )
+    audit_hash = sha256_prefixed(audit_bytes)
+    pilot_invite_hash = sha256_prefixed(
+        canonical_json_bytes(read_json(environment.invite_path))
+    )
+    trust_policy_hash = sha256_prefixed(
+        canonical_json_bytes(environment.runtime.trust_policy)
+    )
+    publisher_roles = ["publisher", "task_issuer"]
+    publisher_rules = _signer_evidence_hash(
+        "ruleset", environment.deployer, publisher_roles
+    )
+    signer_evidence = [
+        {
+            "address": environment.deployer,
+            "roles": publisher_roles,
+            "backend": "anvil-test",
+            "approval_mode": "unlocked_test",
+            "ruleset_sha256": publisher_rules,
+            "rules_attestation_sha256": _signer_evidence_hash(
+                "rules_attestation", environment.deployer, publisher_roles
+            ),
+            "audit_log_sha256": audit_hash,
+        }
+    ]
+    participant_attestations = []
+    attestation_issued_at, attestation_valid_until = (
+        _participant_attestation_window(common["verified_at"])
+    )
+    profiles = {
+        Web3.to_checksum_address(item["profile"]["node"]): item["profile"]
+        for item in environment.runtime.bootstrap["directory"]
+    }
+    for index, node in enumerate(environment.node_accounts):
+        roles = ["node"]
+        ruleset = _signer_evidence_hash("ruleset", node, roles)
+        rules_attestation = _signer_evidence_hash(
+            "rules_attestation", node, roles
+        )
+        assignment = next(
+            task
+            for task in common["network_tasks"]
+            if task["task_type"] == "observe_live_text"
+            and Web3.to_checksum_address(task["recipient"])
+            == Web3.to_checksum_address(node)
+        )
+        signer_evidence.append(
+            {
+                "address": node,
+                "roles": roles,
+                "backend": "anvil-test",
+                "approval_mode": "unlocked_test",
+                "ruleset_sha256": ruleset,
+                "rules_attestation_sha256": rules_attestation,
+                "audit_log_sha256": audit_hash,
+            }
+        )
+        attestation = build_participant_attestation(
+            chain_id=environment.chain_id,
+            registry=environment.registry.address,
+            run_id=environment.runtime.config.run_id,
+            node=node,
+            role="observation_node",
+            profile_hash=payload_hash(profiles[node]),
+            assignment_task_id=assignment["task_id"],
+            assignment_payload_hash=assignment["payload_hash"],
+            pilot_invite_hash=pilot_invite_hash,
+            trust_policy_hash=trust_policy_hash,
+            package_hash=environment.runtime.release["package_hash"],
+            manifest_hash=environment.manifest_hash,
+            service_config_hash=service["config_hash"],
+            ruleset_sha256=ruleset,
+            rules_attestation_sha256=rules_attestation,
+            operator_group_hash=payload_hash(
+                {"simulated_operator_group": 1 if index < 2 else 2}
+            ),
+            network_group_hash=payload_hash(
+                {"simulated_network_group": 1 if index == 0 else 2}
+            ),
+            issued_at=attestation_issued_at,
+            valid_until=attestation_valid_until,
+        )
+        attestation["signature"] = _rpc_sign(
+            environment.w3,
+            node,
+            build_participant_attestation_typed_data(attestation),
+        )
+        participant_attestations.append(attestation)
+    anchor = {**common["verification_anchor"], "selected_via": "latest"}
+    transcript = {
+        "schema_version": "loveengine.witness-core-transcript/2",
+        **common,
+        "source_commit": _exact_source_commit(),
+        "protocol": PROTOCOL_VERSION,
+        "input_mode": "synthetic_fixture",
+        "verification_anchor": anchor,
+        "pilot_invite_hash": pilot_invite_hash,
+        "trust_policy_hash": trust_policy_hash,
+        "public_service": service,
+        "signer_evidence": signer_evidence,
+        "participant_attestations": participant_attestations,
+        "acceptance": acceptance,
+        "does_not_prove": [
+            "content_truth",
+            "participant_independence",
+            "production_availability",
+            "enterprise_identity",
+            "signer_backend_or_rules_enforcement",
+            "tailscale_configuration_authenticity",
+        ],
+        "chain": {
+            "chain_id": environment.chain_id,
+            "registry": environment.registry.address,
+            "publisher": environment.deployer,
+            "deployment_transaction": registry_deployment[
+                "deployment_transaction"
+            ],
+            "runtime_code_hash": registry_deployment["code_hash"],
+            "release_transaction": publish["transaction_hash"],
+            "release_status": "active",
+            "primary_rpc_observation_hash": "sha256:" + "0" * 64,
+            "secondary_rpc_observation_hash": "sha256:" + "0" * 64,
+        },
+    }
+    rpc_url = str(environment.w3.provider.endpoint_uri)
+    observation_hash = observe_release_anchor_rpc(transcript, rpc_url)
+    transcript["chain"]["primary_rpc_observation_hash"] = observation_hash
+    transcript["chain"]["secondary_rpc_observation_hash"] = observation_hash
+    transcript["transcript_hash"] = core_transcript_hash(transcript)
+    return transcript
 
 
 async def _read_only_observer(base: str, session_id: str) -> dict[str, int]:
@@ -247,6 +511,8 @@ async def _prepare_environment(
     runtime: PilotRuntime,
     *,
     stage: str,
+    core_transcript_version: int,
+    participant_port: int | None,
 ) -> PilotEnvironment:
     chain_id = str(w3.eth.chain_id)
     deployer = Web3.to_checksum_address(deployment["deployer"])
@@ -298,15 +564,83 @@ async def _prepare_environment(
         w3.provider.make_request("evm_mine", [])
 
     package = runtime.package
-    app = create_pilot_app(
-        runtime.config,
-        bootstrap=runtime.bootstrap,
-        releases={runtime.release_key: runtime.release},
-        package_artifacts={package.keccak256.lower(): package.archive.read_bytes()},
-    )
-    runner = web.AppRunner(app)
-    await runner.setup()
-    await web.TCPSite(runner, runtime.config.host, runtime.config.port).start()
+    publication = {
+        "bootstrap": runtime.bootstrap,
+        "releases": {runtime.release_key: runtime.release},
+        "package_artifacts": {
+            package.keccak256.lower(): package.archive.read_bytes()
+        },
+    }
+    admin_base = runtime.invite["server_url"]
+    surface_server: PilotSurfaceServer | None = None
+    v2_config: PilotConfigV2 | None = None
+    if core_transcript_version == 2:
+        if stage != "core" or participant_port is None:
+            raise LoveEngineError(
+                "invalid_core_transcript_mode", "V2 is limited to the core stage"
+            )
+        participant_base = f"http://127.0.0.1:{participant_port}"
+        v2_config = PilotConfigV2(
+            schema_version="loveengine.pilot-config/2",
+            run_id=runtime.config.run_id,
+            admin=PilotAdminSurfaceConfig(
+                host=runtime.config.host,
+                port=runtime.config.port,
+                allowed_origins=(admin_base,),
+            ),
+            participant=PilotParticipantSurfaceConfig(
+                host="127.0.0.1",
+                port=participant_port,
+                public_base_url=participant_base,
+            ),
+            database=runtime.config.database,
+            relay_database=runtime.config.relay_database,
+            artifact_root=runtime.config.artifact_root,
+            audit_log=runtime.config.audit_log,
+            token_file=runtime.config.token_file,
+            bootstrap_file=runtime.config.bootstrap_file,
+            release_file=runtime.config.release_file,
+            package_archive=runtime.config.package_archive,
+            rpc_url=runtime.config.rpc_url,
+            rpc_url_file=None,
+            chain_id=runtime.config.chain_id,
+            write_token=runtime.config.write_token,
+        )
+        apps = create_pilot_surfaces(v2_config, **publication)
+        surface_server = PilotSurfaceServer(v2_config, apps)
+        try:
+            await surface_server.start()
+            app = apps.admin
+            runner = None
+            hub = apps.relay
+            metrics = apps.metrics
+            now = int(time.time())
+            invite = build_pilot_invite_v2(
+                participant_url=participant_base,
+                chain_id=chain_id,
+                registry=registry.address,
+                publisher=deployer,
+                version=runtime.release["version"],
+                package_hash=package.keccak256,
+                issued_at=str(now - 60),
+                expires_at=str(now + 3600),
+            )
+            invite_path = output / "pilot-invite.v2.json"
+            write_json(invite_path, invite)
+        except BaseException:
+            await surface_server.stop()
+            raise
+    else:
+        participant_base = admin_base
+        app = create_pilot_app(runtime.config, **publication)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        await web.TCPSite(
+            runner, runtime.config.host, runtime.config.port
+        ).start()
+        hub = app[RELAY_KEY]
+        metrics = app[METRICS_KEY]
+        invite_path = output / "pilot-invite.json"
     return PilotEnvironment(
         output=output,
         w3=w3,
@@ -329,9 +663,17 @@ async def _prepare_environment(
         scheduled_at=scheduled_at,
         app=app,
         runner=runner,
+        surface_server=surface_server,
+        v2_config=v2_config,
+        hub=hub,
+        metrics=metrics,
+        admin_base=admin_base,
+        participant_base=participant_base,
+        invite_path=invite_path,
+        core_transcript_version=core_transcript_version,
         headers={
             "Authorization": f"Bearer {runtime.config.write_token}",
-            "Origin": runtime.invite["server_url"],
+            "Origin": admin_base,
         },
     )
 
@@ -347,7 +689,7 @@ def _start_observation_processes(
                 "node",
                 "connect",
                 "--invite",
-                str(environment.output / "pilot-invite.json"),
+                str(environment.invite_path),
                 *_trust_policy_arguments(environment),
                 "--package",
                 str(environment.runtime.package.archive),
@@ -361,6 +703,8 @@ def _start_observation_processes(
                 str(environment.output / "cursors" / f"node-{index}.sqlite"),
                 "--expected-tasks",
                 "1",
+                "--reconnect-attempts",
+                "3",
                 "--output",
                 str(result_path),
             ]
@@ -376,7 +720,7 @@ async def _enqueue_task_through_operator_api(
     task: dict[str, Any],
 ) -> None:
     async with client.post(
-        environment.runtime.invite["server_url"] + "/v1/relay/tasks",
+        environment.admin_base + "/v1/relay/tasks",
         json=task,
         headers=environment.headers,
     ) as response:
@@ -474,6 +818,200 @@ async def _stop_processes(
             ) from exc
 
 
+async def _stop_pilot_server(environment: PilotEnvironment) -> None:
+    try:
+        if environment.surface_server is not None:
+            await environment.surface_server.stop()
+        elif environment.runner is not None:
+            await environment.runner.cleanup()
+    finally:
+        environment.hub.store.close()
+    # aiohttp closes non-SSL transports asynchronously. Give their callbacks
+    # one loop turn before asyncio.Runner closes the Windows selector loop.
+    await asyncio.sleep(0)
+
+
+def _carry_restart_metrics(
+    previous_hub: Any,
+    previous_metrics: Any,
+    next_hub: Any,
+    next_metrics: Any,
+) -> None:
+    """Carry process-local counters across the deliberate listener restart."""
+
+    next_hub.receipts.extend(previous_hub.receipts)
+    next_hub.rejected = previous_hub.rejected
+    next_hub.acceptance_latencies_ms.extend(previous_hub.acceptance_latencies_ms)
+    next_hub.completion_latencies_ms.extend(previous_hub.completion_latencies_ms)
+    next_hub.receipt_ack_drops.extend(previous_hub.receipt_ack_drops)
+    next_hub.drop_receipt_ack_once_for.update(
+        previous_hub.drop_receipt_ack_once_for
+    )
+    next_metrics.started_at = previous_metrics.started_at
+    next_metrics.accepted_requests = previous_metrics.accepted_requests
+    next_metrics.rejected_requests = previous_metrics.rejected_requests
+    next_metrics.recoveries = previous_metrics.recoveries + 1
+
+
+async def _restart_pilot_server(environment: PilotEnvironment) -> None:
+    previous_hub = environment.hub
+    previous_metrics = environment.metrics
+    package = environment.runtime.package
+    publication = {
+        "bootstrap": environment.runtime.bootstrap,
+        "releases": {
+            environment.runtime.release_key: environment.runtime.release
+        },
+        "package_artifacts": {
+            package.keccak256.lower(): package.archive.read_bytes()
+        },
+    }
+    if environment.v2_config is not None:
+        apps = create_pilot_surfaces(environment.v2_config, **publication)
+        _carry_restart_metrics(
+            previous_hub, previous_metrics, apps.relay, apps.metrics
+        )
+        server = PilotSurfaceServer(environment.v2_config, apps)
+        await server.start()
+        environment.app = apps.admin
+        environment.runner = None
+        environment.surface_server = server
+        environment.hub = apps.relay
+        environment.metrics = apps.metrics
+        return
+    environment.app = create_pilot_app(environment.runtime.config, **publication)
+    _carry_restart_metrics(
+        previous_hub,
+        previous_metrics,
+        environment.app[RELAY_KEY],
+        environment.app[METRICS_KEY],
+    )
+    environment.runner = web.AppRunner(environment.app)
+    await environment.runner.setup()
+    await web.TCPSite(
+        environment.runner,
+        environment.runtime.config.host,
+        environment.runtime.config.port,
+    ).start()
+    environment.surface_server = None
+    environment.hub = environment.app[RELAY_KEY]
+    environment.metrics = environment.app[METRICS_KEY]
+
+
+def _add_snapshot_probe(database: Path, label: str) -> None:
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE loveengine_restore_probe (label TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO loveengine_restore_probe(label) VALUES (?)", (label,)
+        )
+        connection.commit()
+
+
+def _snapshot_probe_absent(database: Path) -> bool:
+    with sqlite3.connect(database) as connection:
+        row = connection.execute(
+            """
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'loveengine_restore_probe'
+            """
+        ).fetchone()
+    return row is None
+
+
+def _mine_snapshot_probe_block(w3: Web3) -> int:
+    before = int(w3.eth.block_number)
+    response = w3.provider.make_request("evm_mine", [])
+    if response.get("error") is not None:
+        raise LoveEngineError(
+            "snapshot_chain_probe_failed", str(response["error"]), 4
+        )
+    after = int(w3.eth.block_number)
+    if after <= before:
+        raise LoveEngineError("snapshot_chain_probe_failed", f"{before}->{after}", 4)
+    return after
+
+
+async def _exercise_system_snapshot_restore(
+    environment: PilotEnvironment,
+) -> None:
+    config = environment.runtime.config
+    chain_root = environment.output / "chain"
+    chain_snapshot = snapshot_chain(
+        chain_root, str(environment.w3.provider.endpoint_uri)
+    )
+    snapshot = create_system_snapshot(
+        run_id=config.run_id,
+        database=config.database,
+        relay_database=config.relay_database,
+        artifact_root=config.artifact_root,
+        audit_log=config.audit_log,
+        chain_root=chain_root,
+        output=environment.output / "snapshots",
+    )
+    snapshot_path = Path(snapshot["snapshot"])
+    await _stop_pilot_server(environment)
+
+    _add_snapshot_probe(config.database, "pilot")
+    _add_snapshot_probe(config.relay_database, "relay")
+    artifact_probe = config.artifact_root / "loveengine-restore-probe.txt"
+    artifact_probe.write_text("must disappear after restore\n", encoding="utf-8")
+    with config.audit_log.open("a", encoding="utf-8") as audit:
+        audit.write('{"restore_probe":true}\n')
+    chain_probe_block = _mine_snapshot_probe_block(environment.w3)
+    for name in ("deployment.json", "state.json"):
+        path = chain_root / name
+        value = read_json(path)
+        value["restore_probe"] = True
+        write_json(path, value)
+
+    restored = restore_system_snapshot(
+        snapshot_path,
+        database=config.database,
+        relay_database=config.relay_database,
+        artifact_root=config.artifact_root,
+        audit_log=config.audit_log,
+        chain_root=chain_root,
+    )
+    chain_restore = restore_chain(
+        chain_root,
+        str(environment.w3.provider.endpoint_uri),
+        Path(chain_snapshot["snapshot"]),
+    )
+    chain_restored = (
+        chain_probe_block > int(chain_snapshot["block_number"])
+        and int(environment.w3.eth.block_number) == int(chain_snapshot["block_number"])
+        and int(chain_restore["block_number"]) == int(chain_snapshot["block_number"])
+    )
+    probes_removed = (
+        _snapshot_probe_absent(config.database)
+        and _snapshot_probe_absent(config.relay_database)
+        and not artifact_probe.exists()
+        and all(
+            "restore_probe" not in read_json(chain_root / name)
+            for name in ("deployment.json", "state.json")
+        )
+        and chain_restored
+    )
+    if not probes_removed:
+        raise LoveEngineError(
+            "snapshot_restore_probe_remaining", str(snapshot_path), 4
+        )
+    environment.system_restore_verified = True
+    environment.system_snapshots.append(
+        {
+            **snapshot,
+            "chain_snapshot": chain_snapshot,
+            "chain_probe_block": str(chain_probe_block),
+            "chain_restore": chain_restore,
+            "restore": restored,
+            "mutation_removed": True,
+        }
+    )
+    await _restart_pilot_server(environment)
+
+
 async def _run_observation_phase(
     environment: PilotEnvironment,
     client: ClientSession,
@@ -484,9 +1022,10 @@ async def _run_observation_phase(
     restart_chain: Callable[[], Awaitable[None]],
     simulate_faults: bool,
 ) -> ObservationPhase:
-    base = environment.runtime.invite["server_url"]
+    admin_base = environment.admin_base
+    base = environment.participant_base
     async with client.post(
-        base + "/v1/live/sessions",
+        admin_base + "/v1/live/sessions",
         json={
             "session_id": environment.session_id,
             "source_type": "operator",
@@ -503,7 +1042,7 @@ async def _run_observation_phase(
         for _ in range(observer_count)
     ]
 
-    hub = environment.app[RELAY_KEY]
+    hub = environment.hub
     tasks = []
     observation_specs: list[tuple[int, str, Path]] = []
     for index, node in enumerate(environment.node_accounts, start=1):
@@ -583,7 +1122,7 @@ async def _run_observation_phase(
     await asyncio.sleep(0.4)
     for index in range(1, event_count + 1):
         async with client.post(
-            base + f"/v1/live/sessions/{environment.session_id}/events",
+            admin_base + f"/v1/live/sessions/{environment.session_id}/events",
             json={
                 "event_id": f"lan-event-{index:04d}",
                 "occurred_at": str(int(time.time())),
@@ -614,34 +1153,20 @@ async def _run_observation_phase(
                 }
                 for task, spec in zip(tasks[:-1], active_specs, strict=True)
             )
-            await environment.runner.cleanup()
+            await _stop_pilot_server(environment)
             await restart_chain()
-            package = environment.runtime.package
-            environment.app = create_pilot_app(
-                environment.runtime.config,
-                bootstrap=environment.runtime.bootstrap,
-                releases={environment.runtime.release_key: environment.runtime.release},
-                package_artifacts={
-                    package.keccak256.lower(): package.archive.read_bytes()
-                },
-            )
-            environment.app[METRICS_KEY].recoveries += 1
-            environment.runner = web.AppRunner(environment.app)
-            await environment.runner.setup()
-            await web.TCPSite(
-                environment.runner,
-                environment.runtime.config.host,
-                environment.runtime.config.port,
-            ).start()
-            hub = environment.app[RELAY_KEY]
+            await _restart_pilot_server(environment)
+            hub = environment.hub
             observation_processes = _start_observation_processes(
                 environment, active_specs
             )
             await asyncio.sleep(0.4)
             fault_recovery_seconds = perf_counter() - fault_started
 
+    if simulate_faults:
+        hub.drop_receipt_ack_once_for.update(task["task_id"] for task in tasks)
     async with client.post(
-        base + f"/v1/live/sessions/{environment.session_id}/close",
+        admin_base + f"/v1/live/sessions/{environment.session_id}/close",
         json={"closed_at": str(int(time.time()))},
         headers=environment.headers,
     ) as response:
@@ -650,7 +1175,7 @@ async def _run_observation_phase(
                 "pilot_session_close_failed", await response.text()
             )
     async with client.post(
-        base + f"/v1/live/sessions/{environment.session_id}/evidence/finalize",
+        admin_base + f"/v1/live/sessions/{environment.session_id}/evidence/finalize",
         json={"revision": "1", "finalized_at": str(int(time.time()))},
         headers=environment.headers,
     ) as response:
@@ -686,6 +1211,43 @@ async def _run_observation_phase(
         for client_result in [*observation_clients, *delayed_clients]
         for receipt in client_result["receipts"]
     ]
+    receipt_ack_loss_proofs: list[dict[str, object]] = []
+    if simulate_faults:
+        clients_by_node = {
+            Web3.to_checksum_address(item["node"]): item
+            for item in [*observation_clients, *delayed_clients]
+        }
+        for task in tasks:
+            node = Web3.to_checksum_address(task["recipient"])
+            state = hub.store.task_state(node, task["task_id"])
+            client_result = clients_by_node.get(node)
+            proof = {
+                "node": node,
+                "task_id": task["task_id"],
+                "receipt_stored": bool(state and state.get("receipt")),
+                "confirmation_ack_dropped": (
+                    task["task_id"] in hub.receipt_ack_drops
+                ),
+                "receipt_state_recovered": bool(
+                    client_result and int(client_result.get("reconnects", 0)) >= 1
+                ),
+                "receipt_confirmed": bool(
+                    state and state.get("receipt_confirmed")
+                ),
+            }
+            if not all(
+                proof[field] is True
+                for field in (
+                    "receipt_stored",
+                    "confirmation_ack_dropped",
+                    "receipt_state_recovered",
+                    "receipt_confirmed",
+                )
+            ):
+                raise LoveEngineError(
+                    "pilot_receipt_ack_loss_not_recovered", task["task_id"], 4
+                )
+            receipt_ack_loss_proofs.append(proof)
     observation_set = aggregate_observations(
         observation_receipts,
         expected_nodes=set(environment.node_accounts),
@@ -700,6 +1262,7 @@ async def _run_observation_phase(
         observer_results=observer_results,
         fault_recovery_seconds=fault_recovery_seconds,
         fault_disconnect_proofs=tuple(fault_disconnect_proofs),
+        receipt_ack_loss_proofs=tuple(receipt_ack_loss_proofs),
     )
 
 
@@ -760,7 +1323,7 @@ async def _run_evidence_phase(
     observation: ObservationPhase,
     client: ClientSession,
 ) -> EvidencePhase:
-    base = environment.runtime.invite["server_url"]
+    base = environment.participant_base
     async with client.get(
         base + f"/v1/live/sessions/{environment.session_id}/evidence"
     ) as response:
@@ -831,7 +1394,7 @@ async def _run_evidence_phase(
                 "node",
                 "connect",
                 "--invite",
-                str(environment.output / "pilot-invite.json"),
+                str(environment.invite_path),
                 *_trust_policy_arguments(environment),
                 "--package",
                 str(environment.runtime.package.archive),
@@ -1040,28 +1603,14 @@ def _run_acceptance_phase(
     event_count: int,
     observer_count: int,
     simulate_faults: bool,
+    acceptance_profile: dict[str, Any] | None,
 ) -> dict[str, Any]:
     w3 = environment.w3
     config = environment.runtime.config
-    snapshots = []
-    if stage == "governance":
-        chain_snapshot = snapshot_chain(
-            environment.output / "chain", str(w3.provider.endpoint_uri)
-        )
-        system_snapshot = create_system_snapshot(
-            run_id=config.run_id,
-            database=config.database,
-            relay_database=config.relay_database,
-            artifact_root=config.artifact_root,
-            audit_log=config.audit_log,
-            chain_root=environment.output / "chain",
-            output=environment.output / "snapshots",
-        )
-        system_snapshot["chain_snapshot"] = chain_snapshot
-        snapshots.append(system_snapshot)
-    metrics = observation.hub.metrics()
-    metrics["server_requests"] = environment.app[METRICS_KEY].accepted_requests
-    metrics["recoveries"] = environment.app[METRICS_KEY].recoveries
+    snapshots = list(environment.system_snapshots)
+    metrics = environment.hub.metrics()
+    metrics["server_requests"] = environment.metrics.accepted_requests
+    metrics["recoveries"] = environment.metrics.recoveries
     metrics["read_only_observers"] = {
         "count": observer_count,
         "connections": sum(
@@ -1074,6 +1623,7 @@ def _run_acceptance_phase(
         "anvil_restarts": int(simulate_faults),
         "agent_disconnects": len(observation.fault_disconnect_proofs),
         "agent_disconnect_proofs": list(observation.fault_disconnect_proofs),
+        "receipt_ack_loss_proofs": list(observation.receipt_ack_loss_proofs),
         "recovery_seconds": round(observation.fault_recovery_seconds, 3),
     }
     artifacts = [
@@ -1125,6 +1675,54 @@ def _run_acceptance_phase(
     rpc_url = str(w3.provider.endpoint_uri)
 
     if stage == "core":
+        if environment.core_transcript_version == 2:
+            if acceptance_profile is None:
+                raise LoveEngineError(
+                    "acceptance_profile_required", "WitnessCoreTranscriptV2"
+                )
+            transcript = _local_v2_transcript(
+                environment,
+                common,
+                acceptance=acceptance_profile,
+            )
+            offline_verification = verify_core_transcript(transcript)
+            secondary_rpc_url = rpc_url.replace("127.0.0.1", "localhost")
+            chain_verification = verify_core_transcript(
+                transcript,
+                rpc_url=rpc_url,
+                secondary_rpc_url=secondary_rpc_url,
+            )
+            trust_verification = verify_core_transcript(
+                transcript,
+                rpc_url=rpc_url,
+                secondary_rpc_url=secondary_rpc_url,
+                trust_policy=trust_policy,
+            )
+            transcript_path = environment.output / "witness-core-v2.fixture.json"
+            write_json(transcript_path, transcript)
+            return {
+                "stage": "core",
+                "core_transcript_version": 2,
+                "transcript": transcript,
+                "transcript_path": str(transcript_path.resolve()),
+                "environment": transcript["environment"],
+                "actors_simulated": transcript["actors_simulated"],
+                "observation_receipts": len(observation.receipts),
+                "review_receipts": len(evidence.review_receipts),
+                "gate_ready": bool(evidence.proposal_gate.get("ready")),
+                "read_only_observers": observer_count,
+                "faults": faults,
+                "snapshot_restore_verified": environment.system_restore_verified,
+                "offline_verification": offline_verification[
+                    "verification_level"
+                ],
+                "chain_verification": chain_verification[
+                    "verification_level"
+                ],
+                "trust_verification": trust_verification[
+                    "verification_level"
+                ],
+            }
         transcript = {
             "schema_version": "loveengine.witness-core-transcript/1",
             **common,
@@ -1150,6 +1748,7 @@ def _run_acceptance_phase(
         write_json(transcript_path, transcript)
         return {
             "stage": "core",
+            "core_transcript_version": 1,
             "transcript": transcript,
             "transcript_path": str(transcript_path.resolve()),
             "environment": transcript["environment"],
@@ -1159,6 +1758,7 @@ def _run_acceptance_phase(
             "gate_ready": bool(evidence.proposal_gate.get("ready")),
             "read_only_observers": observer_count,
             "faults": faults,
+            "snapshot_restore_verified": environment.system_restore_verified,
             "offline_verification": offline_verification["verification_level"],
             "chain_verification": chain_verification["verification_level"],
             "trust_verification": (
@@ -1240,6 +1840,7 @@ def _run_acceptance_phase(
         "total_uto": transcript["final_state"]["total_uto"],
         "read_only_observers": observer_count,
         "faults": faults,
+        "snapshot_restore_verified": environment.system_restore_verified,
         "offline_verification": offline_verification["verification_level"],
         "chain_verification": chain_verification["verification_level"],
         "trust_verification": (
@@ -1262,11 +1863,24 @@ async def run_pilot_phases(
     restart_chain: Callable[[], Awaitable[None]],
     simulate_faults: bool,
     stage: str = "core",
+    core_transcript_version: int = 1,
+    participant_port: int | None = None,
+    acceptance_profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if stage not in {"core", "governance"}:
         raise LoveEngineError("invalid_pilot_stage", stage)
+    if core_transcript_version not in {1, 2}:
+        raise LoveEngineError(
+            "unsupported_core_transcript_version", str(core_transcript_version)
+        )
     environment = await _prepare_environment(
-        output, w3, deployment, runtime, stage=stage
+        output,
+        w3,
+        deployment,
+        runtime,
+        stage=stage,
+        core_transcript_version=core_transcript_version,
+        participant_port=participant_port,
     )
     try:
         async with _new_pilot_client_session() as client:
@@ -1285,6 +1899,7 @@ async def run_pilot_phases(
                 if stage == "governance"
                 else None
             )
+            await _exercise_system_snapshot_restore(environment)
             return _run_acceptance_phase(
                 environment,
                 observation,
@@ -1294,6 +1909,7 @@ async def run_pilot_phases(
                 event_count=event_count,
                 observer_count=observer_count,
                 simulate_faults=simulate_faults,
+                acceptance_profile=acceptance_profile,
             )
     finally:
         try:
@@ -1305,4 +1921,4 @@ async def run_pilot_phases(
                 ]
             )
         finally:
-            await environment.runner.cleanup()
+            await _stop_pilot_server(environment)

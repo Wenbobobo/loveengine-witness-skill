@@ -210,6 +210,8 @@ class RelayHub:
         self.rejected = 0
         self.acceptance_latencies_ms: list[float] = []
         self.completion_latencies_ms: list[float] = []
+        self.drop_receipt_ack_once_for: set[str] = set()
+        self.receipt_ack_drops: list[str] = []
         self.runner: web.AppRunner | None = None
 
     def app(self) -> web.Application:
@@ -499,6 +501,14 @@ class RelayHub:
                         self.completion_latencies_ms.append(
                             (perf_counter() - start) * 1000
                         )
+                    if task_id in self.drop_receipt_ack_once_for:
+                        self.drop_receipt_ack_once_for.remove(task_id)
+                        self.receipt_ack_drops.append(task_id)
+                        await ws.close(
+                            code=1012,
+                            message=b"injected receipt confirmation ack loss",
+                        )
+                        break
                     await send_json(
                         {
                             "type": "ack",

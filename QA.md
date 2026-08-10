@@ -7,7 +7,8 @@
 
 状态标签含义：`[已实现]` 表示有当前代码和自动测试；`[仅本机实验]` 表示只在
 loopback/Anvil 场景验证；`[治理实验]` 表示不属于 Witness Skill 默认核心；
-`[未实现]` 表示不能对外承诺。
+`[本机实现]` 表示 0.7 接口只获得本地代码/测试证据；`[外部试点未完成]` 表示
+真实 Clef、Sepolia、Tailscale 或受邀节点证据仍缺失；`[未实现]` 表示不能对外承诺。
 
 ## 1. 现在到底有几个 LoveEngine Skill？（33:42）
 
@@ -205,10 +206,11 @@ confirmation；core 侧还有 3 个观察回执、3 个复核回执、Gate ready
 quickstart、demo 和 soak 故意不在计时或后台流程中隐式下载/编译，缺产物或 attestation
 失配会明确失败并给出该命令。
 
-**当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；
-`0.6.1-contract-public-pilot` 仍是 candidate，不是已发布版本。一次共享主机
-短验收不等于公网、公共测试网、TLS、生产身份、HA 或长期可用性已通过。后续
-candidate 使用 900 秒、30 事件、10 观察者的工程门；它也不是长期稳定性证明。
+**当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；0.6.1 PR #11
+尚未人工合并。当前 `0.7.0-invited-public-pilot` candidate 叠加在该未合并分支上，
+不是已发布版本。一次共享主机短验收不等于公网、公共测试网、TLS、生产身份、HA
+或长期可用性已通过。当前 candidate 使用 900 秒、30 事件、10 观察者的工程门；
+它也不是长期稳定性证明。
 
 **验证入口：** [开发实验指南](docs/development/integration-guide.md)、
 [中文 README](README.zh-CN.md)。
@@ -222,10 +224,12 @@ candidate 使用 900 秒、30 事件、10 观察者的工程门；它也不是�
 可复核结果讲清楚，能降低开发成员测试时的歧义。
 
 **当前未证明：** 会议中“之后会部署公共测试网”的表述只是当时计划，不是完成
-事实。共享 Linux 短实验已经完成，但仍使用 Anvil signer、模拟 actor 和 SSH
-tunnel，不能外推为公共测试网或企业部署。
+事实。0.7 已实现 Sepolia 交易计划、外部 signer adapter、双 RPC 校验契约、双入口
+Pilot 和 Tailscale Serve preflight，但还没有真实 Clef、Sepolia 交易、Serve 会话
+或受邀远程节点证据。既有共享 Linux 短实验仍使用 Anvil signer、模拟 actor 和
+SSH tunnel，不能外推为公共测试网或企业部署。
 
-**验证入口：** [活动远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
+**验证入口：** [0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
 [工程总规划](docs/specs/love-engine-master-plan.md)。
 
 ## 14. 远程主机测试是否等于可以接企业？
@@ -246,13 +250,16 @@ tunnel 收到连接后任务并返回绑定 receipt。2026-08-04 的 candidate c
 evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation，owned process
 清理验证与独立 postflight 均通过。
 
+上述远程通过事实只属于 0.6.1 历史 candidate，不接受当前 0.7 stacked candidate。
+
 同一 candidate 还完成一次 240 事件、10 只读观察者的四小时本机 core run；全部
 报告门、零秘密发现、空 stderr 与独立 transcript 复验均通过。
 
 **当前未证明：** 这次结果只覆盖一台共享 ARM64 Linux 主机上的短实验和一台
 Windows 主机上的四小时运行。它仍
 不证明生产 signer、TLS、HA、公共测试网、现实见证者独立性、事实真实性或企业
-系统已经接入。三个本机进程和三个实验 profile 也不能替代三个现实组织。
+系统已经接入。三个本机进程和三个实验 profile 也不能替代三个现实组织。0.7
+还没有真实 Clef/Sepolia/Tailscale Serve/受邀远端报告。
 
 旧 baseline 的 tunnel review 只覆盖任务/回执绑定；当前代码已经补上真实
 finalized evidence 复算、ACK-loss journal 恢复、双向 receipt confirmation 和
@@ -263,3 +270,43 @@ finalized evidence 复算、ACK-loss journal 恢复、双向 receipt confirmatio
 [远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
 [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)、
 `tests/test_remote_lab.py`。
+
+## 15. 0.7 受邀公开试点是不是已经上线？
+
+**状态：`[本机实现] [外部试点未完成] [candidate]`**
+
+**当前已证明：** `0.7.0-invited-public-pilot` candidate 已在代码中实现
+`PilotInviteV2`、独立 trust policy、admin/participant 双入口、外部 signer adapter、
+Sepolia EIP-1559 transaction plan、双 RPC transcript verifier、参与者 attestation、
+Tailscale Serve 的失败关闭 preflight/自有配置恢复，以及固定 900 秒、30 events、
+10 observers 的本机 WitnessCoreTranscriptV2 验收形状。协议版本仍是
+`loveengine-witness-net/0.6`，旧 reader 没有删除。
+
+**当前未证明：** 最新 tag 仍是 `v0.6.0-contract-public-pilot`，0.6.1 PR #11 尚未
+人工合并，0.7 因而只是 stacked candidate。当前没有真实 Clef 1.17.3 签名、Sepolia
+deployment/release transaction、Tailscale Serve 会话、三个受邀远程操作者或
+`environment: sepolia_invited_pilot` 的终态 transcript。代码存在、单元测试通过和
+本机 V2 transcript 都不能替代这些外部证据。
+
+**验证入口：** [0.7 SPEC](docs/specs/love-engine-invited-public-pilot.md)、
+[CLI 参考](docs/api/cli-reference.md)、
+`schemas/witness-core-transcript-v2.schema.json`。
+
+## 16. `signer inspect` 能否证明 Clef 已经可以安全用于试点？
+
+**状态：`[本机实现] [真实 Clef 未验证]`**
+
+**当前已证明：** `loveengine signer inspect` 把验证拆成四层：静态 config；ruleset
+与 attestation 文件摘要；指定 Clef binary 的 SHA-256 与精确兼容版本；显式
+`--probe` 的只读 live API 检查。可选参数必须成对完整，后层以前层通过为前提。
+首轮只允许 `manual_confirm`；兼容目标固定为 Geth/Clef 1.17.3。Geth 1.17.4 已移除
+内置 Clef，不能把 Geth 1.17.5 当作 Clef 1.17.3 的升级或替代。
+
+**当前未证明：** 静态检查不证明文件来自可信操作者；evidence 检查不证明正在运行
+的进程加载了同一文件；binary 检查不证明 IPC/HTTP endpoint 指向该进程；live probe
+只读取版本，不签 typed data 或 transaction。只有在目标机上同时绑定受限文件、
+已核验 binary、live endpoint、人工确认签名结果和随后双 RPC 链事实，才能形成首轮
+外部 signer 证据；当前仓库没有这份真实运行报告。
+
+**验证入口：** [发布者流程](docs/development/runbooks/publisher-flow.zh-CN.md)、
+`src/loveengine_witness/signer_client.py`、`tests/test_signer_client.py`。

@@ -1,6 +1,6 @@
 [project]
 name = "loveengine-witness-skill"
-version = "0.6.1"
+version = "0.7.0"
 description = "LoveEngine verifiable witness protocol and core experiment runtime"
 readme = "README.md"
 license = "LicenseRef-SCC0"

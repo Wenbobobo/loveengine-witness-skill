@@ -12,6 +12,7 @@ from web3 import HTTPProvider, Web3
 from .agent_session import relay_challenge_signing_text, run_agent_session
 from .errors import LoveEngineError
 from .jsonio import read_json, write_json
+from .signer_client import SignerClient
 
 
 def _rpc_sign_typed_data(
@@ -58,10 +59,27 @@ def connect_node(
     reconnect_attempts: int = 0,
     idle_timeout_seconds: float = 30,
     before_connect: Callable[[], None] | None = None,
+    signer_client: SignerClient | None = None,
 ) -> dict[str, Any]:
-    w3 = Web3(HTTPProvider(rpc_url))
-    if not w3.is_connected():
-        raise LoveEngineError("rpc_unavailable", rpc_url, 4)
+    if signer_client is not None:
+        if Web3.to_checksum_address(signer_client.address) != Web3.to_checksum_address(
+            address
+        ):
+            raise LoveEngineError("wrong_signer_address", signer_client.address)
+        sign_challenge = lambda challenge: signer_client.sign_message(
+            relay_challenge_signing_text(challenge, node=address)
+        )
+        sign_typed_data = signer_client.sign_typed_data
+    else:
+        w3 = Web3(HTTPProvider(rpc_url))
+        if not w3.is_connected():
+            raise LoveEngineError("rpc_unavailable", rpc_url, 4)
+        sign_challenge = lambda challenge: _rpc_sign_challenge(
+            w3,
+            address,
+            challenge,
+        )
+        sign_typed_data = lambda typed: _rpc_sign_typed_data(w3, address, typed)
     result = asyncio.run(
         run_agent_session(
             url=url,
@@ -77,12 +95,8 @@ def connect_node(
             reconnect_attempts=reconnect_attempts,
             idle_timeout_seconds=idle_timeout_seconds,
             before_connect=before_connect,
-            sign_challenge=lambda challenge: _rpc_sign_challenge(
-                w3,
-                address,
-                challenge,
-            ),
-            sign_typed_data=lambda typed: _rpc_sign_typed_data(w3, address, typed),
+            sign_challenge=sign_challenge,
+            sign_typed_data=sign_typed_data,
         )
     )
     if output:

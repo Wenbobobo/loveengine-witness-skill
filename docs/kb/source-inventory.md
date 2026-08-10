@@ -11,15 +11,17 @@
 | README.md / README.zh-CN.md | 中英文仓库入口和真实成熟度 |
 | QA.md | 会议问题的代码事实回答 |
 | docs/specs/love-engine-master-plan.md | 唯一工程总规划 |
-| docs/specs/love-engine-pre-enterprise-remote-lab.md | 当前 0.6.1 共享 Linux 验收规格 |
+| docs/specs/love-engine-invited-public-pilot.md | 当前 0.7 candidate 的接口、阶段和退出门 |
+| docs/specs/love-engine-pre-enterprise-remote-lab.md | 0.6.1 共享 Linux 历史验收规格 |
 | docs/architecture/witness-core-and-data-flow.zh-CN.md | 核心/治理边界、数据流和存储 |
 | docs/api/ | 当前接口、ABI 和 CLI |
 | docs/development/integration-guide.md | 分层开发实验 |
 | docs/development/runbooks/ | 当前角色操作手册 |
 | skills/loveengine-witness/skill-manifest.json | 当前 source refs/hashes 与 package identity |
 
-最新 Git tag 是 v0.6.0-contract-public-pilot；0.6.1-contract-public-pilot 是工作
-candidate。M3-M6 阶段报告不再属于 current authority。
+最新 Git tag 是 `v0.6.0-contract-public-pilot`；0.6.1 PR #11 尚未人工合并。
+`0.7.0-invited-public-pilot` 是叠加在该 PR 上的工作 candidate，协议仍为
+`loveengine-witness-net/0.6`。M3-M6 阶段报告不再属于 current authority。
 
 ## Preserved current source constraints
 
@@ -60,7 +62,11 @@ docs/archive/source-materials/。
 - Runtime recovery：节点 task journal、issuer nonce 去重、有界重连和 receipt
   ACK-loss confirmation。
 - Core verification：WitnessCoreTranscriptV1 的 offline/RPC/policy 模式。
-- Remote lab：只读资源门、key-only SSH、loopback 服务、低优先级 core/recovery，
+- Invited pilot contract：WitnessCoreTranscriptV2、PilotConfig/InviteV2、双入口、
+  ExternalSignerConfigV1、Sepolia transaction plan、受限文件加载的双 RPC、
+  assignment-bound participant attestation 和 Tailscale Serve preflight/自有配置
+  恢复；目前只有本机实现与测试。
+- Historical remote lab：只读资源门、key-only SSH、loopback 服务、低优先级 core/recovery，
   以及经 SSH tunnel 使用公开 node CLI 的连接后签名任务与回执验证。
 - Governance lab：WitnessDAO、CorporateSink、StreamingEngine、PublicSink、显式
   vote 和 PilotTranscriptV2。
@@ -75,8 +81,9 @@ source hash 和 package hash；只有 M0 package hash 变化时才更新 propaga
 ## Authority order
 
 1. docs/specs/love-engine-master-plan.md
-2. docs/specs/love-engine-pre-enterprise-remote-lab.md
+2. docs/specs/love-engine-invited-public-pilot.md
 3. docs/architecture/witness-core-and-data-flow.zh-CN.md
 4. docs/api/
-5. docs/reference/source-materials/current/
-6. preserved meeting/contract sources and historical archive
+5. docs/specs/love-engine-pre-enterprise-remote-lab.md
+6. docs/reference/source-materials/current/
+7. preserved meeting/contract sources and historical archive
