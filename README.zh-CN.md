@@ -11,10 +11,10 @@
 
 ## 当前状态
 
-最新 Git tag 是 `v0.6.0-contract-public-pilot`。当前 candidate 是
-`0.7.0-invited-public-pilot`，它叠加在尚未合并的 0.6.1 PR #11 上。该分支可以先
-定义并测试 0.7 接口，但不是已发布 release；在 PR #11 经人工 review 和 merge 前，
-也不能描述为“从已发布 0.6.1 升级”。线协议继续使用
+最新 Git tag 是 `v0.6.0-contract-public-pilot`。PR #11 与其上叠加的 0.7 PR #12
+已在 2026-08-10 经项目所有者授权的自审后合入 `main`。当前源码 candidate 是
+`0.7.0-invited-public-pilot`，但 0.6.1 和 0.7 都尚未发布 tag/release asset，不能把
+已合并源码描述为“已发布升级”。线协议继续使用
 `loveengine-witness-net/0.6`，因此 M0-M6 schema 和历史 transcript 仍可验证。
 
 | 范围 | 状态 |
@@ -41,6 +41,12 @@ adapter、精确交易计划，以及固定 900 秒的 V2 验收形状。但当�
 Clef 1.17.3 进程、Sepolia 交易、Tailscale Serve 会话或三个受邀远程操作者的证据。
 Geth 1.17.4 已移除内置 Clef 分发，因此不能把 Geth 1.17.5 当作 Clef 1.17.3 的
 替代或自动升级。首轮试点只允许 `manual_confirm`。
+
+下一次外部实验采用混合边界：Registry 锚定公开 Sepolia 测试网，participant 入口
+只向受邀 tailnet 成员开放，不是匿名公网部署。先按
+[受邀公开试点操作手册](docs/development/runbooks/invited-public-pilot.zh-CN.md)准备，
+并从可校验、秘密只通过文件路径引用的
+[YAML 模板](config/examples/invited-public-pilot.sepolia.example.yaml)建立实验计划。
 
 在干净工作树中执行唯一的精确提交验收入口：
 
@@ -246,6 +252,8 @@ guardian 作为 fail-closed 清理机制。
 - [合约 API](docs/api/loveengine-contract-api.md)
 - [工程总规划](docs/specs/love-engine-master-plan.md)
 - [0.7 受邀公开试点规格](docs/specs/love-engine-invited-public-pilot.md)
+- [Sepolia 受邀公开试点操作手册](docs/development/runbooks/invited-public-pilot.zh-CN.md)
+- [秘密文件引用式实验计划 YAML 模板](config/examples/invited-public-pilot.sepolia.example.yaml)
 - [0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [完整文档索引](docs/README.md)

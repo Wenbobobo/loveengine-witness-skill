@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import psutil
+
 from .core_transcript import verify_core_transcript
 from .errors import LoveEngineError
 from .jsonio import read_json, write_json
@@ -26,6 +28,67 @@ REPORT_FILENAME = "pilot-soak-report.json"
 REPORT_SCHEMA_VERSION = "loveengine.pilot-soak-report/1"
 REPORT_DURATION_TOLERANCE_SECONDS = 1.0
 LAUNCH_REGISTRATION_GRACE_SECONDS = 30.0
+
+
+def _terminate_launched_process(
+    process: subprocess.Popen[bytes],
+    *,
+    timeout_seconds: float = 5.0,
+) -> bool:
+    """Reap a worker tree that could not be published in lifecycle state."""
+
+    descendants: list[psutil.Process] = []
+    tree_available = False
+    try:
+        root = psutil.Process(process.pid)
+        descendants = root.children(recursive=True)
+        tree_available = True
+    except psutil.NoSuchProcess:
+        tree_available = process.poll() is not None
+    except psutil.Error:
+        tree_available = False
+
+    for child in reversed(descendants):
+        try:
+            child.terminate()
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error:
+            tree_available = False
+    try:
+        process.terminate()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+            process.wait(timeout=timeout_seconds)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    alive: list[psutil.Process] = []
+    if descendants:
+        try:
+            _, alive = psutil.wait_procs(descendants, timeout=timeout_seconds)
+        except psutil.Error:
+            alive = list(descendants)
+            tree_available = False
+        for child in alive:
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                continue
+            except psutil.Error:
+                tree_available = False
+        try:
+            _, alive = psutil.wait_procs(alive, timeout=timeout_seconds)
+        except psutil.Error:
+            tree_available = False
+    return process.poll() is not None and tree_available and not alive
 
 
 def _utc_now() -> str:
@@ -310,6 +373,13 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         "loveengine.pilot-soak-run/1"
     ):
         raise LoveEngineError("invalid_soak_state", str(state_path))
+    terminal_failure = (
+        state.get("status") == "failed"
+        and state.get("failure_reason")
+        in {"launch_registration_timeout", "launch_failed"}
+        and isinstance(state.get("finished_at"), str)
+        and bool(state["finished_at"].strip())
+    )
     output = Path(str(state["output"])).resolve()
     report_path = output / REPORT_FILENAME
     pid = int(state.get("pid") or 0)
@@ -334,7 +404,16 @@ def background_soak_status(state_path: Path) -> dict[str, Any]:
         if report_error is None and not isinstance(report, dict):
             report_error = "report_not_object"
     failure_reason: str | None = None
-    if starting_without_pid and not launch_registration_timed_out:
+    if terminal_failure:
+        status = "failed"
+        failure_reason = str(state.get("failure_reason") or "soak_report_failed")
+        existing_report_error = state.get("report_validation_error")
+        report_error = (
+            str(existing_report_error)
+            if isinstance(existing_report_error, str)
+            else None
+        )
+    elif starting_without_pid and not launch_registration_timed_out:
         status = "starting"
     elif launch_registration_timed_out:
         # The launcher may crash between atomically reserving the output and
@@ -528,5 +607,13 @@ def start_background_soak(
         ) from exc
     state["pid"] = process.pid
     state["status"] = "running"
-    _write_soak_state(state_path, state)
+    try:
+        _write_soak_state(state_path, state)
+    except Exception as exc:
+        cleanup_verified = _terminate_launched_process(process)
+        raise LoveEngineError(
+            "pilot_soak_registration_failed",
+            f"{type(exc).__name__};cleanup_verified={str(cleanup_verified).lower()}",
+            4,
+        ) from exc
     return background_soak_status(state_path)

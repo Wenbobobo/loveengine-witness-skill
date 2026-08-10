@@ -85,6 +85,7 @@ def _successful_demo(output: Path, **kwargs: object) -> dict[str, object]:
                     "task_id": f"observe:pilot:{index}",
                     "accepted": True,
                     "connection_closed": True,
+                    "reconnected": True,
                 }
                 for index in range(1, 4)
             ],

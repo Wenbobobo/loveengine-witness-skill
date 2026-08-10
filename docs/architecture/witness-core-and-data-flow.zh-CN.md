@@ -1,6 +1,7 @@
 # LoveEngine Witness 核心与数据流
 
-状态：0.7.0-invited-public-pilot candidate，叠加在尚未人工合并的 0.6.1 PR #11
+状态：0.7.0-invited-public-pilot candidate；PR #11 与 PR #12 已于 2026-08-10
+合入 `main`，但 0.6.1/0.7 release 尚未发布
 协议：loveengine-witness-net/0.6
 定位：开发成员理解和复核当前实现的规范性架构说明
 

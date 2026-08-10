@@ -1160,7 +1160,14 @@ async def _run_observation_phase(
             observation_processes = _start_observation_processes(
                 environment, active_specs
             )
-            await asyncio.sleep(0.4)
+            await _wait_for_relay_node_connections(
+                hub,
+                nodes=active_nodes,
+                connected=True,
+            )
+            for proof in fault_disconnect_proofs:
+                if proof["node"] in active_nodes:
+                    proof["reconnected"] = True
             fault_recovery_seconds = perf_counter() - fault_started
 
     if simulate_faults:
@@ -1198,6 +1205,10 @@ async def _run_observation_phase(
             node=delayed_spec[1],
         )
     delayed_clients = await _collect(delayed_processes, "delayed_observation")
+    if simulate_faults:
+        for proof in fault_disconnect_proofs:
+            if proof["node"] == delayed_spec[1]:
+                proof["reconnected"] = True
     # Review tasks reuse the observation identities. Wait until each completed
     # observation socket is gone so readiness below belongs to the new review
     # child, not a closing predecessor with the same address.

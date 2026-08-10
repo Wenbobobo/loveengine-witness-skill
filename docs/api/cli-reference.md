@@ -1,9 +1,17 @@
 # LoveEngine CLI and operations reference
 
-状态：`0.7.0-invited-public-pilot` candidate，叠加在尚未人工合并的 0.6.1
-PR #11；最新 tag 为 `v0.6.0-contract-public-pilot`
+状态：`0.7.0-invited-public-pilot` candidate；PR #11 与 PR #12 已于
+2026-08-10 合入 `main`，最新 tag 仍为 `v0.6.0-contract-public-pilot`
 协议：`loveengine-witness-net/0.6`
 输出：成功写 stdout JSON；失败写 stderr JSON 和稳定错误码。
+
+受邀试点的跨组件参数先写入秘密文件引用式 YAML，并单独校验：
+
+```powershell
+uv run python .\tools\validate_invited_pilot_plan.py .\tmp\pilot-plans\<run-id>\pilot.yaml --check-input-files
+```
+
+该 YAML 是编排前计划，不替代各运行时 JSON config，也不保存 RPC URL、token 或私钥。
 
 ## 1. 环境
 

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loveengine.local/schemas/invited-public-pilot-plan-v1.schema.json",
+  "title": "InvitedPublicPilotPlanV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "execution_requested",
+    "experiment",
+    "release",
+    "rpc",
+    "signers",
+    "participants",
+    "pilot",
+    "evidence"
+  ],
+  "$defs": {
+    "address": {"type": "string", "pattern": "^0x[0-9a-fA-F]{40}$"},
+    "bytes32": {"type": "string", "pattern": "^0x[0-9a-fA-F]{64}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "file": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 4096,
+      "pattern": "^(?:[A-Za-z]:[\\\\/]|[./~]|[^\\r\\n]*[\\\\/])[^\\r\\n]+$"
+    },
+    "signer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "address",
+        "config_file",
+        "ruleset_file",
+        "rules_attestation_file",
+        "clef_binary",
+        "expected_binary_sha256"
+      ],
+      "properties": {
+        "address": {"$ref": "#/$defs/address"},
+        "config_file": {"$ref": "#/$defs/file"},
+        "ruleset_file": {"$ref": "#/$defs/file"},
+        "rules_attestation_file": {"$ref": "#/$defs/file"},
+        "clef_binary": {"$ref": "#/$defs/file"},
+        "expected_binary_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "address",
+        "operator_group",
+        "network_group",
+        "profile_file",
+        "cursor_database",
+        "resume_existing_cursor",
+        "config_file",
+        "ruleset_file",
+        "rules_attestation_file",
+        "clef_binary",
+        "expected_binary_sha256"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+        "address": {"$ref": "#/$defs/address"},
+        "operator_group": {"type": "string", "minLength": 1, "maxLength": 128},
+        "network_group": {"type": "string", "minLength": 1, "maxLength": 128},
+        "profile_file": {"$ref": "#/$defs/file"},
+        "cursor_database": {"$ref": "#/$defs/file"},
+        "resume_existing_cursor": {"type": "boolean"},
+        "config_file": {"$ref": "#/$defs/file"},
+        "ruleset_file": {"$ref": "#/$defs/file"},
+        "rules_attestation_file": {"$ref": "#/$defs/file"},
+        "clef_binary": {"$ref": "#/$defs/file"},
+        "expected_binary_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "properties": {
+    "schema_version": {"const": "loveengine.invited-public-pilot-plan/1"},
+    "execution_requested": {"type": "boolean"},
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "environment",
+        "source_commit",
+        "duration_seconds",
+        "events",
+        "observers"
+      ],
+      "properties": {
+        "run_id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "environment": {"const": "sepolia_invited_pilot"},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "duration_seconds": {"const": 900},
+        "events": {"const": 30},
+        "observers": {"const": 10}
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chain_id",
+        "protocol_version",
+        "skill_id",
+        "version",
+        "registry",
+        "publisher",
+        "package_hash",
+        "manifest_hash",
+        "package_archive",
+        "release_file",
+        "trust_policy_file"
+      ],
+      "properties": {
+        "chain_id": {"const": "11155111"},
+        "protocol_version": {"const": "loveengine-witness-net/0.6"},
+        "skill_id": {"const": "loveengine-witness"},
+        "version": {"const": "0.7.0-invited-public-pilot"},
+        "registry": {"$ref": "#/$defs/address"},
+        "publisher": {"$ref": "#/$defs/address"},
+        "package_hash": {"$ref": "#/$defs/bytes32"},
+        "manifest_hash": {"$ref": "#/$defs/bytes32"},
+        "package_archive": {"$ref": "#/$defs/file"},
+        "release_file": {"$ref": "#/$defs/file"},
+        "trust_policy_file": {"$ref": "#/$defs/file"}
+      }
+    },
+    "rpc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_url_file", "secondary_url_file"],
+      "properties": {
+        "primary_url_file": {"$ref": "#/$defs/file"},
+        "secondary_url_file": {"$ref": "#/$defs/file"}
+      }
+    },
+    "signers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publisher", "task_issuer"],
+      "properties": {
+        "publisher": {"$ref": "#/$defs/signer"},
+        "task_issuer": {"$ref": "#/$defs/signer"}
+      }
+    },
+    "participants": {
+      "type": "array",
+      "minItems": 3,
+      "items": {"$ref": "#/$defs/participant"}
+    },
+    "pilot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "config_file",
+        "write_token_file",
+        "invite_file",
+        "service_config_file",
+        "admin_url",
+        "participant_loopback_url",
+        "tailscale"
+      ],
+      "properties": {
+        "config_file": {"$ref": "#/$defs/file"},
+        "write_token_file": {"$ref": "#/$defs/file"},
+        "invite_file": {"$ref": "#/$defs/file"},
+        "service_config_file": {"$ref": "#/$defs/file"},
+        "admin_url": {
+          "type": "string",
+          "pattern": "^http://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]+$"
+        },
+        "participant_loopback_url": {
+          "type": "string",
+          "pattern": "^http://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]+$"
+        },
+        "tailscale": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected_hostname",
+            "serve_path",
+            "funnel_enabled",
+            "restore_owned_config"
+          ],
+          "properties": {
+            "expected_hostname": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*\\.ts\\.net$"
+            },
+            "serve_path": {"const": "/"},
+            "funnel_enabled": {"const": false},
+            "restore_owned_config": {"const": true}
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_mode", "session_id", "output_dir"],
+      "properties": {
+        "input_mode": {"const": "invited_operator_input"},
+        "session_id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"},
+        "output_dir": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    }
+  }
+}

@@ -12,6 +12,7 @@ import shlex
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -19,6 +20,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
+
+import psutil
 
 from loveengine_witness.contract_dependency_bundle import (
     BUNDLE_RESULT_SCHEMA_VERSION,
@@ -142,6 +145,55 @@ def _validate_remote_root(value: str) -> str:
     ):
         raise ValueError("remote root must be a safe relative path below $HOME")
     return path.as_posix()
+
+
+REMOTE_DEPLOYMENT_CREATE_SOURCE = r'''import json
+import os
+import sys
+from pathlib import Path, PurePosixPath
+
+
+remote_root = PurePosixPath(sys.argv[1])
+deployment_name = sys.argv[2]
+if (
+    remote_root.is_absolute()
+    or any(part in {"", ".", ".."} for part in remote_root.parts)
+    or not deployment_name
+    or deployment_name in {".", ".."}
+    or "/" in deployment_name
+):
+    raise SystemExit("unsafe deployment path")
+
+home = Path.home().resolve(strict=True)
+current = home
+for part in remote_root.parts:
+    candidate = current / part
+    try:
+        candidate.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    if candidate.is_symlink() or not candidate.is_dir():
+        raise SystemExit("remote root contains a symlink or non-directory")
+    current = candidate.resolve(strict=True)
+    try:
+        current.relative_to(home)
+    except ValueError as exc:
+        raise SystemExit("remote root escaped home") from exc
+
+deployment = current / deployment_name
+deployment.mkdir(mode=0o700)
+if deployment.is_symlink():
+    raise SystemExit("deployment is a symlink")
+resolved = deployment.resolve(strict=True)
+try:
+    relative = resolved.relative_to(home)
+except ValueError as exc:
+    raise SystemExit("deployment escaped home") from exc
+if resolved.parent != current:
+    raise SystemExit("deployment escaped its canonical root")
+os.chmod(resolved, 0o700)
+print(json.dumps({"created": True, "relative": relative.as_posix()}, sort_keys=True))
+'''
 
 
 def _validate_remote_limits(
@@ -417,11 +469,32 @@ def _reap_local_process(
         "verified": False,
         "action": "reap_failed",
         "returncode": None,
+        "process_tree_inspection_available": False,
+        "observed_descendant_count": 0,
+        "alive_descendant_pids": [],
+        "complete_process_tree_cleanup_verified": False,
     }
     errors: list[str] = []
 
     def record_error(exc: Exception) -> None:
         errors.append(type(exc).__name__)
+
+    descendants: list[psutil.Process] = []
+    process_pid = getattr(process, "pid", None)
+    tree_applicable = isinstance(process_pid, int) and process_pid > 0
+    tree_available = not tree_applicable
+    if tree_applicable:
+        try:
+            root = psutil.Process(process_pid)
+            descendants = root.children(recursive=True)
+            tree_available = True
+        except psutil.NoSuchProcess:
+            tree_available = False
+            errors.append("ProcessTreeUnavailable")
+        except psutil.Error as exc:
+            record_error(exc)
+        outcome["process_tree_inspection_available"] = tree_available
+        outcome["observed_descendant_count"] = len(descendants)
 
     try:
         initial_returncode = process.poll()
@@ -429,14 +502,20 @@ def _reap_local_process(
         record_error(exc)
         initial_returncode = None
     if initial_returncode is not None:
-        outcome.update(
-            {
-                "verified": True,
-                "action": "already_exited",
-                "returncode": initial_returncode,
-            }
-        )
+        outcome.update({"action": "already_exited", "returncode": initial_returncode})
+        outcome["complete_process_tree_cleanup_verified"] = tree_available
+        outcome["verified"] = tree_available
+        if errors:
+            outcome["error_types"] = errors
         return outcome
+
+    for child in reversed(descendants):
+        try:
+            child.terminate()
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as exc:
+            record_error(exc)
 
     terminated = False
     try:
@@ -475,10 +554,46 @@ def _reap_local_process(
         record_error(exc)
         final_returncode = None
     if final_returncode is not None:
-        outcome["verified"] = True
         outcome["returncode"] = final_returncode
         if outcome["action"] == "reap_failed":
             outcome["action"] = "exited_during_reap"
+
+    alive_descendants: list[psutil.Process] = []
+    if tree_available and descendants:
+        try:
+            _, alive_descendants = psutil.wait_procs(
+                descendants, timeout=timeout_seconds
+            )
+        except psutil.Error as exc:
+            record_error(exc)
+            alive_descendants = list(descendants)
+        for child in alive_descendants:
+            try:
+                child.kill()
+            except psutil.NoSuchProcess:
+                continue
+            except psutil.Error as exc:
+                record_error(exc)
+        try:
+            _, alive_descendants = psutil.wait_procs(
+                alive_descendants, timeout=timeout_seconds
+            )
+        except psutil.Error as exc:
+            record_error(exc)
+    alive_pids: list[int] = []
+    for child in alive_descendants:
+        try:
+            if child.is_running() and child.status() != psutil.STATUS_ZOMBIE:
+                alive_pids.append(child.pid)
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.Error as exc:
+            record_error(exc)
+            alive_pids.append(child.pid)
+    tree_clean = tree_available and not alive_pids
+    outcome["alive_descendant_pids"] = sorted(alive_pids)
+    outcome["complete_process_tree_cleanup_verified"] = tree_clean
+    outcome["verified"] = final_returncode is not None and tree_clean
     if errors:
         outcome["error_types"] = errors
     return outcome
@@ -1018,8 +1133,10 @@ def group_members(leader):
             continue
         try:
             state, group, session, _ = process_stat(int(entry.name))
-        except (OSError, ValueError):
+        except FileNotFoundError:
             continue
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("process group inspection failed") from exc
         if group == leader and session == leader and state != "Z":
             members.append(int(entry.name))
     return sorted(members)
@@ -1031,13 +1148,15 @@ def socket_inodes(pids):
         fd_root = Path(f"/proc/{pid}/fd")
         try:
             fds = list(fd_root.iterdir())
-        except OSError:
-            continue
+        except OSError as exc:
+            raise RuntimeError("process fd inspection failed") from exc
         for fd in fds:
             try:
                 target = os.readlink(fd)
-            except OSError:
+            except FileNotFoundError:
                 continue
+            except OSError as exc:
+                raise RuntimeError("process fd target inspection failed") from exc
             if target.startswith("socket:[") and target.endswith("]"):
                 found.add(target[8:-1])
     return found
@@ -1048,7 +1167,11 @@ def decode_address(raw, family):
     if family == "ipv4":
         address = str(ipaddress.IPv4Address(bytes.fromhex(address_hex)[::-1]))
     else:
-        address = str(ipaddress.IPv6Address(bytes.fromhex(address_hex)))
+        packed = bytes.fromhex(address_hex)
+        packed = b"".join(
+            packed[index:index + 4][::-1] for index in range(0, 16, 4)
+        )
+        address = str(ipaddress.IPv6Address(packed))
     return address, int(port_hex, 16)
 
 
@@ -1056,8 +1179,8 @@ def listeners(path, family, inodes):
     result = []
     try:
         lines = path.read_text(encoding="utf-8").splitlines()[1:]
-    except OSError:
-        return result
+    except OSError as exc:
+        raise RuntimeError("kernel listener table inspection failed") from exc
     for line in lines:
         columns = line.split()
         if len(columns) < 10 or columns[3] != "0A":
@@ -1113,28 +1236,35 @@ else:
     ):
         result["reason"] = "process_identity_mismatch"
     else:
-        members = group_members(args.pid)
-        found = listeners(Path("/proc/net/tcp"), "ipv4", socket_inodes(members))
-        found += listeners(Path("/proc/net/tcp6"), "ipv6", socket_inodes(members))
-        found.sort(key=lambda item: (item["port"], item["family"], item["address"]))
-        observed_ports = {item["port"] for item in found}
-        non_loopback = [
-            item for item in found
-            if not ipaddress.ip_address(item["address"]).is_loopback
-        ]
-        unexpected = [item for item in found if item["port"] not in expected_ports]
-        result.update(
-            {
-                "available": True,
-                "owned_group_process_count": len(members),
-                "listener_count": len(found),
-                "non_loopback_listener_count": len(non_loopback),
-                "unexpected_listener_count": len(unexpected),
-                "listeners": found,
-                "loopback_only": not non_loopback,
-                "expected_ports_listening": set(expected_ports).issubset(observed_ports),
-            }
-        )
+        try:
+            members = group_members(args.pid)
+            if args.pid not in members:
+                raise RuntimeError("process group leader disappeared")
+            inodes = socket_inodes(members)
+            found = listeners(Path("/proc/net/tcp"), "ipv4", inodes)
+            found += listeners(Path("/proc/net/tcp6"), "ipv6", inodes)
+        except (OSError, RuntimeError, ValueError):
+            result["reason"] = "listener_inspection_unavailable"
+        else:
+            found.sort(key=lambda item: (item["port"], item["family"], item["address"]))
+            observed_ports = {item["port"] for item in found}
+            non_loopback = [
+                item for item in found
+                if not ipaddress.ip_address(item["address"]).is_loopback
+            ]
+            unexpected = [item for item in found if item["port"] not in expected_ports]
+            result.update(
+                {
+                    "available": True,
+                    "owned_group_process_count": len(members),
+                    "listener_count": len(found),
+                    "non_loopback_listener_count": len(non_loopback),
+                    "unexpected_listener_count": len(unexpected),
+                    "listeners": found,
+                    "loopback_only": not non_loopback,
+                    "expected_ports_listening": set(expected_ports).issubset(observed_ports),
+                }
+            )
 print(json.dumps(result, sort_keys=True))
 '''
 
@@ -1717,6 +1847,11 @@ class RemoteLab:
         if self._git_value("status", "--porcelain"):
             raise RuntimeError("remote deployment requires a clean Git worktree")
         return self._git_value("rev-parse", "HEAD")
+
+    def _require_source_unchanged(self, expected_commit: str) -> None:
+        current = self._require_clean_source()
+        if current != expected_commit:
+            raise RuntimeError("remote deployment source commit changed during the run")
 
     @staticmethod
     def _reserve_local_output(path: Path) -> Path:
@@ -2825,7 +2960,6 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
                 + "\n",
                 encoding="utf-8",
             )
-            uv = _resolve_executable(None, "uv")
             node_runs: list[dict[str, Any]] = []
             for index in range(1, TUNNEL_NODE_COUNT + 1):
                 profile_path = tunnel_dir / f"node-{index}.json"
@@ -2848,9 +2982,9 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
                 node_result_path = tunnel_dir / f"node-{index}-result.json"
                 node_process = subprocess.Popen(
                     [
-                        uv,
-                        "run",
-                        "loveengine",
+                        sys.executable,
+                        "-m",
+                        "loveengine_witness.cli",
                         "node",
                         "connect",
                         "--invite",
@@ -3182,14 +3316,22 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
         started_at = _utc_now()
 
         self.current_phase = "remote_deployment_create"
+        deployment_name = PurePosixPath(deployment_rel).name
         create_command = _remote_bash(
-            "set -eu; umask 077; "
-            f"test ! -e \"{remote_deployment}\"; "
-            f"mkdir -p \"{remote_deployment}\""
+            "python3 - "
+            f"{shlex.quote(self.remote_root)} {shlex.quote(deployment_name)}"
         )
-        self.ssh_run(create_command, timeout=30)
+        creation = self.ssh_run(
+            create_command,
+            input_text=REMOTE_DEPLOYMENT_CREATE_SOURCE,
+            timeout=30,
+        )
+        creation_result = _last_json_object(creation.stdout)
+        if creation_result != {"created": True, "relative": deployment_rel}:
+            raise RuntimeError("remote deployment path was not canonically created")
         self.current_remote_deployment_created = True
         self.current_phase = "dependency_bundle_build"
+        self._require_source_unchanged(commit)
         with tempfile.TemporaryDirectory(prefix="loveengine-remote-lab-") as raw_temp:
             archive = Path(raw_temp) / "source.tar"
             dependency_archive = Path(raw_temp) / "contract-dependencies.zip"
@@ -3290,11 +3432,13 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
             expected_max_cpus=core_max_cpus,
         )
         self.current_phase = "tunnel_smoke"
+        self._require_source_unchanged(commit)
         tunnel = self._tunnel_smoke(
             deployment_rel=deployment_rel,
             remote_deployment=remote_deployment,
             local_output=local_output,
         )
+        self._require_source_unchanged(commit)
         self.current_phase = "reporting"
         report = {
             "schema_version": "loveengine.remote-lab-report/1",
@@ -3326,10 +3470,6 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
             "core_cleanup_verification": core_cleanup,
             "remote_file_cleanup_performed": False,
         }
-        (local_output / "remote-lab-report.json").write_text(
-            json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
         return report
 
     def _write_report(self, report: dict[str, Any]) -> None:
@@ -3444,6 +3584,16 @@ print(json.dumps({"package_archive_relative": relative.as_posix()}))
                 "message": "could not verify absence of lab processes",
             }
         report["completed_at"] = _utc_now()
+        if self.current_commit is not None:
+            try:
+                self._require_source_unchanged(self.current_commit)
+            except Exception as exc:
+                report["status"] = "failed"
+                report["phase"] = "source_identity"
+                report["error"] = {
+                    "type": type(exc).__name__,
+                    "message": str(exc)[:2000],
+                }
         self._write_report(report)
         return report
 

@@ -16,10 +16,12 @@
 3. [0.6.1 Remote Lab SPEC (historical evidence)](specs/love-engine-pre-enterprise-remote-lab.md)
 4. [API documents](api/README.md)
 5. [Role runbooks](development/participant-runbook.zh-CN.md)
+6. [Sepolia invited public pilot runbook](development/runbooks/invited-public-pilot.zh-CN.md)
 
 最新发布 tag 仍是 v0.6.0-contract-public-pilot。精确 0.6.1 candidate `9e5058e`
-的本机四小时和共享 Linux remote lab 已通过，但 PR #11 仍需人工 review/merge；
-0.7 分支可以并行设计和实现，不能据此把 0.6.1 或 0.7 表述为已发布。
+的本机四小时和共享 Linux remote lab 已通过。PR #11 与 PR #12 已于 2026-08-10
+经项目所有者授权的自审合入 `main`，但 0.6.1/0.7 tag 和 release asset 均未发布，不能据此把
+0.6.1 或 0.7 表述为已发布。
 
 0.7 candidate 已实现本机 WitnessCoreTranscriptV2、外部 signer adapter、Sepolia
 transaction plan、双 RPC 契约、分离的管理/参与者入口和 Tailscale Serve preflight；
@@ -37,6 +39,7 @@ transaction plan、双 RPC 契约、分离的管理/参与者入口和 Tailscale
 - [Read-only viewer](development/runbooks/public-viewer-flow.zh-CN.md)
 - [Publisher](development/runbooks/publisher-flow.zh-CN.md)
 - [Shared remote lab](development/runbooks/remote-lab-flow.zh-CN.md)
+- [Sepolia invited public pilot](development/runbooks/invited-public-pilot.zh-CN.md)
 - [Technical architecture article](articles/loveengine-technical-architecture.zh-CN.md)
 
 ## Historical evidence

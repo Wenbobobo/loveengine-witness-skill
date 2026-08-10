@@ -1,5 +1,80 @@
 [
   {
+    "id": "invited-public-pilot-runbook",
+    "title": "Sepolia invited public pilot runbook",
+    "path": "docs/development/runbooks/invited-public-pilot.zh-CN.md",
+    "source_group": "docs/development/runbooks",
+    "layer": "operations",
+    "domain_tags": [
+      "Sepolia",
+      "Tailscale Serve",
+      "invited pilot"
+    ],
+    "status": "candidate",
+    "canonical_role": "Operator sequence and stop conditions for the first external pilot",
+    "summary": "Defines the public-chain and tailnet-only boundary, required inputs, secret handling, validated YAML workflow, execution order and evidence limits."
+  },
+  {
+    "id": "invited-public-pilot-plan-schema",
+    "title": "Invited public pilot plan V1 schema",
+    "path": "schemas/invited-public-pilot-plan-v1.schema.json",
+    "source_group": "schemas",
+    "layer": "operations",
+    "domain_tags": [
+      "YAML plan",
+      "Sepolia",
+      "secret-file references"
+    ],
+    "status": "candidate",
+    "canonical_role": "Machine-readable cross-component pilot plan contract",
+    "summary": "Fixes the Sepolia release, dual RPC, external signer, participant, dual-surface, Tailscale and 900-second acceptance inventory while requiring secret-bearing values to remain in referenced files."
+  },
+  {
+    "id": "invited-public-pilot-plan-runtime",
+    "title": "Invited public pilot plan validator runtime",
+    "path": "src/loveengine_witness/invited_pilot_plan.py",
+    "source_group": "runtime",
+    "layer": "operations",
+    "domain_tags": [
+      "configuration validation",
+      "fail closed",
+      "secret boundary"
+    ],
+    "status": "candidate",
+    "canonical_role": "Semantic validation for invited pilot YAML plans",
+    "summary": "Rejects forbidden secret fields, non-path secret references, placeholder execution requests, duplicate identities, single-RPC plans, insufficient groups and mixed surfaces."
+  },
+  {
+    "id": "invited-public-pilot-plan-tool",
+    "title": "Invited public pilot plan validation tool",
+    "path": "tools/validate_invited_pilot_plan.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "preflight",
+      "YAML",
+      "machine report"
+    ],
+    "status": "candidate",
+    "canonical_role": "Secret-file-referencing operator validation entrypoint",
+    "summary": "Loads one plan, optionally checks referenced files and emits only a non-secret validation summary with stable errors."
+  },
+  {
+    "id": "invited-public-pilot-plan-example",
+    "title": "Invited public pilot Sepolia plan example",
+    "path": "config/examples/invited-public-pilot.sepolia.example.yaml",
+    "source_group": "config/examples",
+    "layer": "operations",
+    "domain_tags": [
+      "Sepolia",
+      "operator template",
+      "disabled by default"
+    ],
+    "status": "candidate",
+    "canonical_role": "Editable secret-file-referencing starting point for an invited pilot",
+    "summary": "Provides valid-format sentinels, restricted-file references, three participant slots, distinct surfaces and Funnel-disabled Tailscale settings with execution not requested."
+  },
+  {
     "id": "invited-public-pilot-spec",
     "title": "LoveEngine 0.7 invited public pilot specification",
     "path": "docs/specs/love-engine-invited-public-pilot.md",

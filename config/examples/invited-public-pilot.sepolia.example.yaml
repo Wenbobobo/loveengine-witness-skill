@@ -1,0 +1,104 @@
+schema_version: loveengine.invited-public-pilot-plan/1
+
+# This tracked template cannot authorize execution. Copy it under tmp/ and
+# replace every sentinel before changing this field to true.
+execution_requested: false
+
+experiment:
+  run_id: sepolia-pilot-edit-me
+  environment: sepolia_invited_pilot
+  source_commit: "0000000000000000000000000000000000000000"
+  duration_seconds: 900
+  events: 30
+  observers: 10
+
+release:
+  chain_id: "11155111"
+  protocol_version: loveengine-witness-net/0.6
+  skill_id: loveengine-witness
+  version: 0.7.0-invited-public-pilot
+  registry: "0x0000000000000000000000000000000000000000"
+  publisher: "0x0000000000000000000000000000000000000100"
+  package_hash: "0x0000000000000000000000000000000000000000000000000000000000000000"
+  manifest_hash: "0x0000000000000000000000000000000000000000000000000000000000000000"
+  package_archive: ./inputs/loveengine-witness-0.7.0-invited-public-pilot.zip
+  release_file: ./inputs/registry-release.json
+  trust_policy_file: ./inputs/node-trust-policy.json
+
+# Store one credentialed HTTPS URL in each restricted file. Do not put either
+# URL in this YAML. Use independent providers or infrastructure.
+rpc:
+  primary_url_file: ./secrets/sepolia-primary-rpc.txt
+  secondary_url_file: ./secrets/sepolia-secondary-rpc.txt
+
+signers:
+  publisher:
+    address: "0x0000000000000000000000000000000000000100"
+    config_file: ./inputs/publisher-signer.json
+    ruleset_file: ./inputs/publisher-rules.js
+    rules_attestation_file: ./inputs/publisher-rules-attestation.json
+    clef_binary: ./bin/clef
+    expected_binary_sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  task_issuer:
+    address: "0x0000000000000000000000000000000000000101"
+    config_file: ./inputs/task-issuer-signer.json
+    ruleset_file: ./inputs/task-issuer-rules.js
+    rules_attestation_file: ./inputs/task-issuer-rules-attestation.json
+    clef_binary: ./bin/clef
+    expected_binary_sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+participants:
+  - id: node-1
+    address: "0x0000000000000000000000000000000000000001"
+    operator_group: operator-a
+    network_group: network-a
+    profile_file: ./inputs/node-1-profile.json
+    cursor_database: ./state/node-1.cursor.sqlite
+    resume_existing_cursor: false
+    config_file: ./inputs/node-1-signer.json
+    ruleset_file: ./inputs/node-rules.js
+    rules_attestation_file: ./inputs/node-rules-attestation.json
+    clef_binary: ./bin/clef
+    expected_binary_sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - id: node-2
+    address: "0x0000000000000000000000000000000000000002"
+    operator_group: operator-b
+    network_group: network-b
+    profile_file: ./inputs/node-2-profile.json
+    cursor_database: ./state/node-2.cursor.sqlite
+    resume_existing_cursor: false
+    config_file: ./inputs/node-2-signer.json
+    ruleset_file: ./inputs/node-rules.js
+    rules_attestation_file: ./inputs/node-rules-attestation.json
+    clef_binary: ./bin/clef
+    expected_binary_sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  - id: node-3
+    address: "0x0000000000000000000000000000000000000003"
+    operator_group: operator-b
+    network_group: network-c
+    profile_file: ./inputs/node-3-profile.json
+    cursor_database: ./state/node-3.cursor.sqlite
+    resume_existing_cursor: false
+    config_file: ./inputs/node-3-signer.json
+    ruleset_file: ./inputs/node-rules.js
+    rules_attestation_file: ./inputs/node-rules-attestation.json
+    clef_binary: ./bin/clef
+    expected_binary_sha256: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+pilot:
+  config_file: ./inputs/pilot-config-v2.json
+  write_token_file: ./secrets/pilot-write-token.txt
+  invite_file: ./inputs/pilot-invite-v2.json
+  service_config_file: ./inputs/invited-pilot-service-config.json
+  admin_url: http://127.0.0.1:8780
+  participant_loopback_url: http://127.0.0.1:8781
+  tailscale:
+    expected_hostname: pilot-host.ts.net
+    serve_path: /
+    funnel_enabled: false
+    restore_owned_config: true
+
+evidence:
+  input_mode: invited_operator_input
+  session_id: sepolia-pilot-edit-me
+  output_dir: ./evidence
