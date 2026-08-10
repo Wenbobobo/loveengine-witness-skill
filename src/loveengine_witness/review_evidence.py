@@ -23,6 +23,52 @@ from .secrets import reject_secret_fields
 
 MAX_REVIEW_EVENTS = 1_000
 MAX_REVIEW_ARTIFACT_BYTES = 32 * 1024 * 1024
+CURRENT_REVIEW_PAYLOAD_SCHEMA = "loveengine.review-dispute-payload/1"
+REVIEW_RESULT_BINDING_FIELDS = (
+    "dispute_id",
+    "bundle_hash",
+    "session_id",
+    "revision",
+    "event_count",
+    "head_event_hash",
+)
+REVIEW_RESULT_HASH_FIELDS = {"bundle_hash", "head_event_hash"}
+
+
+def is_current_review_payload(payload: object) -> bool:
+    return (
+        isinstance(payload, dict)
+        and payload.get("schema_version") == CURRENT_REVIEW_PAYLOAD_SCHEMA
+    )
+
+
+def require_verified_review_result(
+    payload: object,
+    result: object,
+    *,
+    task_id: str,
+) -> dict[str, Any]:
+    """Require the executable review binding recorded by a current node."""
+
+    if not is_current_review_payload(payload):
+        raise LoveEngineError("review_evidence_payload_required", task_id)
+    validate_schema(payload, "review-dispute-payload-v1.schema.json")
+    if not isinstance(result, dict):
+        raise LoveEngineError("review_evidence_result_invalid", task_id)
+    if result.get("evidence_verified") is not True:
+        raise LoveEngineError("review_evidence_not_verified", task_id)
+    for field in REVIEW_RESULT_BINDING_FIELDS:
+        expected = payload[field]
+        actual = result.get(field)
+        if field in REVIEW_RESULT_HASH_FIELDS:
+            matches = str(actual).lower() == str(expected).lower()
+        else:
+            matches = str(actual) == str(expected)
+        if not matches:
+            raise LoveEngineError(
+                "review_evidence_binding_mismatch", f"{task_id}:{field}"
+            )
+    return result
 
 
 def validate_review_urls(

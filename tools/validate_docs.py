@@ -69,6 +69,11 @@ VERSION_STATUS_DOCS = {
     "docs/development/participant-runbook.zh-CN.md",
 }
 LATEST_TAG = "v0.6.0-contract-public-pilot"
+GENERATED_CONTRACT_RUNTIME_PATHS = (
+    "contracts/lib",
+    "contracts/out",
+    "contracts/cache",
+)
 
 
 def require_text(
@@ -177,6 +182,14 @@ def validate_inline_paths(path: Path, text: str, errors: list[str]) -> None:
     for raw in INLINE_PATH_RE.findall(text):
         target = raw.rstrip(".,;:").replace("\\", "/")
         if any(character in target for character in "<>*{}"):
+            continue
+        if any(
+            target == runtime_path or target.startswith(runtime_path + "/")
+            for runtime_path in GENERATED_CONTRACT_RUNTIME_PATHS
+        ):
+            # These directories are intentionally ignored work products of
+            # `loveengine pilot contracts prepare`, so a clean checkout must
+            # be allowed to document them before preparation has run.
             continue
         candidates = [(ROOT / target).resolve(), (path.parent / target).resolve()]
         in_repo = []

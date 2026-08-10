@@ -20,6 +20,7 @@ from .errors import LoveEngineError
 from .hashes import TEXT_SOURCE_SUFFIXES, keccak256_hex, sha256_prefixed
 from .release_identity import PROTOCOL_VERSION, SKILL_VERSION
 from .schema import validate_schema
+from .toolchain import verify_prepared_contract_artifacts
 
 
 # Kept as a public compatibility alias for existing adapters.
@@ -60,6 +61,7 @@ FORBIDDEN_ARCHIVE_NAMES = {
     "keystore",
 }
 FORBIDDEN_ARCHIVE_SUFFIXES = {".key", ".pem", ".p12", ".pfx"}
+TRANSIENT_ARCHIVE_ROOTS = {".tmp", "tmp", "temp"}
 IGNORED_INSTALL_ROOTS = {".venv"}
 IGNORED_INSTALL_CACHE_DIRS = {
     "__pycache__",
@@ -99,6 +101,8 @@ def _safe_archive_path(name: str) -> PurePosixPath:
     ):
         raise LoveEngineError("unsafe_archive_path", name)
     lowered = [part.lower() for part in path.parts]
+    if lowered[0] in TRANSIENT_ARCHIVE_ROOTS:
+        raise LoveEngineError("unsafe_archive_path", name)
     if (
         any(part in FORBIDDEN_ARCHIVE_NAMES for part in lowered)
         or any(part.startswith(".env.") for part in lowered)
@@ -110,6 +114,9 @@ def _safe_archive_path(name: str) -> PurePosixPath:
 
 
 def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
+    # Do not let the standalone packaging route bypass the same attested
+    # source/dependency/artifact boundary used by active Pilot paths.
+    verify_prepared_contract_artifacts(root / "contracts")
     manifest_path = root / "skills/loveengine-witness/skill-manifest.json"
     try:
         manifest = _load_json_bytes(
@@ -132,6 +139,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         "QA.md",
         "contracts/foundry.toml",
         "contracts/remappings.txt",
+        "contracts/dependency-lock.json",
         "skills/loveengine-witness/SKILL.md",
         "skills/loveengine-witness/agents/openai.yaml",
         "skills/loveengine-witness/skill-manifest.json",
@@ -189,7 +197,7 @@ def _runtime_files(root: Path) -> Iterable[tuple[str, bytes]]:
         if not artifact_path.is_file():
             raise LoveEngineError(
                 "contract_artifact_missing",
-                f"{name}: run pinned Foundry build before packaging",
+                f"{name}: run loveengine pilot contracts prepare before packaging",
                 3,
             )
         if artifact_path.is_symlink():
@@ -286,7 +294,14 @@ def build_package(root: Path, output: Path) -> PackageBuildResult:
     root = Path(root).resolve()
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    files = dict(_runtime_files(root))
+    # Manifest source hashes already define repository text in canonical LF
+    # form. Archive bytes must use that same representation, otherwise a
+    # Windows CRLF checkout and an LF checkout produce different release
+    # hashes for identical source content.
+    files = {
+        name: _source_bytes(name, data)
+        for name, data in _runtime_files(root)
+    }
     manifest = json.loads(files["skills/loveengine-witness/skill-manifest.json"])
     if manifest.get("version") != SKILL_VERSION or manifest.get(
         "protocol"

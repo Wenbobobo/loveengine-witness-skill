@@ -96,6 +96,7 @@ def test_m0_validator_accepts_revision_and_rejects_tampering() -> None:
     assert validation.returncode == 0, validation.stdout + validation.stderr
     assert tamper.returncode == 0, tamper.stdout + tamper.stderr
     assert "tamper check rejected modified manifest" in tamper.stdout
+    assert tamper.stderr == ""
 
 
 def test_manifest_rejects_unknown_or_missing_schema_version(tmp_path: Path) -> None:

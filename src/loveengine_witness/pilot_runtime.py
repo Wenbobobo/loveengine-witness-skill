@@ -28,6 +28,7 @@ from .package import PackageBuildResult, build_package
 from .pilot_chain import initialize_chain, start_chain, stop_chain
 from .pilot_config import PilotConfig, build_pilot_invite
 from .release_identity import SKILL_VERSION
+from .toolchain import verify_prepared_contract_artifacts
 from .trust_policy import build_node_trust_policy
 
 
@@ -153,6 +154,7 @@ def prepare_local_pilot_runtime(
     base = validate_local_quickstart(host, port, base_url)
     root = Path(root).resolve()
     root.mkdir(parents=True, exist_ok=True)
+    verify_prepared_contract_artifacts()
     package = build_package(ROOT, root / "release")
     chain_root = root / "chain"
     if not (chain_root / "deployment.json").is_file():

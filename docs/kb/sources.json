@@ -1,5 +1,20 @@
 [
   {
+    "id": "engineering-acceptance-runner",
+    "title": "Engineering acceptance runner",
+    "path": "tools/run_engineering_acceptance.py",
+    "source_group": "tools",
+    "layer": "verification",
+    "domain_tags": [
+      "candidate gate",
+      "15 minute acceptance",
+      "evidence binding"
+    ],
+    "status": "current",
+    "canonical_role": "Exact-commit candidate engineering acceptance",
+    "summary": "Binds the complete release gate and one 900-second core run to a clean commit, package hash, terminal report, empty stderr and independent transcript verification."
+  },
+  {
     "id": "release-check-runner",
     "title": "Release check runner",
     "path": "tools/run_release_checks.ps1",

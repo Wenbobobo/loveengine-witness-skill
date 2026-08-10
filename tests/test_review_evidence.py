@@ -133,3 +133,70 @@ def test_review_urls_are_bound_to_invite_origin() -> None:
             )
         )
     assert error.value.code == "review_origin_mismatch"
+
+
+def test_review_node_verifies_a_240_event_http_response(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        app = create_live_app(tmp_path / "live.sqlite", tmp_path / "artifacts")
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            session_id = "review-large-session"
+            assert (
+                await client.post(
+                    "/v1/live/sessions",
+                    json={
+                        "session_id": session_id,
+                        "source_type": "operator",
+                        "created_at": "1770000000",
+                    },
+                )
+            ).status == 201
+            for index in range(1, 241):
+                response = await client.post(
+                    f"/v1/live/sessions/{session_id}/events",
+                    json={
+                        "event_id": f"review-large-event-{index}",
+                        "occurred_at": str(1770000000 + index),
+                        "category": "source",
+                        "source_type": "operator",
+                        "content": f"review evidence event {index}",
+                    },
+                )
+                assert response.status == 202
+            assert (
+                await client.post(
+                    f"/v1/live/sessions/{session_id}/close",
+                    json={"closed_at": "1770000300"},
+                )
+            ).status == 200
+            finalized = await client.post(
+                f"/v1/live/sessions/{session_id}/evidence/finalize",
+                json={"revision": "1", "finalized_at": "1770000300"},
+            )
+            bundle = await finalized.json()
+            base = str(client.make_url("")).rstrip("/")
+            payload = {
+                "schema_version": "loveengine.review-dispute-payload/1",
+                "dispute_id": "dispute-large",
+                "bundle_hash": bundle["bundle_hash"],
+                "session_id": session_id,
+                "evidence_url": (
+                    f"{base}/v1/live/sessions/{session_id}/evidence"
+                ),
+                "events_url": f"{base}/v1/live/sessions/{session_id}/events",
+                "artifact_base_url": f"{base}/v1/live/artifacts",
+                "revision": bundle["revision"],
+                "event_count": bundle["event_count"],
+                "head_event_hash": bundle["head_event_hash"],
+            }
+
+            verified = await verify_review_evidence(
+                payload, allowed_origin=base
+            )
+            assert verified["evidence_verified"] is True
+            assert verified["event_count"] == "240"
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())

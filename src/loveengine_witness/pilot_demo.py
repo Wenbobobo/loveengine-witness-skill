@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable
 
 from web3 import HTTPProvider, Web3
 
@@ -17,9 +18,23 @@ from .pilot_phases import run_pilot_phases
 from .pilot_runtime import prepare_local_pilot_runtime
 
 
+def _run_pilot_with_platform_loop(
+    coroutine: Awaitable[dict[str, Any]],
+) -> dict[str, Any]:
+    """Run the restart-bearing local Pilot on a loop that closes cleanly."""
+
+    if os.name == "nt":
+        # CPython's Proactor loop can race an aiohttp listener restart with a
+        # late accept callback. Keep the workaround local to this demo runner.
+        with asyncio.Runner(loop_factory=asyncio.SelectorEventLoop) as runner:
+            return runner.run(coroutine)
+    return asyncio.run(coroutine)
+
+
 def run_pilot_demo(
     output: Path,
     *,
+    run_id: str | None = None,
     event_count: int = 12,
     observer_count: int = 10,
     event_interval: float = 0.01,
@@ -38,7 +53,7 @@ def run_pilot_demo(
         host="127.0.0.1",
         port=server_port,
         rpc_port=rpc_port,
-        run_id="lan-pilot-e2e-001",
+        run_id=run_id or "lan-pilot-e2e-001",
     )
     package = runtime.package
     installed = install_package(
@@ -63,7 +78,7 @@ def run_pilot_demo(
 
     try:
         status_chain(chain_root, rpc_url)
-        result = asyncio.run(
+        result = _run_pilot_with_platform_loop(
             run_pilot_phases(
                 output,
                 w3,

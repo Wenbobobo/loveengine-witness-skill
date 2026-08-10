@@ -9,8 +9,11 @@ import math
 import os
 import platform
 import re
+import secrets
 import shutil
+import stat
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -18,6 +21,12 @@ from typing import Any
 
 GIB = 1024**3
 SCHEMA_VERSION = "loveengine.remote-host-preflight/1"
+SHARED_HOST_LEASE_SCHEMA_VERSION = "loveengine.shared-host-preflight-lease/1"
+SHARED_HOST_LEASE_MAX_BYTES = 64 * 1024
+SHARED_HOST_LEASE_TTL_NS = 15_000_000_000
+SHARED_HOST_LOCK_FILENAME = ".shared-host-core.lock"
+MIN_RESERVED_SHARED_HOST_CPUS = 1
+MAX_LAB_CPU_ASSIGNMENT = 2
 REQUIRED_TOOLS = (
     "python3",
     "uv",
@@ -45,6 +54,325 @@ class CapacityThresholds:
     min_available_memory_bytes: int = 3 * GIB
     min_free_disk_bytes: int = 5 * GIB
     min_cpu_count: int = 2
+
+
+def _threshold_record(thresholds: CapacityThresholds) -> dict[str, int | float]:
+    """Return the exact threshold representation used in a one-shot lease."""
+
+    return asdict(thresholds)
+
+
+def _has_exact_thresholds(
+    value: object,
+    expected: CapacityThresholds,
+) -> bool:
+    if not isinstance(value, dict):
+        return False
+    record = _threshold_record(expected)
+    if set(value) != set(record):
+        return False
+    return all(
+        type(value[key]) is type(expected_value) and value[key] == expected_value
+        for key, expected_value in record.items()
+    )
+
+
+def is_passing_preflight(
+    preflight: object,
+    workspace: Path,
+    thresholds: CapacityThresholds,
+) -> bool:
+    """Check a report before it is used as an in-memory launch authorization."""
+
+    if not isinstance(preflight, dict):
+        return False
+    host = preflight.get("host")
+    return (
+        preflight.get("schema_version") == SCHEMA_VERSION
+        and preflight.get("workspace") == str(workspace.resolve())
+        and preflight.get("safe_to_run") is True
+        and preflight.get("mutated_host") is False
+        and preflight.get("reasons") == []
+        and isinstance(preflight.get("checked_at_monotonic_ns"), int)
+        and not isinstance(preflight.get("checked_at_monotonic_ns"), bool)
+        and preflight["checked_at_monotonic_ns"] > 0
+        and _has_exact_thresholds(preflight.get("thresholds"), thresholds)
+        and isinstance(host, dict)
+        and host.get("process_snapshot_ok") is True
+        and host.get("relevant_processes") == []
+    )
+
+
+def shared_host_lock_path() -> Path:
+    """Return the per-user advisory lock for compliant shared-host labs."""
+
+    return (
+        Path.home()
+        / ".local"
+        / "share"
+        / "loveengine-witness-lab"
+        / SHARED_HOST_LOCK_FILENAME
+    )
+
+
+def acquire_shared_host_lock() -> int | None:
+    """Acquire the one shared-host lab lock without waiting for other work."""
+
+    if os.name == "nt":
+        raise RuntimeError("shared-host locking requires POSIX")
+    import fcntl
+
+    path = shared_host_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        # A non-interactive caller can arrive with one of its standard streams
+        # closed, in which case ``open`` is allowed to return 0, 1, or 2. The
+        # supervisor/guardian protocol deliberately refuses those descriptors,
+        # so normalize the launcher-owned lock before it crosses that boundary.
+        if descriptor < 3:
+            duplicate_command = getattr(fcntl, "F_DUPFD_CLOEXEC", fcntl.F_DUPFD)
+            replacement = fcntl.fcntl(descriptor, duplicate_command, 3)
+            try:
+                os.close(descriptor)
+            except OSError:
+                os.close(replacement)
+                raise
+            descriptor = replacement
+        if descriptor < 3:
+            raise RuntimeError("shared-host lab lock descriptor is not non-standard")
+        mode = os.fstat(descriptor).st_mode
+        if not stat.S_ISREG(mode):
+            raise RuntimeError("shared-host lab lock is not a regular file")
+        os.fchmod(descriptor, 0o600)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(descriptor)
+            return None
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def close_shared_host_lock(descriptor: int | None) -> None:
+    if descriptor is not None:
+        os.close(descriptor)
+
+
+def validate_shared_host_lock_descriptor(descriptor: int) -> None:
+    """Require a non-standard descriptor for the canonical held lab lock.
+
+    The launcher passes the advisory lock through the supervisor to the
+    guardian.  A descriptor that merely happens to be open cannot establish
+    that lifecycle boundary: standard streams and an unrelated file would let
+    the launcher release the real lock while a claimed guardian still runs.
+    ``flock`` on an inherited open-file description keeps the lock held by the
+    guardian after the supervisor exits.
+    """
+
+    if os.name == "nt":
+        raise RuntimeError("shared-host locking requires POSIX")
+    if type(descriptor) is not int or descriptor < 3:
+        raise ValueError("shared-host lock descriptor must be at least 3")
+    path = shared_host_lock_path()
+    try:
+        path_lstat = path.lstat()
+        expected = path.stat()
+        actual = os.fstat(descriptor)
+    except OSError as exc:
+        raise ValueError("shared-host lock descriptor is unavailable") from exc
+    if (
+        stat.S_ISLNK(path_lstat.st_mode)
+        or not stat.S_ISREG(expected.st_mode)
+        or not stat.S_ISREG(actual.st_mode)
+        or (path_lstat.st_dev, path_lstat.st_ino)
+        != (expected.st_dev, expected.st_ino)
+        or (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino)
+    ):
+        raise ValueError("shared-host lock descriptor is not the canonical lock")
+    import fcntl
+
+    try:
+        # This is a no-op for the inherited lock's open-file description. If
+        # the descriptor was separately opened, it becomes the guardian's own
+        # held lock before any workload lifetime is accepted.
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError as exc:
+        raise ValueError("shared-host lock descriptor is not the held lock") from exc
+    try:
+        current_path_lstat = path.lstat()
+    except OSError as exc:
+        raise ValueError("shared-host lock path changed during validation") from exc
+    if (
+        stat.S_ISLNK(current_path_lstat.st_mode)
+        or (current_path_lstat.st_dev, current_path_lstat.st_ino)
+        != (expected.st_dev, expected.st_ino)
+    ):
+        raise ValueError("shared-host lock path changed during validation")
+
+
+def _read_lease_bytes(descriptor: int) -> bytes:
+    if descriptor < 0:
+        raise ValueError("shared-host preflight lease descriptor is invalid")
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            chunk = os.read(descriptor, min(4096, SHARED_HOST_LEASE_MAX_BYTES + 1))
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > SHARED_HOST_LEASE_MAX_BYTES:
+                raise ValueError("shared-host preflight lease is too large")
+            chunks.append(chunk)
+    finally:
+        os.close(descriptor)
+    if not chunks:
+        raise ValueError("shared-host preflight lease is empty")
+    return b"".join(chunks)
+
+
+def _write_lease_bytes(descriptor: int, value: bytes) -> None:
+    if descriptor < 0 or len(value) > SHARED_HOST_LEASE_MAX_BYTES:
+        raise ValueError("shared-host preflight lease is invalid")
+    offset = 0
+    try:
+        while offset < len(value):
+            written = os.write(descriptor, value[offset:])
+            if written <= 0:
+                raise OSError("could not write shared-host preflight lease")
+            offset += written
+    finally:
+        os.close(descriptor)
+
+
+def create_shared_host_preflight_lease(
+    descriptor: int,
+    workspace: Path,
+    thresholds: CapacityThresholds,
+    preflight: dict[str, Any],
+    *,
+    launcher_pid: int,
+    launcher_start_ticks: int,
+) -> str:
+    """Write one short-lived, EOF-delimited lease to an inherited POSIX pipe."""
+
+    write_started = False
+    try:
+        resolved_workspace = workspace.resolve()
+        if launcher_pid <= 1 or launcher_start_ticks <= 0:
+            raise ValueError("shared-host preflight lease launcher identity is invalid")
+        if not is_passing_preflight(preflight, resolved_workspace, thresholds):
+            raise ValueError("cannot lease a non-passing shared-host preflight")
+        issued_at = time.monotonic_ns()
+        lease_id = secrets.token_hex(16)
+        value = {
+            "schema_version": SHARED_HOST_LEASE_SCHEMA_VERSION,
+            "lease_id": lease_id,
+            "workspace": str(resolved_workspace),
+            "thresholds": _threshold_record(thresholds),
+            "preflight": preflight,
+            "launcher": {
+                "pid": launcher_pid,
+                "process_start_ticks": launcher_start_ticks,
+            },
+            "issued_at_monotonic_ns": issued_at,
+            "expires_at_monotonic_ns": issued_at + SHARED_HOST_LEASE_TTL_NS,
+        }
+        encoded = json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        write_started = True
+        _write_lease_bytes(descriptor, encoded)
+        return lease_id
+    except Exception:
+        if not write_started:
+            os.close(descriptor)
+        raise
+
+
+def consume_shared_host_preflight_lease(
+    descriptor: int,
+    workspace: Path,
+    thresholds: CapacityThresholds,
+    *,
+    launcher_pid: int,
+    launcher_start_ticks: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Consume an inherited preflight lease exactly once and fail closed."""
+
+    resolved_workspace = workspace.resolve()
+    try:
+        value = json.loads(_read_lease_bytes(descriptor).decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("shared-host preflight lease is unreadable") from exc
+    if not isinstance(value, dict):
+        raise ValueError("shared-host preflight lease is not an object")
+    if value.get("schema_version") != SHARED_HOST_LEASE_SCHEMA_VERSION:
+        raise ValueError("shared-host preflight lease schema is invalid")
+    lease_id = value.get("lease_id")
+    if not isinstance(lease_id, str) or re.fullmatch(r"[0-9a-f]{32}", lease_id) is None:
+        raise ValueError("shared-host preflight lease identifier is invalid")
+    if value.get("workspace") != str(resolved_workspace):
+        raise ValueError("shared-host preflight lease workspace is invalid")
+    if not _has_exact_thresholds(value.get("thresholds"), thresholds):
+        raise ValueError("shared-host preflight lease thresholds are invalid")
+    launcher = value.get("launcher")
+    if (
+        not isinstance(launcher, dict)
+        or launcher.get("pid") != launcher_pid
+        or launcher.get("process_start_ticks") != launcher_start_ticks
+    ):
+        raise ValueError("shared-host preflight lease launcher identity is invalid")
+    issued_at = value.get("issued_at_monotonic_ns")
+    expires_at = value.get("expires_at_monotonic_ns")
+    now = time.monotonic_ns()
+    if (
+        isinstance(issued_at, bool)
+        or not isinstance(issued_at, int)
+        or isinstance(expires_at, bool)
+        or not isinstance(expires_at, int)
+        or expires_at != issued_at + SHARED_HOST_LEASE_TTL_NS
+        or now < issued_at
+        or now > expires_at
+    ):
+        raise ValueError("shared-host preflight lease is expired")
+    preflight = value.get("preflight")
+    if not is_passing_preflight(preflight, resolved_workspace, thresholds):
+        raise ValueError("shared-host preflight lease is not a passing resource gate")
+    return preflight, {
+        "schema_version": SHARED_HOST_LEASE_SCHEMA_VERSION,
+        "lease_id": lease_id,
+        "issued_at_monotonic_ns": issued_at,
+        "expires_at_monotonic_ns": expires_at,
+        "launcher": launcher,
+    }
+
+
+def max_lab_cpu_assignment(
+    available_cpu_count: int,
+    requested_max_cpus: int = MAX_LAB_CPU_ASSIGNMENT,
+) -> int:
+    """Return the bounded lab affinity while retaining one shared-host CPU."""
+
+    if (
+        isinstance(available_cpu_count, bool)
+        or not isinstance(available_cpu_count, int)
+        or available_cpu_count < 0
+    ):
+        raise ValueError("available CPU count must be a non-negative integer")
+    if (
+        isinstance(requested_max_cpus, bool)
+        or not isinstance(requested_max_cpus, int)
+        or not 1 <= requested_max_cpus <= MAX_LAB_CPU_ASSIGNMENT
+    ):
+        raise ValueError("requested lab CPUs must be between 1 and 2")
+    return min(requested_max_cpus, max(0, available_cpu_count - MIN_RESERVED_SHARED_HOST_CPUS))
 
 
 def _existing_path(path: Path) -> Path:
@@ -229,6 +557,8 @@ def collect_host_snapshot(workspace: Path) -> dict[str, Any]:
         "architecture": platform.machine(),
         "host_cpu_count": host_cpu_count,
         "cpu_count": cpu_count,
+        "reserved_cpu_count": MIN_RESERVED_SHARED_HOST_CPUS,
+        "max_lab_cpu_assignment": max_lab_cpu_assignment(cpu_count),
         "load_1m": load[0],
         "load_5m": load[1],
         "load_15m": load[2],
@@ -267,6 +597,8 @@ def evaluate_capacity(
         reasons.append("could not verify existing shared-host processes")
     if int(snapshot.get("cpu_count") or 0) < thresholds.min_cpu_count:
         reasons.append("insufficient CPU count")
+    if max_lab_cpu_assignment(int(snapshot.get("cpu_count") or 0)) < 1:
+        reasons.append("CPU reserve leaves no CPU for the lab")
     if float(snapshot.get("load_per_cpu_1m") or 0.0) > thresholds.max_load_per_cpu:
         reasons.append("one-minute load per CPU exceeds the shared-host limit")
     available = snapshot.get("memory_available_bytes")
@@ -303,6 +635,34 @@ def run_preflight(
         "thresholds": asdict(thresholds),
         "host": snapshot,
         "mutated_host": False,
+        "checked_at_monotonic_ns": time.monotonic_ns(),
+    }
+
+
+def shared_host_lock_rejection(
+    workspace: Path,
+    thresholds: CapacityThresholds,
+) -> dict[str, Any]:
+    """Return a schema-complete rejection when the lab lease lock is held.
+
+    A lock holder intentionally prevents a second host snapshot or process
+    launch.  The caller still needs a rejection record that the remote runner
+    can bind to its requested workspace and resource thresholds.
+    """
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "workspace": str(workspace.resolve()),
+        "safe_to_run": False,
+        "reasons": ["another compliant LoveEngine shared-host lab is running"],
+        "thresholds": _threshold_record(thresholds),
+        "host": {
+            "process_snapshot_ok": False,
+            "relevant_processes": [],
+            "lock_held": True,
+        },
+        "mutated_host": False,
+        "checked_at_monotonic_ns": time.monotonic_ns(),
     }
 
 

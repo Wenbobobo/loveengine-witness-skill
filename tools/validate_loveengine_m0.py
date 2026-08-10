@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import shutil
 import sys
 import tempfile
+from contextlib import redirect_stderr
 from pathlib import Path
 
 
@@ -281,18 +283,24 @@ def run_tamper_check() -> None:
             encoding="utf-8",
         )
 
+        expected_failure = (
+            f"FAIL: manifest missing source refs: {[removed_ref]!r}\n"
+        )
+        captured_stderr = io.StringIO()
         try:
-            validate_package(
-                root=tmp_root,
-                manifest_path=tampered_manifest_path,
-                onboarding_path=tmp_skill / "agent-onboarding.md",
-                node_profile_path=tmp_fixtures / "agent-node-profile.fixture.json",
-                propagation_task_path=tmp_fixtures / "propagation-task.fixture.json",
-            )
+            with redirect_stderr(captured_stderr):
+                validate_package(
+                    root=tmp_root,
+                    manifest_path=tampered_manifest_path,
+                    onboarding_path=tmp_skill / "agent-onboarding.md",
+                    node_profile_path=tmp_fixtures / "agent-node-profile.fixture.json",
+                    propagation_task_path=tmp_fixtures / "propagation-task.fixture.json",
+                )
         except SystemExit as exc:
-            if exc.code == 1:
+            if exc.code == 1 and captured_stderr.getvalue() == expected_failure:
                 print("LoveEngine Witness M0 tamper check rejected modified manifest")
                 return
+            sys.stderr.write(captured_stderr.getvalue())
             raise
         fail("tamper check accepted a modified manifest")
 

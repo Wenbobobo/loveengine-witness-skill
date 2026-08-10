@@ -11,11 +11,26 @@
 uv sync --frozen
 uv run loveengine version
 uv run loveengine manifest verify
+uv run loveengine pilot contracts prepare
 ```
 
 合约和本机 pilot 固定使用 Foundry `1.7.1`。将包含 `forge`、`anvil` 和
 `cast` 的目录设为 `FOUNDRY_BIN`，或安装到
 `~/.codex/tools/foundry-v1.7.1/`。
+
+`pilot contracts prepare` 严格验证 `forge` 和 `anvil` 都报告 Foundry `1.7.1`，并核验
+版本化 `contracts/dependency-lock.json`。仅缺少时才从允许的 HTTPS 仓库受控检出完整固定
+commit 的公开合约依赖；其版本化 submodule 图会先核验路径、URL 和 gitlink，再初始化
+每个 direct submodule，更深层声明会失败关闭，最后核验最终规范树摘要；已有目录与锁定
+规范树摘要不符时默认失败关闭。使用
+`pilot contracts prepare --refresh-dependencies` 才会在 staging 中重新取得固定提交、
+核验完整树后切换受管目录。随后执行 `forge build --threads 1`。成功 JSON 记录
+toolchain、合约源码、依赖树、attestation 和五份部署 artifact 的摘要；不会记录 tool
+output。它会在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并按区分大小写的 POSIX
+相对路径排序依赖记录，再写入忽略的
+`contracts/lib`、`contracts/out`、`contracts/cache`。真实 package、
+quickstart、demo、chain init 和 soak 都要求这些已经验证且仍匹配 attestation 的 artifact；
+它们不会在主流程中隐式编译或下载。dry-run 不需要该前置步骤。
 
 ## 2. Loopback quickstart
 
@@ -130,13 +145,18 @@ uv run loveengine demo lan-pilot --stage governance --events 12 --observers 10 -
 uv run loveengine pilot transcript verify .\governance-output\pilot.fixture.json
 ```
 
+自动化 runner 可以传入非敏感的 `--run-id`，使其报告、Pilot runtime 和生成的
+transcript 绑定到同一次运行；普通本机 demo 不指定时保留固定的演示 ID。
+
 两个 demo 都会在临时 Anvil 仍运行时完成 RPC 和 policy 验证，并把三种
 verification level 写入机器输出，随后关闭该链。链关闭后只能使用上面的离线命令；
 手工传 `--rpc-url` 时必须保证它仍是 transcript 记录的同一条链。
 
-V1 返回 `legacy_consistency`。Core/V2 离线返回 `offline_integrity` 和
-`trust_bound: false`；只有 RPC 返回 `chain_consistency`，仍不代表调用方认可
-该 Publisher；RPC 加外部 trust policy 才返回 `chain_verified` 与
+V1 和含旧式最小 review payload 的 V2 都返回 `legacy_consistency`。只有带完整
+review payload、跨字段 evidence binding 和 `evidence_verified:true` receipt 的
+Core/当前 V2，离线才返回 `offline_integrity` 和 `trust_bound: false`；只有 RPC
+返回 `chain_consistency`，仍不代表调用方认可该 Publisher；RPC 加外部 trust policy
+才返回 `chain_verified` 与
 `trust_bound: true`。RPC 查询固定在 transcript 的 final block，并核对区块
 hash/timestamp、Registry、交易、code 和相应最终状态。
 
@@ -178,19 +198,61 @@ powershell -ExecutionPolicy Bypass -File .\tools\run_release_checks.ps1
 
 脚本覆盖仓库/hash、非集成 pytest、Foundry、M2-M6 E2E、确定性双构建、
 core-stage accelerated soak、secret scan 和 `git diff --check`。治理 soak 可用
-`--stage governance` 单独运行；四小时墙钟 soak 需单独运行
-并保存报告。
+`--stage governance` 单独运行；candidate 的正式工程门另运行 900 秒并保存报告。
+该门不证明长期稳定性。发布门与跨平台 core runner 都把 `pilot contracts prepare` 作为其显式、
+已记录的第一个合约阶段；不再依赖早先 `forge test` 偶然留下的 `contracts/out`。
 
-后台运行时使用：
+推荐通过统一 runner 执行完整发布门和 15 分钟验收：
 
 ```powershell
-uv run loveengine pilot soak --stage core --duration-seconds 1800 --events 30 --observers 10 --output .\pilot-soak --background
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
+
+后台运行时使用：在新的、干净的 worktree 中，必须先显式执行 `uv sync --frozen`
+和 `uv run loveengine pilot contracts prepare`，并确认后者返回 `prepared: true`。准备阶段不计入
+soak 时长；`pilot soak` 只复验已 attested 的产物，缺失时会失败关闭。
+
+```powershell
+uv run loveengine pilot soak --stage core --duration-seconds 900 --events 30 --observers 10 --output .\pilot-soak --background
 uv run loveengine pilot soak-status .\pilot-soak\pilot-soak-run.json
 ```
 
-只有最终 `pilot-soak-report.json` 存在且 `status: passed` 才构成通过证据。
-`process_exited_without_report` 只说明记录的 PID 已不存在且未产生最终报告；部分
-artifact 仅供诊断，不能作为成功结果，也不能据此归因外部宿主为何终止了进程。
+只有 `pilot soak-status` 返回 `status: passed`，且最终
+`pilot-soak-report.json` 同时为 `passed: true` 时，才构成通过证据。失败报告仍是
+有效诊断产物：`failure_reason: soak_report_failed` 只是生命周期分类，具体稳定错误码和
+失败门应读取 `report.failure.code` 与 `report.checks`。`process_exited_without_report`
+只说明记录的 PID 已不存在且未产生最终报告；部分 artifact 仅供诊断，不能作为成功结果，
+也不能据此归因外部宿主为何终止了进程。
+
+每次 soak（前台或后台）都会生成非敏感 `run_id`；后台启动会预先把它写入 state，
+再同时传入 Pilot runtime、transcript 和 report，并拒绝已有而无 state 的 report。
+状态读取器仅在该 ID 在 state、report、离线重验的 transcript 和 verifier 回传值中一致、
+记录的子进程已退出、report 的实测 `elapsed_seconds` 达到请求时长（仅允许 1 秒计时
+舍入余量），且本机状态检查已跨过 `planned_end_epoch` 后，才会把通过报告绑定到固定 schema、
+stage、事件数与观察者数；它同时要求完整的标准成功检查集和所有已报告的
+`checks` 都严格为 true、`secret_leaks` 为一个空列表，以及 transcript 路径在本次输出
+目录内。状态读取器会重新读取该 transcript，不传 RPC 或 trust policy 地复验完整性；core
+还必须确有 3 个 observation receipt、3 个 review receipt 和 ready Gate。格式错误、
+stale/cross-run 错绑、缺少标准 checks、secret finding、不可复验 transcript 或
+`passed:true` 与 checks 矛盾的报告都会返回失败和 `report_validation_error`，不能作为通过证据。
+记录的子进程已退出后，状态读取器才会以同目录的原子替换把首次经复验的终态写回 state：
+`status`、`finished_at` 以及适用的窄化失败分类。子进程仍存活时，即使已经出现部分或
+失败报告，state 仍保持 `running`；在启动器尚未登记 PID 的短窗口，state 保持 `starting`，
+但该 launch lease 最长为 30 秒。超过 lease 而仍未登记 PID 会原子写为
+`failed`，并带 `failure_reason: launch_registration_timeout`，使监控得到明确终态；
+保留该 state 以保护原始证据，新的实验必须选择新的 output 目录。
+同一 output 目录的初始 state 使用排他保留；另一个启动器在 PID 登记窗口或运行期间尝试
+复用该目录会被拒绝，不能产生两份共享 report 的 worker。
+这些持久字段只是可恢复的生命周期摘要，每次查询仍会
+重新验证 report 与 transcript，不能充当信任锚。
+
+`peak_rss_bytes` 保留为兼容字段，且由 `peak_rss_bytes_scope` 明确标记为根进程的
+OS 峰值。`memory.root_process_peak_rss_bytes` 也是该局部诊断；完整实验的资源门是
+`memory.runtime_tree_sampled_peak_rss_bytes`，它在运行中采样本次 CLI 及其递归子进程的
+sum-RSS。只有 `checks.runtime_tree_memory_under_512mb` 可表达本次自有 lab 的采样
+sum-RSS 门低于 512 MiB；它还要求一次干净采样至少观察到根进程和三个预期子进程。短生命周期
+进程仍可能落在采样间隔之间，所以这不是物理瞬时内存上界。采样不可用、采样错误、子进程
+观察不足或超限都会使报告不能通过；它不测量共享主机其他任务，也不是操作系统级资源硬限制。
 
 跨平台核心实验入口为：
 
@@ -210,8 +272,15 @@ uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts <known-hosts>
 ```
 
+run 在上传前从本机锁定树构建确定性依赖 ZIP；远端以本机 archive hash 验证全部
+成员，在 staging 复算 manifest、逐文件 hash 和树摘要后原子安装。因此共享主机不执行
+Git 依赖下载，报告以 `contract_dependency_bundle.verified:true` 绑定两侧摘要。
+
 run 模式要求干净 Git worktree；远端只使用 loopback、唯一用户目录、nice +15、
-最多两核和低并发。它先运行 core/recovery，再建立本机 SSH tunnel，使用公开
+低并发，并始终预留一颗 CPU 给既有任务（2 vCPU 时 lab 仅绑定 1 核，否则最多
+2 核）。每个受控 core/Quickstart 组都有身份绑定、带期限的 watchdog；runner
+在继续 core 等待或任务入队前核验其存活，清理后核验其退出。它先运行
+core/recovery，再建立本机 SSH tunnel，使用公开
 `loveengine node connect` 连接远端 Quickstart，并通过鉴权任务入口证明连接后任务
 和绑定 receipt。runner 先同时连接 3 个公开 node 进程，再分别提交 3 个 tunnel
 review task。每个任务指向刚创建的 finalized evidence；节点实际取回 bundle、

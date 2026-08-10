@@ -22,6 +22,10 @@ SKIP_DIRECTORIES = {
     "lib",
     "out",
 }
+# These are transient output roots produced by local validation commands.  They
+# are deliberately checked only at repository depth one: source directories
+# such as ``src/tmp`` remain part of the release surface and must be scanned.
+TRANSIENT_OUTPUT_ROOTS = {".tmp", "tmp", "temp"}
 FORBIDDEN_NAMES = {".env", "id_rsa", "id_ed25519", "mnemonic", "keystore"}
 FORBIDDEN_SUFFIXES = {".key", ".pem", ".p12", ".pfx"}
 MAX_TEXT_BYTES = 5 * 1024 * 1024
@@ -41,6 +45,11 @@ def _files(root: Path) -> list[Path]:
         for path in root.rglob("*")
         if path.is_file()
         and not any(part in SKIP_DIRECTORIES for part in path.relative_to(root).parts)
+        and not (
+            len(path.relative_to(root).parts) > 1
+            and path.relative_to(root).parts[0].casefold()
+            in TRANSIENT_OUTPUT_ROOTS
+        )
     )
 
 

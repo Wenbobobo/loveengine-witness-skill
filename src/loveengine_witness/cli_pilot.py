@@ -27,6 +27,7 @@ from .pilot_snapshot import (
 from .pilot_soak import run_pilot_soak
 from .pilot_soak_process import background_soak_status, start_background_soak
 from .pilot_transcript import verify_pilot_transcript
+from .toolchain import prepare_contracts
 
 
 def add_pilot_parser(commands: Any) -> None:
@@ -44,6 +45,11 @@ def add_pilot_parser(commands: Any) -> None:
     serve.add_argument("--config", type=Path, required=True)
     status = pilot_commands.add_parser("status")
     status.add_argument("--url", required=True)
+
+    contracts = pilot_commands.add_parser("contracts")
+    contracts_commands = contracts.add_subparsers(dest="pilot_contracts_command")
+    contracts_prepare = contracts_commands.add_parser("prepare")
+    contracts_prepare.add_argument("--refresh-dependencies", action="store_true")
 
     chain = pilot_commands.add_parser("chain")
     chain_commands = chain.add_subparsers(dest="pilot_chain_command")
@@ -88,12 +94,13 @@ def add_pilot_parser(commands: Any) -> None:
     prune.add_argument("--older-than-days", type=int, default=30)
 
     soak = pilot_commands.add_parser("soak")
-    soak.add_argument("--duration-seconds", type=float, default=14400)
-    soak.add_argument("--events", type=int, default=240)
+    soak.add_argument("--duration-seconds", type=float, default=900)
+    soak.add_argument("--events", type=int, default=30)
     soak.add_argument("--observers", type=int, default=10)
     soak.add_argument("--stage", choices=("core", "governance"), default="core")
     soak.add_argument("--output", type=Path, required=True)
     soak.add_argument("--background", action="store_true")
+    soak.add_argument("--worker-run-id", help=argparse.SUPPRESS)
     soak_status = pilot_commands.add_parser("soak-status")
     soak_status.add_argument("state", type=Path)
 
@@ -114,6 +121,13 @@ def handle_pilot(args: argparse.Namespace) -> dict[str, Any]:
         return {"stopped": True}
     if args.pilot_command == "status":
         return asyncio.run(pilot_status(args.url))
+    if (
+        args.pilot_command == "contracts"
+        and args.pilot_contracts_command == "prepare"
+    ):
+        return prepare_contracts(
+            refresh_dependencies=args.refresh_dependencies,
+        )
     if args.pilot_command == "chain":
         if args.pilot_chain_command == "init":
             return initialize_chain(args.root, port=args.port)
@@ -176,6 +190,7 @@ def handle_pilot(args: argparse.Namespace) -> dict[str, Any]:
             event_count=args.events,
             observers=args.observers,
             stage=args.stage,
+            run_id=args.worker_run_id,
         )
     if args.pilot_command == "soak-status":
         return background_soak_status(args.state)

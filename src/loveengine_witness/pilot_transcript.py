@@ -23,6 +23,10 @@ from .m4_network import (
     verify_task_v2,
 )
 from .observation import aggregate_observations, observation_set_hash
+from .review_evidence import (
+    is_current_review_payload,
+    require_verified_review_result,
+)
 from .schema import validate_schema
 from .secrets import reject_secret_fields
 from .trust_policy import load_node_trust_policy, validate_node_trust_policy
@@ -390,6 +394,8 @@ def _verify_receipts(
     tasks: dict[str, dict[str, Any]],
     value: dict[str, Any],
     expected_type: str,
+    *,
+    allow_legacy_review_payload: bool = False,
 ) -> None:
     seen: set[str] = set()
     for receipt in receipts:
@@ -426,6 +432,10 @@ def _verify_receipts(
         elif expected_type == "review_dispute":
             result = receipt["result"]
             payload = task["payload"]
+            if not allow_legacy_review_payload:
+                require_verified_review_result(
+                    payload, result, task_id=task_id
+                )
             for field in ("dispute_id", "bundle_hash"):
                 _same(
                     result.get(field),
@@ -515,6 +525,7 @@ def verify_witness_evidence_stages(
     value: dict[str, Any],
     *,
     allowed_issuers: list[str] | tuple[str, ...] | None = None,
+    allow_legacy_review_payload: bool = False,
 ) -> tuple[dict[str, set[str]], dict[str, dict[str, Any]]]:
     """Verify the release-to-Gate stages shared by core and governance transcripts."""
 
@@ -522,7 +533,13 @@ def verify_witness_evidence_stages(
     members = _bootstrap_members(value)
     tasks = _verify_tasks(value, members, allowed_issuers)
     _verify_receipts(value["observation_receipts"], tasks, value, "observe_live_text")
-    _verify_receipts(value["review_receipts"], tasks, value, "review_dispute")
+    _verify_receipts(
+        value["review_receipts"],
+        tasks,
+        value,
+        "review_dispute",
+        allow_legacy_review_payload=allow_legacy_review_payload,
+    )
     _verify_event_chain(value, require_events=True)
     _verify_artifacts(value)
 
@@ -903,6 +920,23 @@ def _verify_rpc(value: dict[str, Any], rpc_url: str, vote_signers: set[str]) -> 
         raise LoveEngineError("chain_verification_failed", str(exc), 4) from exc
 
 
+def _uses_legacy_review_payload(value: dict[str, Any]) -> bool:
+    payloads = [
+        task.get("payload")
+        for task in value["network_tasks"]
+        if task.get("task_type") == "review_dispute"
+    ]
+    if not payloads:
+        return False
+    current = [is_current_review_payload(payload) for payload in payloads]
+    if any(current) and not all(current):
+        raise LoveEngineError(
+            "mixed_review_evidence_payloads",
+            "current and legacy review payloads cannot share a transcript",
+        )
+    return not all(current)
+
+
 def _verify_v2(
     value: dict[str, Any],
     rpc_url: str | None,
@@ -911,15 +945,30 @@ def _verify_v2(
     validate_schema(value, "pilot-transcript-v2.schema.json")
     if value["transcript_hash"] != pilot_transcript_hash(value):
         raise LoveEngineError("transcript_hash_mismatch", "PilotTranscriptV2")
-    policy = _load_trust_policy(trust_policy)
+    legacy_review_payload = _uses_legacy_review_payload(value)
+    policy = None if legacy_review_payload else _load_trust_policy(trust_policy)
     verify_witness_evidence_stages(
         value,
         allowed_issuers=(policy["allowed_issuers"] if policy is not None else None),
+        allow_legacy_review_payload=legacy_review_payload,
     )
     vote_signers = _verify_votes(value)
     _verify_transactions_and_code_inventory(value)
     if not value["final_state"].get("proposal_executed"):
         raise LoveEngineError("pilot_cross_reference_mismatch", "proposal not executed")
+    if legacy_review_payload:
+        return {
+            "valid": True,
+            "verification_level": "legacy_consistency",
+            "chain_verified": False,
+            "trust_bound": False,
+            "run_id": value["run_id"],
+            "event_count": len(value["events"]),
+            "observation_receipts": len(value["observation_receipts"]),
+            "review_receipts": len(value["review_receipts"]),
+            "vote_approvals": len(value["vote_approvals"]),
+            "total_uto": value["final_state"]["total_uto"],
+        }
     if policy is not None:
         verify_transcript_trust_policy(value, policy)
     if rpc_url:

@@ -4,6 +4,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from loveengine_witness.cli import build_parser
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,12 +41,35 @@ def test_cli_exposes_m5_command_tree() -> None:
         "quickstart",
         "serve",
         "status",
+        "contracts",
         "chain",
         "transcript",
         "snapshot",
         "soak",
     ):
         assert command in pilot.stdout
+
+    soak = run_cli("pilot", "soak", "--help")
+    assert soak.returncode == 0, soak.stderr
+    assert "--worker-run-id" not in soak.stdout
+
+
+def test_lan_pilot_exposes_explicit_run_id_binding() -> None:
+    result = run_cli("demo", "lan-pilot", "--help")
+
+    assert result.returncode == 0, result.stderr
+    assert "--run-id" in result.stdout
+
+
+def test_pilot_soak_defaults_to_engineering_acceptance_profile() -> None:
+    args = build_parser().parse_args(
+        ["pilot", "soak", "--output", "candidate-soak"]
+    )
+
+    assert args.duration_seconds == 900
+    assert args.events == 30
+    assert args.observers == 10
+    assert args.stage == "core"
 
 
 def test_version_reports_runtime_source() -> None:

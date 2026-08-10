@@ -16,9 +16,10 @@
 3. [API documents](api/README.md)
 4. [Role runbooks](development/participant-runbook.zh-CN.md)
 
-0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。共享
-Linux remote lab 是当前活动验收门；公司直播、Tailscale 直接服务、公网和测试网
-仍不属于当前已完成能力。
+0.6.1 是工作 candidate，最新发布 tag 是 v0.6.0-contract-public-pilot。精确
+candidate `9e5058e` 的本机四小时和共享 Linux remote lab 已通过；后续候选改用
+900 秒工程验收。公司直播、Tailscale 直接服务、公网和测试网仍不属于 0.6.1
+已完成能力。
 
 ## Development and operations
 

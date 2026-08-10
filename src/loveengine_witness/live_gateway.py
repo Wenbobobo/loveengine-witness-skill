@@ -285,10 +285,14 @@ async def stream_events(request: web.Request) -> web.Response:
         events = metadata.list_events(session_id, after)
         while not events:
             session = metadata.get_session(session_id)
-            if (
-                session["status"] == "closed"
-                or asyncio.get_running_loop().time() >= deadline
-            ):
+            if session["status"] == "closed":
+                # Closing is terminal: once it is observed, no later append can
+                # be accepted. Re-read after the close snapshot so an event
+                # committed between the initial empty read and this state read
+                # is never hidden behind a keepalive response.
+                events = metadata.list_events(session_id, after)
+                break
+            if asyncio.get_running_loop().time() >= deadline:
                 break
             await asyncio.sleep(0.05)
             events = metadata.list_events(session_id, after)

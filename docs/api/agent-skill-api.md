@@ -203,6 +203,7 @@ loveengine package build --output <dir>
 loveengine package verify <archive> --expected-package-hash <registry-keccak>
 loveengine package install <archive> --target <dir> --expected-package-hash <registry-keccak>
 loveengine package self-check --root <dir> --expected-package-hash <registry-keccak>
+loveengine pilot contracts prepare
 loveengine pilot quickstart --root <dir> [--headless]
 loveengine pilot serve --config <path>
 loveengine pilot status --url <url>
@@ -218,7 +219,7 @@ loveengine pilot snapshot prune --output <dir> --older-than-days 30
 loveengine witness vote approve --proposal-plan <path> --rpc-url <url> --address <address>
 loveengine demo lan-pilot --stage core|governance --events 12 --observers 10 --output <dir>
 loveengine pilot transcript verify <path> [--rpc-url <url>] [--trust-policy <policy>]
-loveengine pilot soak --duration-seconds 14400 --events 240 --observers 10 --output <dir> [--background]
+loveengine pilot soak --duration-seconds 900 --events 30 --observers 10 --output <dir> [--background]
 loveengine pilot soak-status <dir>/pilot-soak-run.json
 ```
 
@@ -227,12 +228,32 @@ Each command should support machine-readable output. Prefer JSON output by defau
 ### Background soak lifecycle
 
 `--background` returns a state-file path immediately; poll it with `pilot soak-status`.
-`status: passed` is valid only when the final `pilot-soak-report.json` exists and
-passes. A terminal `failure_reason` is intentionally narrow: `launch_failed`,
-`soak_report_failed`, or `process_exited_without_report`. The last value means
-the recorded PID is no longer alive and no final report exists; partial artifacts
-are diagnostic only and must not be treated as a passing soak. It does not claim
-to identify why an external host or supervisor ended the process.
+The `status` field belongs to that lifecycle response. Each background launch
+creates a non-secret `run_id`, passes it to its child, and rejects an orphaned
+report before launch. `status: passed` is valid only when the final
+`pilot-soak-report.json` has the same `run_id`, `passed: true`, every reported
+check passes, and the recorded child PID has exited. The lifecycle reader also
+binds a passing report to its schema, stage, event count, observer count, and
+requested duration; a malformed, stale, cross-run, self-contradictory, or
+incomplete success-check report is terminally failed. A terminal
+`failure_reason` is intentionally narrow:
+`launch_failed`, `soak_report_failed`, or `process_exited_without_report`.
+`soak_report_failed` means a final diagnostic report exists; read its stable
+`failure.code` and `checks` to identify the failed gate. The last value means the
+recorded PID is no longer alive and no final report exists; partial artifacts are
+diagnostic only and must not be treated as a passing soak. It does not claim to
+identify why an external host or supervisor ended the process.
+
+For resource evidence, the compatibility field `peak_rss_bytes` is explicitly
+scoped by `peak_rss_bytes_scope: root_process_os_peak`; it is not an entire-lab
+measurement. The nested `memory` object separately records the root process HWM
+and the sampled sum-RSS peak of the CLI process plus its recursive descendants.
+Only `checks.runtime_tree_memory_under_512mb` is the owned-lab 512 MiB sampled
+sum-RSS gate; it also requires a clean sample that observed at least the root
+plus three expected child processes. This is not a physical instantaneous memory
+upper bound: short-lived children may fall between samples. Sampling unavailable,
+failed, under-observed, or over the limit cannot produce a passing report;
+sampling is telemetry, not an OS-enforced resource reservation.
 
 ## Adapter expectations
 

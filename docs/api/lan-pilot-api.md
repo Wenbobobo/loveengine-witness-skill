@@ -146,6 +146,7 @@ deployment/state 和完整 checksums。verify 拒绝空清单、缺失文件、s
 ~~~text
 loveengine package build|verify|install|self-check
 loveengine registry publish|verify
+loveengine pilot contracts prepare
 loveengine pilot quickstart|serve|status
 loveengine pilot chain init|start|status|snapshot|restore
 loveengine pilot snapshot create|verify|restore|prune

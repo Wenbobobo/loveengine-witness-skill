@@ -29,15 +29,13 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.7.1
+          cache: false
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Contract tests
         working-directory: contracts
         run: forge test
@@ -52,15 +50,13 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.7.1
+          cache: false
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Three-node network integration
         run: uv run pytest tests/integration/test_network_demo.py
 
@@ -72,15 +68,13 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.7.1
+          cache: false
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Live evidence integration
         run: uv run pytest tests/integration/test_live_evidence_demo.py
 
@@ -92,16 +86,13 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.7.1
+          cache: false
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
-          forge build
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Build twice and verify deterministic package
         id: package
         shell: bash
@@ -157,15 +148,13 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.7.1
+          cache: false
       - name: Set up Python
         run: uv python install 3.12
       - name: Sync
         run: uv sync --frozen
-      - name: Install pinned contract dependencies
-        working-directory: contracts
-        run: |
-          forge install foundry-rs/forge-std@77041d2ce690e692d6e03cc812b57d1ddaa4d505 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@e4f70216d759d8e6a64144a9e1f7bbeed78e7079 --no-git
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
       - name: Persistent chain integration
         run: uv run pytest tests/integration/test_pilot_chain.py
       - name: Unified package-to-PublicSink E2E
@@ -174,3 +163,41 @@ jobs:
         run: uv run pytest tests/integration/test_pilot_quickstart.py
       - name: Accelerated faults and ten-observer soak
         run: uv run pytest tests/integration/test_pilot_soak.py
+
+  windows-pilot-restart:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+          cache: false
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync
+        run: uv sync --frozen
+      - name: Prepare pinned contract artifacts
+        run: uv run loveengine pilot contracts prepare --refresh-dependencies
+      - name: Pilot restart smoke
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "pilot-restart-smoke.log"
+          & uv run pytest tests/test_pilot_event_loop.py tests/integration/test_pilot_demo.py *> $log
+          $exitCode = $LASTEXITCODE
+          Get-Content -LiteralPath $log
+          if ($exitCode -ne 0) {
+            exit $exitCode
+          }
+          $diagnostics = Select-String -LiteralPath $log -SimpleMatch `
+            "Task exception was never retrieved", `
+            "Unhandled exception in client_connected_cb", `
+            "Exception in callback", `
+            "BaseProactorEventLoop", `
+            "AssertionError", `
+            "Task was destroyed but it is pending!", `
+            "Unclosed client session", `
+            "Unclosed connector"
+          if ($diagnostics) {
+            throw "Pilot restart smoke emitted an unhandled asynchronous runtime diagnostic."
+          }

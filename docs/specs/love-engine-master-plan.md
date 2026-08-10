@@ -3,7 +3,7 @@
 状态：current
 工作目标：0.6.1-contract-public-pilot candidate
 最新 Git tag：v0.6.0-contract-public-pilot
-更新日期：2026-07-27
+更新日期：2026-08-09
 
 本文是唯一活动工程总规划。当前实施规格是
 [Pre-enterprise Remote Lab SPEC](love-engine-pre-enterprise-remote-lab.md)。
@@ -30,11 +30,11 @@
   package-to-chain 实验基线。
 - M6 / v0.6.0-contract-public-pilot：最新发布 tag，是本机 Anvil/LAN 合约融合
   基线，不代表 Tailscale、公网或测试网部署。
-- 0.6.1 candidate：信任边界、核心/治理拆分、可解释实验和 CI 已完成本机加固；
-  candidate baseline `2fd3a29` 已通过共享 ARM64 Linux 旧版短实验门。当前增强又
-  加入真实 review evidence 复算、durable task journal/ACK-loss 重连、精确依赖
-  commit 和失败/postflight 报告；增强路径以每次机器报告中的精确 source_commit
-  逐次验收，长 soak 延期。wire protocol 保持 loveengine-witness-net/0.6。
+- 0.6.1 candidate：信任边界、核心/治理拆分、可解释实验和 CI 已完成加固；精确
+  candidate `9e5058e` 已通过完整本机门、四小时 core 运行和共享 ARM64 Linux
+  loopback/tunnel 验收。增强路径包含真实 review evidence 复算、durable task
+  journal/ACK-loss 重连、精确依赖 commit、失败报告和 postflight 清理。wire
+  protocol 保持 loveengine-witness-net/0.6。
 
 当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
 签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
@@ -79,10 +79,12 @@ critical dispute；它不裁决事实、不签名、不提交交易，也不是�
 
 完成 0.6.1 本机核心和共享 Linux 短实验后，下一阶段仍需逐项决策和验收：
 
-- 共享远程实验：旧 baseline 的短 core/recovery 和公开 node CLI tunnel 已通过；
-  增强后的 evidence/reconnect/receipt-confirmation/postflight 路径增加 3 个
-  公开节点同时连接后的独立任务/回执门，并以新机器报告逐次复验。30 分钟与
-  4 小时 soak 只在独立空闲窗口执行。
+- 0.7.0 邀请制公开试点：分离管理/参与者入口，以 Tailscale Serve 提供 tailnet
+  只读与节点接入，使用外部 signer，并把 SkillRegistry 锚定到 Sepolia；不使用
+  Funnel，不接企业直播。
+- 工程验收：每个新 candidate 运行 900 秒、30 个事件、10 个只读观察者，并覆盖
+  一次服务重启和一次节点重连。它是回归/恢复门，不证明长期可用性；既有四小时
+  `9e5058e` 结果只保留为该历史 candidate 的补充证据。
 - 公众反馈闭环：把表达、证据、异议、回复和处置结果连成可追溯记录。
 - PoL 教育：把协议边界、证据素养和公共协作训练转成课程和实践材料。
 - UHAH：只在真实需求和独立安全审计成立后评估。

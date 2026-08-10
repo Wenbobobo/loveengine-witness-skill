@@ -148,6 +148,7 @@ sequenceDiagram
 | 文字原文 bytes | artifacts/sha256/[prefix]/[digest] | 内容寻址；存在性仍依赖单机磁盘 |
 | 关键写入和拒绝 | audit.jsonl | hash-linked append log |
 | Anvil deployment/state、交易和 code hash | Pilot chain root | 本机实验链；不是公共测试网 |
+| Foundry dependency/cache 与 deployment artifacts | `contracts/lib`、`contracts/cache`、`contracts/out` | 被 Git 忽略的显式准备产物；报告保留摘要，不是发布信任根 |
 | ZIP/manifest hash 和 release 状态 | SkillRegistry | 链上 hash/状态，不存 ZIP bytes |
 | proposal、vote、UTO 会计 | 四个治理实验合约 | 可选层，只存结构化值和 hash |
 | 原文、token、私钥 | 不上链 | token 只从受限文件读取；私钥只在外部 signer |
@@ -158,6 +159,24 @@ snapshot 对数据库、artifact、audit 与链状态做完整 checksum 覆盖�
 Unix-like 系统会检查 token 文件的 group/other 权限；当前 Windows quickstart 只把
 token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此它是 loopback 实验
 边界，不是已完成的多用户主机凭据隔离方案。
+
+所有真实 Pilot 路径都先要求 `loveengine pilot contracts prepare`。它严格检查
+Forge/Anvil `1.7.1`、版本化 dependency lock、受控 Foundry profile/remapping，并以
+单线程构建。缺失依赖只可从允许的 HTTPS 仓库受控检出完整固定 commit；版本化
+submodule 图会先核验路径、URL 和 gitlink，再初始化每个 direct submodule，更深层声明
+会失败关闭，最后核验最终规范树摘要；已有依赖的规范树摘要失配则失败关闭，只有
+显式 `--refresh-dependencies` 才会在 staging 核验后切换。成功后在
+`contracts/cache/loveengine-contract-preparation.json` 保存本地 attestation；package、
+quickstart、demo、chain init 与 soak 会重新计算它，因此不在执行过程中隐式编译。这样
+计时实验的资源指标不混入下载/编译副作用。prepare 会先把受管依赖中 UTF-8 文本规范化为
+LF，并按区分大小写的 POSIX 相对路径排序依赖记录，避免宿主 Git 行尾或路径排序策略进入
+编译 metadata；package build 也会以同一 LF 表示写入所有
+文本 archive 条目，避免等价 CRLF checkout 产生不同 release hash；缺产物或 attestation 失配时也会明确 fail
+closed。该本地 attestation 只能发现未经重新准备的后续改动，不单独证明上游源码来源；
+发布信任仍来自包、Registry 与外部 policy。
+
+每份部署 artifact 的 compiler metadata 还必须只列出 `src/` 或两棵锁定的 `lib/` 依赖树；
+因此相对 import 不能把 `test/`、`script/` 或工作区外文件悄悄带入部署字节码。
 
 ## Hash 语义
 
@@ -185,7 +204,17 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 - Relay 使用 at-least-once 语义。节点以 taskId 和 issuer+nonce 双重去重，并在
   发回前把 signed receipt 落入本地 SQLite journal。
 - 接收 ACK 延迟和任务完成延迟分别记录；长观察任务期间继续处理 heartbeat。
+- 本机 core harness 为避免把 Windows 的进程开销误当作 Witness 能力，两个节点在
+  live stream 期间保持连接；第三个节点先确认 Relay 已持久化 task ACK 后受控中断，
+  并在 session finalize 后以相同 profile、cursor 和 task journal 重连重放。每次
+  故障断开都须先有 ACK 和认证连接，并在 transcript 的 fault proof 中记录 node、task
+  与连接关闭；三份 receipt 仍独立签名。这证明 at-least-once/replay，而不声称三份
+  本机进程等于三个现实组织。
 - observation cursor 持久化，SSE 重连携带 Last-Event-ID 或 after。
+- 已关闭 session 的 terminal sequence 高于本地 cursor 时，观察节点会从 SSE 重放不可变尾部；
+  只有 cursor 超前、事件序号错误或补齐后的 head 不一致才拒绝。
+- harness 的只读 SSE 观察者在读取到 terminal session 后也会以同一 cursor 对持久
+  events 端点做一次最终补读，避免服务重启恰好截断 SSE 响应前缀时把部分事件误判为完整。
 - receipt 必须属于当前鉴权连接和该节点已接受的 pending task；伪造、错绑或重复
   receipt 均拒绝。
 - Relay 保存 receipt 后返回 ACK，节点再回 receipt confirmation。若第一份 ACK
@@ -206,8 +235,11 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
   生产网络仍未验证。
 - NetworkTaskV2 只执行 observe_live_text 和 review_dispute。旧 V1 的
   propagate_skill、observe_broadcast 只保留历史兼容验证。
-- 历史 V2 transcript 的最小 observe/review payload 仍能校验签名和交叉引用，但
-  公开任务入口只接收带 URL、cursor、revision、count 和 head hash 的完整 payload。
+- 历史 V2 transcript 的最小 observe/review payload 仍可由兼容 reader 校验签名和
+  交叉引用，但只返回 `legacy_consistency`，不再获得 release/chain 信任结论。当前
+  Core/V2 路径要求完整 payload，review receipt 必须带 `evidence_verified:true`，并把
+  dispute、bundle、session、revision、count、head hash 全部回绑；公开任务入口同样只接收
+  带 URL、cursor、revision、count 和 head hash 的完整 payload。
 
 ## Transcript 能与不能证明什么
 
@@ -216,9 +248,10 @@ token 隔离在本机文件中，尚未显式配置或验收 NTFS ACL。因此�
 | PilotTranscriptV1 | 历史字段一致性 | 发布信任或链事实；返回 legacy_consistency |
 | WitnessCoreTranscriptV1 offline | 核心阶段的 hash、签名、成员、quorum 与引用一致 | Registry/链事实；trust_bound:false |
 | WitnessCoreTranscriptV1 RPC + policy | 核心 release anchor 与记录区块的链事实 | 现实陈述真实性、成员社会独立性 |
-| PilotTranscriptV2 offline | 治理实验内部一致性 | 外部信任绑定；返回 offline_integrity |
-| PilotTranscriptV2 RPC, no policy | 记录区块的链状态一致 | 谁授权这套 release；返回 chain_consistency |
-| PilotTranscriptV2 RPC + policy | policy、Registry、交易、区块、code 与最终状态一致 | 公共网络部署或现实事实；返回 chain_verified |
+| PilotTranscriptV2 legacy review payload | 历史签名与字段一致性 | release/chain 信任；返回 legacy_consistency |
+| PilotTranscriptV2 current offline | 完整 review 证据绑定和治理实验内部一致性 | 外部信任绑定；返回 offline_integrity |
+| PilotTranscriptV2 current RPC, no policy | 记录区块的链状态一致 | 谁授权这套 release；返回 chain_consistency |
+| PilotTranscriptV2 current RPC + policy | policy、Registry、交易、区块、code 与最终状态一致 | 公共网络部署或现实事实；返回 chain_verified |
 
 RPC verifier 读取 transcript 记录的最终区块号，并核对区块 hash 和 timestamp；
 链继续出块不会让旧 transcript 因“当前状态变化”失效。

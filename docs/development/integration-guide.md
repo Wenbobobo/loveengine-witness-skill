@@ -14,7 +14,19 @@
 uv sync --frozen
 uv run loveengine version
 uv run python .\tools\check.py
+uv run loveengine pilot contracts prepare
 ```
+
+`pilot contracts prepare` 是所有会创建真实 package、Anvil 或 Pilot runtime 的命令
+的显式前置步骤。它严格检查 Forge/Anvil `1.7.1` 和版本化的
+`contracts/dependency-lock.json`，使用单线程构建并返回可记录的 artifact、源码、依赖
+和 attestation 摘要。仅缺少的 forge-std/OpenZeppelin 才会按固定 commit 安装；已有
+目录的规范树摘要不符会失败关闭，需显式使用
+`pilot contracts prepare --refresh-dependencies`，在 staging 核验后才替换受管目录。
+它在编译前将受管依赖中的 UTF-8 文本规范化为 LF，并会改变被忽略的
+`contracts/lib`、`contracts/out`、`contracts/cache`；因此不要把它
+混进一次已有计时的 soak。原始 `package build`、quickstart、demo 和 soak 均不会
+隐式执行该步骤，并会重新核验 attestation。
 
 依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
 [CLI 参考](../api/cli-reference.md)和
@@ -122,7 +134,17 @@ uv run python .\tools\run_core_experiments.py
 
 runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证等级和篡改检查。
 报告必须写明 environment: local_anvil、actors_simulated: true，以及每项实验
-“证明/不证明”的边界。
+“证明/不证明”的边界。它把 `contracts prepare` 作为首个已记录阶段，因此来自干净
+源码 checkout 的构建 provenance 也保留在报告中。
+
+为控制 Windows 本机 soak 的实际进程资源，Pilot 在 live stream 期间保持两个公开
+node CLI；第三个节点先确认 Relay 的 durable ACK，随后受控中断，并在 evidence
+finalize 后以同一 profile、cursor SQLite 和 task journal 重连完成回放。该调度仍
+要求三个节点在故障前均已完成 durable ACK 和认证 Relay 连接；每次受控断开都把
+node、task ID、ACK 与连接关闭 proof 写入 transcript。只读 SSE 观察者在 session
+关闭后还会按自己的 cursor 从持久 events 端点补读一次，因此服务器重启不能把 SSE
+响应前缀误当成完整观察。该调度仍要求三份独立签名 receipt、完整事件链和 Gate ready，
+专门验证 at-least-once 恢复；它不把同机进程数包装为现实社会独立性。
 
 默认 soak 也停在 core；治理 soak 必须显式指定：
 
@@ -130,6 +152,18 @@ runner 在忽略的 tmp/core-experiments 目录运行核心 E2E、三种验证�
 uv run loveengine pilot soak --stage core --duration-seconds 1 --events 12 --observers 10 --output .\core-soak
 uv run loveengine pilot soak --stage governance --duration-seconds 1 --events 12 --observers 10 --output .\governance-soak
 ```
+
+新 candidate 的正式工程验收使用 900 秒、30 个事件和 10 个只读观察者：
+
+```powershell
+uv run python .\tools\run_engineering_acceptance.py --output .\tmp\engineering-acceptance\<run-id>
+```
+
+脚本先执行完整发布门，再启动固定为 900 秒、30 个事件、10 个只读观察者的 core
+soak。只有生命周期和最终 report 同时为 passed、run ID 一致、子进程已退出、全部
+检查为 true、secret finding 为零、运行时 stderr 为空且 transcript 独立离线复验
+通过，才构成工程门。机器报告同时绑定精确 commit 与 manifest package hash。900 秒
+不证明长期稳定性。
 
 ## 实验 5：共享 Linux remote lab
 
@@ -140,31 +174,39 @@ uv run python .\tools\run_remote_lab.py preflight --host <host> --user <user> --
 uv run python .\tools\run_remote_lab.py run --host <host> --user <user> --identity-file <ssh-key> --known-hosts .\tmp\remote-known-hosts
 ```
 
+远端运行前，runner 会在本机从 dependency lock 验证并构建确定性依赖 bundle；远端
+只接受相同 archive/manifest hash，在 staging 复算树后原子安装，不执行 Git 依赖下载。
+
 preflight 是只读操作；部署只接受干净 commit，在远端 home 的唯一目录内以 nice
-+15、最多两核和低构建并发运行 core/recovery。Pilot 与 Anvil 不绑定 Tailscale
++15、低构建并发运行 core/recovery，并始终为既有任务留一颗 CPU（2 vCPU 时 lab
+只绑定 1 核，否则最多 2 核）。Pilot 与 Anvil 不绑定 Tailscale
 地址，报告/transcript 下载后由本机再次离线验证。随后 runner 建立 SSH tunnel，
 启动 3 个公开 node CLI 进程连接远端 Quickstart，等三者全部连接后才分别提交
 签名任务并验收 3 个绑定 receipt。每个 review task 指向辅助程序刚创建并
 finalize 的真实 evidence，节点会通过 tunnel 读取并复算；报告要求三份
 `evidence_verified:true`，Relay 还必须精确记录 `acked:3` 和
-`receipt_confirmed:3`。它只停止自己创建的进程组；成功或失败都写 report，
-postflight 另验无相关残留。详细门槛见
+`receipt_confirmed:3`。它只停止自己创建的进程组；core 和 Quickstart 都有受
+PID/start tick/PGID/SID/命令约束的 watchdog，runner 在 core 等待和任务入队前
+验证其存活，清理后验证其退出。成功或失败都写 report，postflight 另验无相关
+残留。详细门槛见
 [共享主机 runbook](runbooks/remote-lab-flow.zh-CN.md)。
 
 证明：相同 commit 能否在受约束 Linux 主机上复跑核心/恢复测试，以及公开节点
 路径能否经安全 tunnel 完成连接后任务和 receipt。
 不证明：生产服务、公共网络、真实组织独立性、生产 signer 或企业接入。
 
-2026-07-27 的 candidate baseline `2fd3a29` 已通过旧版短实验；它只提供单节点
-tunnel 的历史证据。2026-07-29 的合并 commit
-`76b7163fc2a72c503db6a1b34fd2670b5b9ab580` 已通过增强后的短实验：3 个
+2026-08-04 的精确 candidate
+`9e5058ec51942a8c1e4004457d58c05d2ea5b824` 已通过当前增强实验：3 个
 observation receipt、3 个 review receipt、Gate ready、恢复测试通过，下载
 transcript 为 `offline_integrity` / `trust_bound:false`；3 个公开 node 分别得到
 evidence-verified 绑定 receipt，Relay 精确记录 `acked:3` 和
-`receipt_confirmed:3`，postflight 未发现相关残留进程。增强后的 runner 仍必须以
+`receipt_confirmed:3`，postflight 未发现相关残留进程。报告 SHA-256 为
+`c646d1bd20cf3aa64dd3e20d7b4ef0f99cdf703af79091020108ce71cb276010`。
+同一 candidate 的四小时本机 core run 也已通过，但只作为该提交的额外历史运行
+证据。增强后的 runner 仍必须以
 每次报告中的精确 source_commit、三节点/三回执、`evidence_verified`、
-`relay_receipt_confirmed` 和 postflight 字段逐次验收。本机前台 30 分钟 core soak
-已通过；远端 30 分钟和全部 4 小时 soak 仍延期。
+`relay_receipt_confirmed` 和 postflight 字段逐次验收；后续 candidate 使用 900 秒
+工程门，不继承 `9e5058e` 的通过结论。
 
 ## 变更验收
 

@@ -109,7 +109,11 @@ def _sign(account: object, typed: dict) -> str:
     ).signature.hex()
 
 
-def _v2_fixture() -> dict:
+def _v2_fixture(
+    *,
+    legacy_review_payload: bool = False,
+    evidence_verified: bool | None = True,
+) -> dict:
     chain_id = "31337"
     registry = Web3.to_checksum_address("0x" + "12" * 20)
     dao = Web3.to_checksum_address("0x" + "13" * 20)
@@ -253,6 +257,23 @@ def _v2_fixture() -> dict:
     review_receipts = []
     reviews = []
     for index, node in enumerate(nodes, start=1):
+        review_payload = {
+            "schema_version": "loveengine.review-dispute-payload/1",
+            "dispute_id": dispute["dispute_id"],
+            "bundle_hash": bundle["bundle_hash"],
+            "session_id": "session-1",
+            "evidence_url": "http://127.0.0.1:8780/v1/live/sessions/session-1/evidence",
+            "events_url": "http://127.0.0.1:8780/v1/live/sessions/session-1/events",
+            "artifact_base_url": "http://127.0.0.1:8780/v1/live/artifacts",
+            "revision": bundle["revision"],
+            "event_count": bundle["event_count"],
+            "head_event_hash": bundle["head_event_hash"],
+        }
+        if legacy_review_payload:
+            review_payload = {
+                "dispute_id": dispute["dispute_id"],
+                "bundle_hash": bundle["bundle_hash"],
+            }
         task = build_task_v2(
             chain_id=chain_id,
             registry=registry,
@@ -261,10 +282,7 @@ def _v2_fixture() -> dict:
             issuer=publisher.address,
             recipient=node.address,
             manifest_hash=manifest_hash,
-            payload={
-                "dispute_id": dispute["dispute_id"],
-                "bundle_hash": bundle["bundle_hash"],
-            },
+            payload=review_payload,
             nonce=str(100 + index),
             deadline=deadline,
         )
@@ -276,6 +294,17 @@ def _v2_fixture() -> dict:
             "verdict": "dismiss" if index < 3 else "uphold",
             "reason_hash": keccak256_hex(f"review-{index}".encode("utf-8")),
         }
+        if not legacy_review_payload:
+            result.update(
+                {
+                    "session_id": "session-1",
+                    "revision": bundle["revision"],
+                    "event_count": bundle["event_count"],
+                    "head_event_hash": bundle["head_event_hash"],
+                }
+            )
+            if evidence_verified is not None:
+                result["evidence_verified"] = evidence_verified
         receipt = build_receipt_v2(
             chain_id=chain_id,
             registry=registry,
@@ -445,6 +474,28 @@ def test_v2_transcript_verifies_signed_membership_quorum_and_cross_references() 
     result = verify_pilot_transcript(value)
 
     assert result["verification_level"] == "offline_integrity"
+    assert result["chain_verified"] is False
+    assert result["trust_bound"] is False
+
+
+@pytest.mark.parametrize("evidence_verified", [False, None])
+def test_v2_transcript_rejects_review_without_verified_evidence(
+    evidence_verified: bool | None,
+) -> None:
+    value = _v2_fixture(evidence_verified=evidence_verified)
+
+    with pytest.raises(LoveEngineError) as error:
+        verify_pilot_transcript(value)
+
+    assert error.value.code == "review_evidence_not_verified"
+
+
+def test_v2_legacy_review_payload_is_consistency_only() -> None:
+    value = _v2_fixture(legacy_review_payload=True)
+
+    result = verify_pilot_transcript(value, rpc_url="http://rpc.invalid")
+
+    assert result["verification_level"] == "legacy_consistency"
     assert result["chain_verified"] is False
     assert result["trust_bound"] is False
 

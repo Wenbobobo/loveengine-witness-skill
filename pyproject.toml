@@ -12,6 +12,7 @@ dependencies = [
     "eth-hash[pycryptodome]>=0.8.0",
     "eth-utils>=6.0.0",
     "jsonschema>=4.26.0",
+    "psutil>=7.0.0",
     "web3>=7.16.0",
 ]
 
@@ -34,6 +35,7 @@ build-backend = "hatchling.build"
 packages = ["src/loveengine_witness"]
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 markers = [
     "integration: requires the pinned Foundry toolchain and a local Anvil process",
 ]
