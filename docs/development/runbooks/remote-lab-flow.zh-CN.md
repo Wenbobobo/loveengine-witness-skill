@@ -62,7 +62,8 @@ uv run python .\tools\run_remote_lab.py run `
 2. 将当前 commit 打成 tar；同时在本机把已通过 dependency lock 验证的
    `contracts/lib` 构建为确定性 ZIP，manifest 记录固定 commit、树摘要和逐文件
    SHA-256；
-3. 在远端 home 下创建唯一、权限收紧的实验目录；
+3. 在远端 home 下逐级创建唯一、权限收紧的实验目录；每一级都拒绝 symlink 或
+   非目录，复核 canonical path 留在 home 内，并原子拒绝重复 deployment；
 4. 在 core supervisor、guardian 或 Anvil child 创建前，先取得按用户范围的 advisory
    lock，并在该唯一输出目录内再次执行资源门。只有 `safe_to_run:true` 的结果才能以短时、
    EOF 分隔的 POSIX FD lease 交给直接 supervisor；它必须在 15 秒内一次性消费，绑定输出目录、
@@ -84,7 +85,8 @@ uv run python .\tools\run_remote_lab.py run `
    evidence；
 10. 分别提交绑定 bundle/events/artifacts 的签名 V2 review task；每个节点实际
    复算自己的证据并返回与 node/task/dispute 绑定的 receipt；
-11. 终止且只终止本次创建的 Quickstart 进程组，再执行只读 postflight。
+11. 终止且只终止本次创建的 Quickstart 进程组，再执行只读 postflight；只有
+    postflight 和本机 exact-commit 复核完成后才落盘 terminal `passed` 报告。
 
 SSH 调用只使用指定的 known_hosts，禁用系统全局 known_hosts，也不加载远端 login
 shell。Quickstart 在远端启动一个只在 Pilot 子进程存活期间担任 leader 的 supervisor 和独立、
@@ -173,8 +175,10 @@ Pilot 配置改成 `0.0.0.0`。
   `listener_inspection.expected_ports_listening: true`，non-loopback 与 extra listener
   计数均为 0；
 - `owned_process_cleanup: true`，远端实验文件仍保留。
-- `local_process_cleanup` 的每项均为 `verified: true`；本机 node 或 SSH tunnel 的
-  terminate/wait 失败也不得跳过远端 group 或 watchdog 的清理；
+- `local_process_cleanup` 的每项均为 `verified: true` 且
+  `complete_process_tree_cleanup_verified:true`；本机 node 直接从当前 Python
+  environment 启动，不以 `uv` wrapper 充当可误判的进程根。本机 node 或 SSH
+  tunnel 的 terminate/wait 失败也不得跳过远端 group 或 watchdog 的清理；
 - `watchdog_cleanup.verified: true`；
 - `tunnel_smoke.requested_teardown.group_cleanup_verified: true`，且
   `tunnel_smoke.requested_teardown.watchdog_safe_terminal: true`；该字段表示受控回收，

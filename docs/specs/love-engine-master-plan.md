@@ -37,11 +37,12 @@
   loopback/tunnel 验收。增强路径包含真实 review evidence 复算、durable task
   journal/ACK-loss 重连、精确依赖 commit、失败报告和 postflight 清理。wire
   protocol 保持 loveengine-witness-net/0.6。
-- 0.7 candidate implementation：当前分支叠加于尚未人工合并的 PR #11，已实现
-  本地 V2、双入口、外部 signer adapter、Sepolia transaction plan、双 RPC 与
+- 0.7 candidate implementation：PR #11 与 PR #12 已于 2026-08-10 经项目所有者
+  授权的自审合入 `main`，当前源码已实现本地 V2、双入口、外部 signer adapter、
+  Sepolia transaction plan、双 RPC 与
   Tailscale Serve preflight，但不能据此宣称 0.6.1/0.7 已发布。0.7 release 必须以
-  人工 review/merge 后的 0.6.1 精确 release base 为祖先，并对最终 commit 重跑
-  全部门。
+  已合并的 0.6.1 代码基线为祖先，并对最终 commit 重跑全部门；0.6.1/0.7 tag
+  和 release asset 仍未发布。
 
 当前代码能验证 package/manifest 与 Registry release、一组受 policy 约束的节点、
 签名 task/receipt、artifact 与事件链、争议 quorum 和跨阶段引用。可选治理实验
@@ -91,8 +92,8 @@ safe block、服务配置和参与者声明。治理合约仍留在本机可选�
 
 0.7 按依赖顺序实施，任何后段证据不能替代前段信任门：
 
-- 0.6.1 依赖：PR #11 人工 review/merge、精确 tag/release asset 和 0.7 ancestry
-  校验。它不阻塞本分支设计，但阻塞 0.7 tag 和公开验收结论。
+- 0.6.1 依赖：PR #11/PR #12 merge 与 0.7 ancestry 已完成；精确 tag/release asset
+  仍待发布。后者继续阻塞 0.7 tag 和“已发布”结论，但不阻塞受邀试点准备。
 - Signer/Sepolia：统一 SignerClient，以 Clef strict rules 约束 Publisher、task
   issuer 和节点角色；只把 SkillRegistry 部署到 Sepolia，并由两个 RPC 在相同
   historical safe block 核对交易、code 和 release。

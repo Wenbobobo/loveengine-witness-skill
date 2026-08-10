@@ -74,7 +74,9 @@ def test_witness_core_pilot_replays_delayed_observer_after_fault(tmp_path: Path)
         f"observe:lan-pilot-session-001:{index}" for index in range(1, 4)
     }
     assert all(
-        proof["accepted"] is True and proof["connection_closed"] is True
+        proof["accepted"] is True
+        and proof["connection_closed"] is True
+        and proof["reconnected"] is True
         for proof in proofs
     )
     receipt_ack_loss = result["faults"]["receipt_ack_loss_proofs"]

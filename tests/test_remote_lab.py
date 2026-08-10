@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import os
 import shutil
 import subprocess
@@ -2256,6 +2257,166 @@ def test_local_reaping_never_raises_when_terminate_or_wait_fails() -> None:
     assert wait_result["error_types"] == ["OSError"]
 
 
+def test_local_reaping_terminates_the_owned_descendant_tree() -> None:
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys,time; "
+                "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+                "print(child.pid, flush=True); time.sleep(60)"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert parent.stdout is not None
+    child_pid = int(parent.stdout.readline().strip())
+    try:
+        result = run_remote_lab._reap_local_process(
+            parent,
+            label="owned-process-tree",
+        )
+        assert result["verified"] is True
+        assert result["process_tree_inspection_available"] is True
+        assert result["observed_descendant_count"] >= 1
+        assert result["alive_descendant_pids"] == []
+        assert result["complete_process_tree_cleanup_verified"] is True
+    finally:
+        for pid in (child_pid, parent.pid):
+            try:
+                process = run_remote_lab.psutil.Process(pid)
+                process.kill()
+            except run_remote_lab.psutil.NoSuchProcess:
+                pass
+
+
+def test_local_reaping_fails_closed_when_parent_tree_is_no_longer_observable() -> None:
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys; "
+                "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+                "print(child.pid, flush=True)"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert parent.stdout is not None
+    child_pid = int(parent.stdout.readline().strip())
+    parent.wait(timeout=10)
+    try:
+        result = run_remote_lab._reap_local_process(
+            parent,
+            label="unobservable-process-tree",
+        )
+        assert result["verified"] is False
+        assert result["process_tree_inspection_available"] is False
+        assert result["complete_process_tree_cleanup_verified"] is False
+        assert "ProcessTreeUnavailable" in result["error_types"]
+        assert run_remote_lab.psutil.Process(child_pid).is_running()
+    finally:
+        try:
+            child = run_remote_lab.psutil.Process(child_pid)
+            child.kill()
+            child.wait(timeout=10)
+        except run_remote_lab.psutil.NoSuchProcess:
+            pass
+
+
+def test_remote_deployment_source_creates_once_below_home(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    environment = {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
+    command = [
+        sys.executable,
+        "-",
+        ".local/share/loveengine-witness-lab",
+        "candidate-001",
+    ]
+
+    created = subprocess.run(
+        command,
+        input=run_remote_lab.REMOTE_DEPLOYMENT_CREATE_SOURCE,
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    duplicate = subprocess.run(
+        command,
+        input=run_remote_lab.REMOTE_DEPLOYMENT_CREATE_SOURCE,
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert created.returncode == 0
+    assert json.loads(created.stdout) == {
+        "created": True,
+        "relative": ".local/share/loveengine-witness-lab/candidate-001",
+    }
+    assert duplicate.returncode != 0
+
+
+def test_remote_deployment_source_rejects_a_symlinked_parent(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    outside = tmp_path / "outside"
+    home.mkdir()
+    outside.mkdir()
+    try:
+        (home / ".local").symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("directory symlinks are unavailable on this host")
+    environment = {**os.environ, "HOME": str(home), "USERPROFILE": str(home)}
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            ".local/share/loveengine-witness-lab",
+            "candidate-001",
+        ],
+        input=run_remote_lab.REMOTE_DEPLOYMENT_CREATE_SOURCE,
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert not (outside / "share").exists()
+
+
+def test_remote_listener_source_decodes_ipv6_and_fails_closed() -> None:
+    definitions = run_remote_lab.REMOTE_LISTENER_INSPECTION_SOURCE.split(
+        "parser = argparse.ArgumentParser()", 1
+    )[0]
+    namespace: dict[str, object] = {}
+    exec(definitions, namespace)
+
+    decode_address = namespace["decode_address"]
+    listeners = namespace["listeners"]
+
+    assert decode_address(
+        "00000000000000000000000001000000:01BB", "ipv6"
+    ) == ("::1", 443)
+
+    class Unreadable:
+        def read_text(self, **_kwargs: object) -> str:
+            raise PermissionError("blocked")
+
+    with pytest.raises(RuntimeError, match="listener table inspection failed"):
+        listeners(Unreadable(), "ipv4", set())
+
+
 def test_remote_cleanup_wrappers_report_transport_failures_without_raising() -> None:
     lab = object.__new__(run_remote_lab.RemoteLab)
 
@@ -3320,6 +3481,43 @@ def test_remote_runner_writes_failure_phase_and_postflight_cleanup(
     assert (
         tmp_path / "remote-lab-report.json"
     ).read_text(encoding="utf-8").find('"status": "failed"') >= 0
+
+
+def test_remote_runner_persists_success_only_after_postflight(tmp_path: Path) -> None:
+    lab = object.__new__(run_remote_lab.RemoteLab)
+    lab.args = Namespace(host="test-host", output=tmp_path)
+    lab.current_phase = "reporting"
+    lab.current_output = tmp_path
+    lab.current_commit = None
+    report_path = tmp_path / "remote-lab-report.json"
+
+    def passed() -> dict[str, object]:
+        assert not report_path.exists()
+        return {
+            "schema_version": "loveengine.remote-lab-report/1",
+            "status": "passed",
+        }
+
+    def postflight() -> dict[str, object]:
+        assert not report_path.exists()
+        return {
+            "host": {
+                "process_snapshot_ok": True,
+                "relevant_processes": [],
+            }
+        }
+
+    lab._run_once = passed
+    lab.preflight = postflight
+
+    report = lab.run()
+
+    assert report["status"] == "passed"
+    assert report["postflight_cleanup_verified"] is True
+    assert report_path.is_file()
+    assert "remote-lab-report.json" not in inspect.getsource(
+        run_remote_lab.RemoteLab._run_once
+    )
 
 
 def test_remote_runner_surfaces_owned_core_resource_block(

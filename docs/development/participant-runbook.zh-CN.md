@@ -4,7 +4,7 @@
 协议：`loveengine-witness-net/0.6`
 最新 tag：`v0.6.0-contract-public-pilot`
 
-0.7 分支叠加在尚未人工合并的 0.6.1 PR #11 上。当前已实现本机 V2、双入口、
+PR #11 与 PR #12 已于 2026-08-10 合入 `main`，但 release/tag 尚未发布。当前已实现本机 V2、双入口、
 外部 signer adapter、Sepolia transaction plan、双 RPC 校验契约和 Tailscale Serve
 preflight；尚未完成真实 Clef/Sepolia/Tailscale/受邀远端验收。不要把本文中的准备
 命令描述为已经上线的公开试点。

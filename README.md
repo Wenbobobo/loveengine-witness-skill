@@ -13,11 +13,12 @@ act, vote, or decide real-world truth for people.
 
 ## Status
 
-The latest Git tag is `v0.6.0-contract-public-pilot`. The current candidate is
-`0.7.0-invited-public-pilot`, stacked on the still-unmerged 0.6.1 PR #11. This
-branch can define and test 0.7 interfaces, but it is not a published release and
-cannot be described as an upgrade from a released 0.6.1 until that PR is
-reviewed and merged manually. The wire protocol remains
+The latest Git tag is `v0.6.0-contract-public-pilot`. PR #11 and the stacked
+0.7 PR #12 received owner-authorized self-review and were merged into `main`
+on 2026-08-10. The current
+source candidate is `0.7.0-invited-public-pilot`, but neither a 0.6.1 nor a 0.7
+tag/release asset has been published, so the merged source must not be described
+as a released upgrade. The wire protocol remains
 `loveengine-witness-net/0.6`, so M0-M6 schemas and historical transcripts remain
 verifiable.
 
@@ -49,6 +50,13 @@ produced evidence from an actual Clef 1.17.3 process, Sepolia transaction,
 Tailscale Serve session, or three invited remote operators. Geth 1.17.4 removed
 the built-in Clef distribution; Geth 1.17.5 is therefore not a valid substitute
 or automatic Clef upgrade. The first pilot permits `manual_confirm` only.
+
+The next external experiment is a hybrid boundary: a public Sepolia Registry
+anchor with an invited, tailnet-only participant surface. It is not an anonymous
+public-internet deployment. Start with the
+[invited public pilot runbook](docs/development/runbooks/invited-public-pilot.zh-CN.md)
+and its validated
+[YAML inventory with secret-file references](config/examples/invited-public-pilot.sepolia.example.yaml).
 
 Run that exact-commit gate from a clean worktree:
 
@@ -306,6 +314,8 @@ promise of production availability.
 - [Contract API](docs/api/loveengine-contract-api.md)
 - [Engineering master plan](docs/specs/love-engine-master-plan.md)
 - [0.7 invited public pilot specification](docs/specs/love-engine-invited-public-pilot.md)
+- [Sepolia invited public pilot runbook](docs/development/runbooks/invited-public-pilot.zh-CN.md)
+- [Pilot YAML template with secret-file references](config/examples/invited-public-pilot.sepolia.example.yaml)
 - [0.6.1 remote lab specification](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [Shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [Documentation index](docs/README.md)

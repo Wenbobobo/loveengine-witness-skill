@@ -4,7 +4,7 @@
 协议：`loveengine-witness-net/0.6`
 最新 tag：`v0.6.0-contract-public-pilot`
 
-0.7 分支叠加在尚未人工合并的 0.6.1 PR #11 上。Publisher 构建确定性 ZIP，生成
+PR #11 与 PR #12 已于 2026-08-10 合入 `main`，但 release/tag 尚未发布。Publisher 构建确定性 ZIP，生成
 精确 Sepolia EIP-1559 transaction plan，经外部 signer 人工确认签名，并由 CLI 在
 重新校验 plan、raw transaction 和 nonce 后广播。当前实现和本机测试已经覆盖这些
 接口，但尚无真实 Clef 1.17.3 或 Sepolia deployment/release receipt；不得把以下

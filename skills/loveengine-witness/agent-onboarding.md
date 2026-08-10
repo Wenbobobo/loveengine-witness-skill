@@ -59,4 +59,4 @@ Governance parameters:
 
 M0 compatibility manifest spec hash:
 
-`sha256:22bfa88db6bf98c0d28aef92d894ff8b1e68ecc534f495b21563683e49625e75`
+`sha256:cddf123cbd3207b8753a871a1967198962d9395b8a4157571331a24a62ecbb37`

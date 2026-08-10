@@ -12,6 +12,8 @@
 | QA.md | 会议问题的代码事实回答 |
 | docs/specs/love-engine-master-plan.md | 唯一工程总规划 |
 | docs/specs/love-engine-invited-public-pilot.md | 当前 0.7 candidate 的接口、阶段和退出门 |
+| docs/development/runbooks/invited-public-pilot.zh-CN.md | Sepolia + tailnet-only 受邀试点操作手册 |
+| config/examples/invited-public-pilot.sepolia.example.yaml | 秘密文件引用式、默认不申请执行的试点计划模板 |
 | docs/specs/love-engine-pre-enterprise-remote-lab.md | 0.6.1 共享 Linux 历史验收规格 |
 | docs/architecture/witness-core-and-data-flow.zh-CN.md | 核心/治理边界、数据流和存储 |
 | docs/api/ | 当前接口、ABI 和 CLI |
@@ -19,8 +21,9 @@
 | docs/development/runbooks/ | 当前角色操作手册 |
 | skills/loveengine-witness/skill-manifest.json | 当前 source refs/hashes 与 package identity |
 
-最新 Git tag 是 `v0.6.0-contract-public-pilot`；0.6.1 PR #11 尚未人工合并。
-`0.7.0-invited-public-pilot` 是叠加在该 PR 上的工作 candidate，协议仍为
+最新 Git tag 是 `v0.6.0-contract-public-pilot`；PR #11 与 PR #12 已在
+2026-08-10 经项目所有者授权的自审合入 `main`，但 0.6.1/0.7 tag 和 release asset 均未发布。
+`0.7.0-invited-public-pilot` 仍是 candidate，协议为
 `loveengine-witness-net/0.6`。M3-M6 阶段报告不再属于 current authority。
 
 ## Preserved current source constraints

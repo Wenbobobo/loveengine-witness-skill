@@ -40,6 +40,7 @@ REQUIRED_CURRENT_DOCS = {
     "docs/development/runbooks/public-viewer-flow.zh-CN.md",
     "docs/development/runbooks/publisher-flow.zh-CN.md",
     "docs/development/runbooks/remote-lab-flow.zh-CN.md",
+    "docs/development/runbooks/invited-public-pilot.zh-CN.md",
     "docs/articles/loveengine-technical-architecture.zh-CN.md",
     "docs/api/README.md",
     "docs/api/loveengine-contract-api.md",

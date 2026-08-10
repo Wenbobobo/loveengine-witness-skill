@@ -1,6 +1,7 @@
 # Developer experiment guide
 
-适用目标：0.7.0-invited-public-pilot candidate（叠加于尚未人工合并的 0.6.1 PR #11）
+适用目标：0.7.0-invited-public-pilot candidate（PR #11 与 PR #12 已于
+2026-08-10 合入 `main`，release/tag 尚未发布）
 最新发布 tag：v0.6.0-contract-public-pilot
 
 本指南按当前能力而不是 M1-M6 历史组织实验。默认验证路径在 ProposalGate 结束；
@@ -31,6 +32,7 @@ uv run loveengine pilot contracts prepare
 依次阅读 [QA](../../QA.md)、[核心架构](../architecture/witness-core-and-data-flow.zh-CN.md)、
 [CLI 参考](../api/cli-reference.md)、
 [0.7 受邀试点 SPEC](../specs/love-engine-invited-public-pilot.md)和
+[Sepolia 受邀试点操作手册](runbooks/invited-public-pilot.zh-CN.md)，以及
 [0.6.1 远程实验 SPEC](../specs/love-engine-pre-enterprise-remote-lab.md)。历史阶段报告只在
 追查兼容性时阅读。
 
@@ -308,6 +310,16 @@ uv run loveengine pilot task enqueue --input .\task.signed.json --admin-url <adm
 运行 `pilot serve --tailscale-serve`。工具只映射 participant loopback，固定 900 秒，
 并精确恢复自己接管前的 Serve 状态；它不执行 `tailscale up`，也不接管账号/ACL。
 当前尚无真实 Serve 或受邀节点报告。
+
+跨组件输入先从
+`config/examples/invited-public-pilot.sepolia.example.yaml` 建立秘密文件引用式计划，并执行：
+
+```powershell
+uv run python .\tools\validate_invited_pilot_plan.py .\tmp\pilot-plans\<run-id>\pilot.yaml --check-input-files
+```
+
+校验器只确认配置边界和引用文件存在，不会替操作者签名、提交 Sepolia 交易、登录
+Tailscale 或启动试点。
 
 ## 变更验收
 

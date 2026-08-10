@@ -8,8 +8,8 @@ M3 稳定版本：`0.3.1-demo-ready`（兼容 `0.3.0-network-pilot`）。
 bootstrap、task 和 receipt 使用 EIP-712 domain version 2；当前 V2 只执行
 `observe_live_text` 和 `review_dispute`。P2P 和节点直连未实现。
 
-0.7 candidate 叠加在尚未人工合并的 0.6.1 PR #11 上，协议版本仍为
-`loveengine-witness-net/0.6`。本节所述新 schema/adapter 已在本机实现并测试；当前
+PR #11 与 PR #12 已于 2026-08-10 合入 `main`，但 0.6.1/0.7 release 尚未发布；
+协议版本仍为 `loveengine-witness-net/0.6`。本节所述新 schema/adapter 已在本机实现并测试；当前
 没有真实 Clef 1.17.3、Sepolia、Tailscale Serve 或受邀远端节点证据。
 
 ## 0. 0.7 邀请与 signer 边界

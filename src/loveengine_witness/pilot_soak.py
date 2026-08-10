@@ -93,6 +93,7 @@ def _has_verified_disconnect_proofs(faults: object) -> bool:
             or not node
             or proof.get("accepted") is not True
             or proof.get("connection_closed") is not True
+            or proof.get("reconnected") is not True
         ):
             return False
         task_ids.add(task_id)

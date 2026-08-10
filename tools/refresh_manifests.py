@@ -41,6 +41,7 @@ RELEASE_ROOT_REFS = [
     "docs/development/runbooks/voting-witness-flow.zh-CN.md",
     "docs/development/runbooks/public-viewer-flow.zh-CN.md",
     "docs/development/runbooks/publisher-flow.zh-CN.md",
+    "docs/development/runbooks/invited-public-pilot.zh-CN.md",
     "docs/articles/loveengine-technical-architecture.zh-CN.md",
     "docs/reference/contracts/contract-team-v2/README.md",
     "docs/reference/licenses/scc0-provenance.md",
@@ -65,6 +66,7 @@ RELEASE_ROOT_REFS = [
     "schemas/signed-chain-transaction-v1.schema.json",
     "schemas/participant-attestation-v1.schema.json",
     "schemas/invited-pilot-service-config-v1.schema.json",
+    "schemas/invited-public-pilot-plan-v1.schema.json",
     "schemas/pilot-snapshot-v1.schema.json",
     "schemas/pilot-snapshot-checksums-v1.schema.json",
     "contracts/dependency-lock.json",
@@ -99,6 +101,7 @@ RELEASE_ROOT_REFS = [
     "src/loveengine_witness/participant_attestation.py",
     "src/loveengine_witness/invited_operator.py",
     "src/loveengine_witness/rpc_endpoints.py",
+    "src/loveengine_witness/invited_pilot_plan.py",
     "src/loveengine_witness/trust_policy.py",
     "src/loveengine_witness/pilot_demo.py",
     "src/loveengine_witness/pilot_phases.py",
@@ -120,6 +123,8 @@ RELEASE_ROOT_REFS = [
     "tools/start_shared_quickstart.py",
     "tools/start_shared_core.py",
     "tools/run_remote_lab.py",
+    "tools/validate_invited_pilot_plan.py",
+    "config/examples/invited-public-pilot.sepolia.example.yaml",
 ]
 
 # Documentation screenshots are tracked through the source inventory, but they

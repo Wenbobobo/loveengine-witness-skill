@@ -43,18 +43,18 @@ invited input -> artifacts/events -> observation -> dispute review
 
 ### 1.2 上游发布依赖
 
-本分支叠加在 PR #11 的候选树上，可以先完成接口设计和本机实现，但 0.7 发布必须
-依赖以下事实：
+PR #11 与其上叠加的 0.7 PR #12 已在 2026-08-10 经项目所有者授权的自审合入
+`main`。因此当前
+源码树已经吸收 0.6.1 收尾和 0.7 接口，但发布仍依赖以下事实：
 
-1. PR #11 经人工 review 后合入 `main`，不得自动合并；
-2. 0.6.1 收尾提交、tag 与 release asset 已由精确 commit 的发布门验证；
-3. 本分支以该已发布 commit 为祖先，或在 rebase 后证明最终 tree 吸收了全部
-   0.6.1 收尾改动；
-4. rebase、manifest/package hash 改变或上游修复都使旧的 0.7 运行证据失效，必须
-   对新精确 commit 重跑完整门。
+1. PR #11、PR #12 的 merge commit 和 ancestry 可验证；
+2. 0.6.1 精确 tag 与 release asset 尚待由对应 commit 的发布门验证并发布；
+3. 0.7 candidate 必须以已合并基线为祖先，最终 release commit 必须干净；
+4. manifest/package hash、上游修复或 candidate commit 改变都会使旧运行证据失效，
+   必须对新精确 commit 重跑完整门。
 
-PR #11 尚未合并不阻塞本规格和独立模块实现；它阻塞 0.7 release、tag、公开
-验收结论以及“从已发布 0.6.1 升级”的表述。
+合并完成允许继续准备受邀试点，但不等于 0.6.1/0.7 已发布。缺少精确 tag/release
+asset 仍阻塞 0.7 release 以及“从已发布 0.6.1 升级”的表述。
 
 ### 1.3 当前实现与证据状态
 
@@ -68,8 +68,8 @@ PR #11 尚未合并不阻塞本规格和独立模块实现；它阻塞 0.7 relea
 | Tailscale Serve | 冲突/登录/Funnel preflight、自有映射与精确恢复 | 本机模拟测试 | 目标 tailnet/ACL/Serve 报告 |
 | 15 分钟门 | core、900 秒、30 events、10 observers 的固定 V2 profile | 本机 runner contract | exact candidate 的完整终态报告 |
 
-最新发布 tag 仍是 `v0.6.0-contract-public-pilot`。上述“已实现”只指当前 stacked
-branch 的代码与本机测试面，不得当作 0.7 release 或外部试点已经完成。
+最新发布 tag 仍是 `v0.6.0-contract-public-pilot`。上述“已实现”只指已合入
+`main` 的 candidate 代码与本机测试面，不得当作 0.7 release 或外部试点已经完成。
 
 ## 2. 信任模型
 
@@ -329,11 +329,12 @@ transaction 没有该 deadline。解码复核要求空 access list，但 raw byt
 
 ### P0：0.6.1 基线吸收与规格冻结
 
-输出：已人工合并的 0.6.1 release base、0.7 version plan、schema/CLI 变更清单、
+输出：已合并的 0.6.1 代码基线、0.7 version plan、schema/CLI 变更清单、
 threat model 和迁移表。
 
-退出门：PR #11 人工合并事实可验证；0.6.1 tag 指向经过验证的 commit；0.7 分支
-包含该基线；M0-M6 fixture 继续通过。设计和测试桩可以在此前并行，release 不能。
+退出门：PR #11/PR #12 合并和 ancestry 可验证；0.6.1 tag 指向经过验证的 commit；
+0.7 分支包含该基线；M0-M6 fixture 继续通过。前两项中的 merge/ancestry 已完成，
+0.6.1 tag/release asset 仍待完成。
 
 ### P1：SignerClient 与 Clef
 
@@ -426,7 +427,7 @@ non-integration/integration、900 秒门、远端邀请试点、secret scan 和
 
 | 条件 | 必须动作 | 禁止降级 |
 | --- | --- | --- |
-| PR #11/0.6.1 未人工合并 | 可继续隔离开发；阻止 release/tag/public acceptance | 不把 stacked branch 称为已发布基线 |
+| 0.6.1/0.7 tag 或 release asset 未发布 | 可继续 candidate 测试；阻止 release 结论 | 不把已合并源码称为已发布版本 |
 | Clef config/rules/attestation 不匹配 | 拒绝签名和广播 | 不改用 unlocked RPC、raw key 或 blind sign |
 | Sepolia RPC 分歧或 safe block 不可得 | 停止 chain verification | 不切 latest、不单 RPC 宣称 chain_verified |
 | Registry/code/package/manifest 不匹配 | 节点不连接、任务不执行 | 不接受 invite/Relay 自报 hash |
@@ -458,7 +459,10 @@ tailnet-only 服务验证了一个 Sepolia 锚定 release 的 Witness 核心闭�
 
 ## 9. 验收清单
 
-- [ ] PR #11 已人工 review/merge，0.6.1 精确 release base 可验证。
+- [x] PR #11 与 PR #12 已完成 owner-authorized self-review/merge，0.7 ancestry 可验证。
+- [x] 秘密文件引用式 YAML 计划、schema、校验器和操作手册已纳入发布 source inventory。
+- [ ] 至少一名非作者开发者完成独立 review；self-review 不替代该发布门。
+- [ ] 0.6.1 精确 tag/release asset 已发布并绑定通过发布门的 commit。
 - [ ] SignerClient/Clef 默认拒绝规则及 audit/attestation 通过负向测试。
 - [ ] SkillRegistry 在 Sepolia 的 deployment/release 由外部 signer 提交并由双 RPC
       在历史 safe block 验证。

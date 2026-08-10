@@ -206,16 +206,17 @@ confirmation；core 侧还有 3 个观察回执、3 个复核回执、Gate ready
 quickstart、demo 和 soak 故意不在计时或后台流程中隐式下载/编译，缺产物或 attestation
 失配会明确失败并给出该命令。
 
-**当前未证明：** 当前最新 Git tag 是 `v0.6.0-contract-public-pilot`；0.6.1 PR #11
-尚未人工合并。当前 `0.7.0-invited-public-pilot` candidate 叠加在该未合并分支上，
-不是已发布版本。一次共享主机短验收不等于公网、公共测试网、TLS、生产身份、HA
+**当前未证明：** PR #11 与 PR #12 已于 2026-08-10 经项目所有者授权的自审合入
+`main`，但当前
+最新 Git tag 仍是 `v0.6.0-contract-public-pilot`；0.6.1/0.7 tag 和 release asset
+尚未发布。一次共享主机短验收不等于公网、公共测试网、TLS、生产身份、HA
 或长期可用性已通过。当前 candidate 使用 900 秒、30 事件、10 观察者的工程门；
 它也不是长期稳定性证明。
 
 **验证入口：** [开发实验指南](docs/development/integration-guide.md)、
 [中文 README](README.zh-CN.md)。
 
-## 13. 为什么这次不先接公司直播或公共测试网？（41:21、49:47-50:02）
+## 13. 为什么之前不先接公司直播或公共测试网？下一次实验是什么？（41:21、49:47-50:02）
 
 **状态：`[未实现]`**
 
@@ -223,13 +224,15 @@ quickstart、demo 和 soak 故意不在计时或后台流程中隐式下载/编�
 需要把平台认证、调度、限流、视频格式和运维问题同时引入。先把信任、数据流和
 可复核结果讲清楚，能降低开发成员测试时的歧义。
 
-**当前未证明：** 会议中“之后会部署公共测试网”的表述只是当时计划，不是完成
-事实。0.7 已实现 Sepolia 交易计划、外部 signer adapter、双 RPC 校验契约、双入口
+**当前未证明：** 会议中“之后会部署公共测试网”的表述不是完成事实。下一次实验
+现在明确为“公开 Sepolia Registry 锚点 + tailnet-only 受邀 participant 入口”，不是
+匿名公网服务。0.7 已实现 Sepolia 交易计划、外部 signer adapter、双 RPC 校验契约、双入口
 Pilot 和 Tailscale Serve preflight，但还没有真实 Clef、Sepolia 交易、Serve 会话
 或受邀远程节点证据。既有共享 Linux 短实验仍使用 Anvil signer、模拟 actor 和
 SSH tunnel，不能外推为公共测试网或企业部署。
 
-**验证入口：** [0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
+**验证入口：** [受邀公开试点操作手册](docs/development/runbooks/invited-public-pilot.zh-CN.md)、
+[0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)、
 [工程总规划](docs/specs/love-engine-master-plan.md)。
 
 ## 14. 远程主机测试是否等于可以接企业？
@@ -250,7 +253,7 @@ tunnel 收到连接后任务并返回绑定 receipt。2026-08-04 的 candidate c
 evidence-verified 绑定回执、3 个 ACK 和 3 个 receipt confirmation，owned process
 清理验证与独立 postflight 均通过。
 
-上述远程通过事实只属于 0.6.1 历史 candidate，不接受当前 0.7 stacked candidate。
+上述远程通过事实只属于 0.6.1 历史 candidate，不接受当前 0.7 candidate。
 
 同一 candidate 还完成一次 240 事件、10 只读观察者的四小时本机 core run；全部
 报告门、零秘密发现、空 stderr 与独立 transcript 复验均通过。
@@ -282,13 +285,15 @@ Tailscale Serve 的失败关闭 preflight/自有配置恢复，以及固定 900 
 10 observers 的本机 WitnessCoreTranscriptV2 验收形状。协议版本仍是
 `loveengine-witness-net/0.6`，旧 reader 没有删除。
 
-**当前未证明：** 最新 tag 仍是 `v0.6.0-contract-public-pilot`，0.6.1 PR #11 尚未
-人工合并，0.7 因而只是 stacked candidate。当前没有真实 Clef 1.17.3 签名、Sepolia
+**当前未证明：** PR #11 与 PR #12 已在 2026-08-10 合入 `main`，但最新 tag 仍是
+`v0.6.0-contract-public-pilot`，0.6.1/0.7 release asset 均未发布。当前没有真实
+Clef 1.17.3 签名、Sepolia
 deployment/release transaction、Tailscale Serve 会话、三个受邀远程操作者或
 `environment: sepolia_invited_pilot` 的终态 transcript。代码存在、单元测试通过和
 本机 V2 transcript 都不能替代这些外部证据。
 
 **验证入口：** [0.7 SPEC](docs/specs/love-engine-invited-public-pilot.md)、
+[受邀公开试点操作手册](docs/development/runbooks/invited-public-pilot.zh-CN.md)、
 [CLI 参考](docs/api/cli-reference.md)、
 `schemas/witness-core-transcript-v2.schema.json`。
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -135,6 +137,70 @@ def test_background_soak_writes_queryable_state(
     assert 0 <= status["progress_percent"] <= 100
 
 
+def test_background_soak_reaps_worker_when_pid_state_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    process = FakeProcess()
+    cleanup_calls: list[object] = []
+    monkeypatch.setattr(
+        pilot_soak_process.subprocess,
+        "Popen",
+        lambda *args, **kwargs: process,
+    )
+    monkeypatch.setattr(
+        pilot_soak_process,
+        "_write_soak_state",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("state write failed")),
+    )
+    monkeypatch.setattr(
+        pilot_soak_process,
+        "_terminate_launched_process",
+        lambda owned: cleanup_calls.append(owned) is None or True,
+    )
+
+    with pytest.raises(LoveEngineError) as error:
+        start_background_soak(
+            tmp_path,
+            duration_seconds=60,
+            event_count=12,
+            observers=10,
+        )
+
+    assert error.value.code == "pilot_soak_registration_failed"
+    assert "cleanup_verified=true" in error.value.message
+    assert cleanup_calls == [process]
+
+
+def test_failed_registration_cleanup_terminates_real_worker_tree() -> None:
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import subprocess,sys,time; "
+                "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+                "print(child.pid, flush=True); time.sleep(60)"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert parent.stdout is not None
+    child_pid = int(parent.stdout.readline().strip())
+    try:
+        assert pilot_soak_process._terminate_launched_process(parent) is True
+        with pytest.raises(pilot_soak_process.psutil.NoSuchProcess):
+            pilot_soak_process.psutil.Process(child_pid).status()
+    finally:
+        for pid in (child_pid, parent.pid):
+            try:
+                process = pilot_soak_process.psutil.Process(pid)
+                process.kill()
+            except pilot_soak_process.psutil.NoSuchProcess:
+                pass
+
+
 def test_background_soak_status_uses_completed_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -252,7 +318,13 @@ def test_background_soak_status_fails_unregistered_launch_after_lease(
         "status": "starting",
         "pid": None,
         "started_at_epoch": started_at_epoch,
+        "planned_end_epoch": started_at_epoch + 60,
         "duration_seconds": 60,
+        "event_count": 12,
+        "observer_count": 10,
+        "stage": "core",
+        "core_transcript_version": 1,
+        "run_id": "late-launch-report",
         "output": str(tmp_path),
     }
     state_path.write_text(json.dumps(original), encoding="utf-8")
@@ -271,6 +343,16 @@ def test_background_soak_status_fails_unregistered_launch_after_lease(
     assert persisted["status"] == "failed"
     assert persisted["failure_reason"] == "launch_registration_timeout"
     assert isinstance(persisted["finished_at"], str)
+
+    _install_valid_core_transcript(tmp_path, original, monkeypatch)
+    (tmp_path / "pilot-soak-report.json").write_text(
+        json.dumps(_passing_report(original)), encoding="utf-8"
+    )
+
+    repeated = background_soak_status(state_path)
+
+    assert repeated["status"] == "failed"
+    assert repeated["failure_reason"] == "launch_registration_timeout"
 
 
 def test_background_soak_rejects_report_before_planned_wall_clock_end(
