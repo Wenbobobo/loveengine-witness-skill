@@ -21,10 +21,12 @@ REQUIRED_CURRENT_DOCS = {
     "README.md",
     "AGENTS.md",
     "CONTRIBUTING.md",
+    "SECURITY.md",
     "QA.md",
     "docs/README.md",
     "docs/architecture/witness-core-and-data-flow.zh-CN.md",
     "docs/development/integration-guide.md",
+    "docs/development/showcase-question-bridge.zh-CN.md",
     "docs/development/repository-structure.md",
     "docs/specs/love-engine-master-plan.md",
     "docs/specs/love-engine-pre-enterprise-remote-lab.md",
@@ -46,12 +48,17 @@ REQUIRED_CURRENT_DOCS = {
     "docs/api/loveengine-contract-api.md",
     "docs/api/agent-skill-api.md",
     "docs/kb/source-inventory.md",
+    "showcase/README.md",
 }
 
 FORBIDDEN_ACTIVE_TEXT = {
     "docs/specs/love-engine-skill-spec.md",
     "docs/specs/love-engine-next-phase-spec.md",
     "docs/specs/love-engine-lan-pilot-spec.md",
+    "docs/development/m3-demo-runbook.md",
+    "docs/development/m3-acceptance-report.md",
+    "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
+    "docs/development/m5-acceptance-report.md",
     "LoveEngine" + "Skill/",
     "D:" + "\\zWenbo\\AI\\DAism",
 }
@@ -123,6 +130,35 @@ def validate_interface_docs(errors: list[str]) -> None:
         errors.append("QA.md questions must retain explicit status labels")
 
 
+def validate_showcase(errors: list[str]) -> None:
+    page = (ROOT / "showcase/index.html").read_text(encoding="utf-8")
+    required = {
+        'id="question-form"',
+        'id="question-text"',
+        'maxlength="1200"',
+        "loveengine-showcase-question:v1",
+        "github.com/Wenbobobo/loveengine-witness-skill/issues/new",
+        "0.7 候选版",
+        "blob/main/README.zh-CN.md",
+    }
+    for value in sorted(required):
+        if value not in page:
+            errors.append(f"showcase question flow missing: {value}")
+    forbidden = {
+        "codex/formal-soak-review-reliability",
+        "loveengine-witness-0.6.1-contract-public-pilot.zip",
+    }
+    for value in sorted(forbidden):
+        if value in page:
+            errors.append(f"stale showcase text: {value}")
+
+    template = (
+        ROOT / ".github/ISSUE_TEMPLATE/showcase_question.md"
+    ).read_text(encoding="utf-8")
+    if "loveengine-showcase-question:v1" not in template:
+        errors.append("showcase issue template must retain the stable marker")
+
+
 def fail(messages: list[str]) -> None:
     for message in messages:
         print(f"FAIL: {message}", file=sys.stderr)
@@ -132,8 +168,12 @@ def fail(messages: list[str]) -> None:
 def active_markdown_files() -> list[Path]:
     files = [
         ROOT / "README.md",
+        ROOT / "README.zh-CN.md",
         ROOT / "AGENTS.md",
         ROOT / "CONTRIBUTING.md",
+        ROOT / "QA.md",
+        ROOT / "SECURITY.md",
+        ROOT / "showcase/README.md",
     ]
     files.extend((ROOT / "docs").rglob("*.md"))
     return sorted(path for path in files if ARCHIVE not in path.parents)
@@ -315,6 +355,7 @@ def main() -> None:
 
     validate_version_status(errors)
     validate_interface_docs(errors)
+    validate_showcase(errors)
 
     if errors:
         fail(errors)

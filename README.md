@@ -307,6 +307,7 @@ promise of production availability.
 
 ## Documentation
 
+- [Public Chinese showcase](https://love-engine-skill.garyryry.chatgpt.site)
 - [Meeting questions and evidence-backed answers](QA.md)
 - [Core architecture and data flow](docs/architecture/witness-core-and-data-flow.zh-CN.md)
 - [Developer experiments](docs/development/integration-guide.md)
@@ -319,6 +320,14 @@ promise of production availability.
 - [0.6.1 remote lab specification](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [Shared-host runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [Documentation index](docs/README.md)
+- [Public-question to local-Codex bridge](docs/development/showcase-question-bridge.zh-CN.md)
+- [Security policy](SECURITY.md)
+
+The showcase question form opens a prefilled public GitHub Issue for the visitor
+to confirm. It does not expose a local Codex endpoint. After reviewing the
+untrusted question, maintainers can generate a draft from a temporary tracked-file
+snapshot in read-only, no-network mode and explicitly approve the reply with
+`tools/answer_showcase_question.py`.
 
 ## License
 

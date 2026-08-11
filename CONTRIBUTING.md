@@ -11,9 +11,11 @@ uv run python .\tools\check.py
 
 Then read:
 
+- `QA.md`
+- `docs/architecture/witness-core-and-data-flow.zh-CN.md`
 - `docs/development/integration-guide.md`
-- `docs/development/contract-team-handoff.md`
 - `docs/specs/love-engine-master-plan.md`
+- `docs/specs/love-engine-invited-public-pilot.md`
 - `docs/specs/love-engine-pre-enterprise-remote-lab.md`
 - `docs/api/loveengine-contract-api.md`
 - `docs/api/agent-skill-api.md`
@@ -92,8 +94,17 @@ uv run pytest .\tests\integration\test_pilot_soak.py
 
 ## Current priority
 
-M0–M5 are implemented through the LAN pilot line. M6 is the active
-contract-fusion and public-pilot preparation track. Do not replace current
-contracts wholesale with `docs/reference/contracts/contract-team-v2/`; merge
-business improvements only after preserving nonce/deadline/payloadHash,
-reasonHash and transcript boundaries.
+The current source is the `0.7.0-invited-public-pilot` candidate; the latest
+published tag remains `v0.6.0-contract-public-pilot`. Keep the Witness core
+ending at ProposalGate and treat WitnessDAO/PublicSink as an optional governance
+experiment. Real Clef, Sepolia, Tailscale Serve, and invited-operator evidence
+remain external acceptance work.
+
+Questions submitted from the public showcase arrive as GitHub Issues. Maintainers
+can generate a repository-grounded draft without posting it:
+
+```powershell
+uv run python .\tools\answer_showcase_question.py <issue-number> --reviewed
+```
+
+Read `docs/development/showcase-question-bridge.zh-CN.md` before using `--post`.

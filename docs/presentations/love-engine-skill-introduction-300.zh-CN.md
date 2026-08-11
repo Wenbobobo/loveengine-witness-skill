@@ -1,0 +1,3 @@
+# LoveEngine Witness Skill｜300 字介绍稿
+
+LoveEngine Witness Skill 是 NaturalDAO / Proof of Love 愿景中 LoveEngine/UAS 层的第一条可验证纵向切片。它不是直播平台，也不替用户投票或裁决事实，而是让 Agent 按清晰的信任边界完成见证：Publisher 构建确定性 ZIP，并由 SkillRegistry 锚定发布版本；节点通过独立 NodeTrustPolicy 和 bootstrap 校验包、链、身份与任务；Relay 以至少一次投递派发观察或争议复核任务，Agent 通过 SSE/HTTP 读取事件和 artifact，返回绑定节点、任务、nonce、deadline 的签名回执。证据原文保存在内容寻址文件中，事件链、artifact、复核和 ProposalGate 组成可复核记录。默认核心流程在 Gate 结束，WitnessDAO、投票和 PublicSink 只是可选治理实验。当前本机 Anvil、Windows/ARM64 Linux 短实验和 30 分钟 core soak 已验证跨平台复跑、重启恢复、三 Agent 与十个观察者路径；远程服务仍只监听 loopback，三节点增强 tunnel 门、生产 signer、公网、TLS、HA、公司直播和长期 soak 尚未完成。系统能证明记录完整、引用一致、签名有效，不能仅凭 hash 证明内容真实或参与者社会独立。它的价值，是把“我相信这条消息”变成“任何复核者都能知道系统保存了什么、谁签了什么、哪里仍未得到证明”。下一阶段优先做实验、文档和独立验收，而不是急于包装成企业产品。

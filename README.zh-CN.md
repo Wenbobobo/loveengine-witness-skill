@@ -245,6 +245,7 @@ guardian 作为 fail-closed 清理机制。
 
 ## 文档入口
 
+- [中文公开展示页](https://love-engine-skill.garyryry.chatgpt.site)
 - [会议问题与代码事实问答](QA.md)
 - [核心架构与数据流](docs/architecture/witness-core-and-data-flow.zh-CN.md)
 - [开发实验指南](docs/development/integration-guide.md)
@@ -257,6 +258,13 @@ guardian 作为 fail-closed 清理机制。
 - [0.6.1 远程实验规格](docs/specs/love-engine-pre-enterprise-remote-lab.md)
 - [共享主机 runbook](docs/development/runbooks/remote-lab-flow.zh-CN.md)
 - [完整文档索引](docs/README.md)
+- [公开问题与本地 Codex 回答流程](docs/development/showcase-question-bridge.zh-CN.md)
+- [安全报告规则](SECURITY.md)
+
+展示页的问题输入框会打开预填的公开 GitHub Issue，由访客登录、检查并确认发布；
+它不会把本机 Codex 暴露到公网。维护者审核这份不可信输入后，可用
+`tools/answer_showcase_question.py` 在临时的已跟踪文件快照中以只读、无网络模式生成草稿，
+再显式确认回帖。
 
 ## License
 
