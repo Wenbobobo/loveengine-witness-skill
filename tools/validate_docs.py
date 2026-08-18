@@ -152,6 +152,31 @@ def validate_showcase(errors: list[str]) -> None:
         if value in page:
             errors.append(f"stale showcase text: {value}")
 
+    if 'href="/mtp/"' not in page:
+        errors.append("showcase must link the MTP research page")
+
+    mtp_page = (ROOT / "showcase/mtp.html").read_text(encoding="utf-8")
+    mtp_required = {
+        'data-mode="baseline"',
+        'data-mode="verify"',
+        'id="draft-depth"',
+        'id="accept-rate"',
+        'data-check="benchmark"',
+        "https://arxiv.org/abs/2211.17192",
+        "https://arxiv.org/abs/2404.19737",
+        "https://arxiv.org/html/2412.19437",
+        "https://docs.sglang.io/docs/advanced_features/speculative_decoding",
+        "端到端 TPS、TTFT、TPOT 或成本节省",
+    }
+    for value in sorted(mtp_required):
+        if value not in mtp_page:
+            errors.append(f"MTP showcase missing: {value}")
+
+    build = (ROOT / "showcase/build.mjs").read_text(encoding="utf-8")
+    for route in ('"/mtp/"', '"/mtp.html"'):
+        if route not in build:
+            errors.append(f"showcase build route missing: {route}")
+
     template = (
         ROOT / ".github/ISSUE_TEMPLATE/showcase_question.md"
     ).read_text(encoding="utf-8")

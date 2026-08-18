@@ -5,6 +5,7 @@ const output = new URL("./dist/", import.meta.url);
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(new URL("./index.html", import.meta.url), new URL("./index.html", output));
+await cp(new URL("./mtp.html", import.meta.url), new URL("./mtp.html", output));
 await cp(new URL("./assets/", import.meta.url), new URL("./assets/", output), {
   recursive: true,
 });
@@ -13,13 +14,21 @@ await cp(new URL("./.openai/", import.meta.url), new URL("./.openai/", output), 
 });
 
 const html = await readFile(new URL("./index.html", import.meta.url), "utf8");
+const mtpHtml = await readFile(new URL("./mtp.html", import.meta.url), "utf8");
 const operatorImage = await readFile(
   new URL("./assets/operator-console.png", import.meta.url),
 );
 const viewerImage = await readFile(
   new URL("./assets/read-only-dashboard.png", import.meta.url),
 );
-const worker = `const html = ${JSON.stringify(html)};
+const pages = {
+  "/": html,
+  "/index.html": html,
+  "/mtp/": mtpHtml,
+  "/mtp": mtpHtml,
+  "/mtp.html": mtpHtml,
+};
+const worker = `const pages = ${JSON.stringify(pages)};
 const assets = {
   "/assets/operator-console.png": ${JSON.stringify(operatorImage.toString("base64"))},
   "/assets/read-only-dashboard.png": ${JSON.stringify(viewerImage.toString("base64"))},
@@ -37,8 +46,9 @@ function decodeBase64(value) {
 export default {
   async fetch(request) {
     const { pathname } = new URL(request.url);
-    if (pathname === "/" || pathname === "/index.html") {
-      return new Response(html, {
+    const page = pages[pathname];
+    if (page) {
+      return new Response(page, {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
     }

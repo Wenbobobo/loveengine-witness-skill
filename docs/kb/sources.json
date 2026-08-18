@@ -2618,5 +2618,37 @@
     "status": "published",
     "canonical_role": "Visitor-confirmed public question envelope",
     "summary": "Applies a stable marker and public-data warning to questions submitted from the showcase."
+  },
+  {
+    "id": "llm-mtp-research-brief-zh-cn",
+    "title": "LLM MTP research brief zh-CN",
+    "path": "docs/presentations/llm-mtp-research-brief.zh-CN.md",
+    "source_group": "docs/presentations",
+    "layer": "research",
+    "domain_tags": [
+      "LLM",
+      "Multi-Token Prediction",
+      "speculative decoding",
+      "Chinese"
+    ],
+    "status": "published",
+    "canonical_role": "Source-backed MTP sharing brief for collaborators",
+    "summary": "Separates MTP training and model modules from speculative verification, records evidence boundaries, and gives a workload-specific evaluation protocol."
+  },
+  {
+    "id": "llm-mtp-interactive-showcase",
+    "title": "LLM MTP interactive showcase",
+    "path": "showcase/mtp.html",
+    "source_group": "showcase",
+    "layer": "presentation",
+    "domain_tags": [
+      "LLM",
+      "Multi-Token Prediction",
+      "interactive",
+      "Chinese"
+    ],
+    "status": "published",
+    "canonical_role": "Interactive Chinese explanation of MTP and speculative decoding",
+    "summary": "Provides interactive mechanism, acceptance-rate, evidence-timeline and adoption-checklist views, linked to primary research and official serving documentation."
   }
 ]

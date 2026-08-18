@@ -335,7 +335,7 @@
     "examples/transcripts/network-pilot.fixture.json": "sha256:c7fcf441aaa7cc642cee8c55d905f121e345e79e4cb8daf61808ded1c4dba331",
     "README.zh-CN.md": "sha256:6ca959d307d5f0f3b5da72d6f7eab86386c318b9bb6457793159e5e3799526cc",
     "examples/transcripts/live-review.fixture.json": "sha256:5026f7b01839d0e64e67da925c56a8325bef0d0d507ddd0a9818143590ea9648",
-    "docs/kb/sources.json": "sha256:7c089f513f69bca7e39215dc667cacc725c6d2afebd04364d03310814518873a",
+    "docs/kb/sources.json": "sha256:521f0e6e2eadd9c4f3cee64d55e51f6e90ac5fe82a3000b76665a732fdce21e2",
     "src/loveengine_witness/pilot_config.py": "sha256:7ca736d3efd7cea4cd293b1f75e7eba3f46c23dd7f75ef072a0d9a19209c0a30",
     "src/loveengine_witness/pilot_auth.py": "sha256:b1a8f0b93638629da454c22db29c4c10a1d3050014ccb287dcfabb55149437ac",
     "src/loveengine_witness/pilot_audit.py": "sha256:40dc41a58faf1a44e90cee06961dfa9d15eca4014f8b163161ee035525ea89c1",
@@ -494,7 +494,7 @@
     "private_keys_in_transcripts": false,
     "vote_signing_tasks_allowed": false
   },
-  "package_hash": "sha256:7567f17864bd2d9132d0827e216fdf8231ba823991b079515311595e05519fe5",
+  "package_hash": "sha256:87a236de56f230c412fbcc9b67e0260205a8ca97079949e7449964e44dc3593b",
   "distribution": {
     "archive_format": "zip",
     "deterministic": true,

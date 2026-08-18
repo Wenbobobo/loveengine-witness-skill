@@ -1,0 +1,800 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="面向协作伙伴的 LLM MTP 交互研究页：区分多 token 预测、模型模块与投机解码，并说明当前证据与验证方法。">
+  <title>LLM MTP | 多 token 预测与投机解码</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f4f6f5;
+      --surface: #ffffff;
+      --ink: #172020;
+      --muted: #5e6a68;
+      --line: #d3dcda;
+      --line-strong: #9eaeaa;
+      --teal: #0d6b68;
+      --teal-soft: #e5f4f1;
+      --coral: #bd4b37;
+      --coral-soft: #fbe9e5;
+      --amber: #8a6200;
+      --amber-soft: #fff2cf;
+      --violet: #67528f;
+      --violet-soft: #f0edfa;
+      --code: #1d2625;
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      letter-spacing: 0;
+    }
+    button, input { font: inherit; letter-spacing: 0; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    a { color: var(--teal); text-underline-offset: 3px; }
+    code {
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: .9em;
+      overflow-wrap: anywhere;
+    }
+    .shell { width: min(var(--max), calc(100% - 48px)); margin: 0 auto; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid var(--line);
+      background: rgba(244, 246, 245, .96);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-inner {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+      color: var(--ink);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .brand strong { font-size: 17px; }
+    .brand span { color: var(--muted); font-size: 13px; }
+    .main-nav { display: flex; align-items: center; gap: 4px; }
+    .main-nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 0 10px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 14px;
+      text-decoration: none;
+    }
+    .main-nav a:hover, .main-nav a[aria-current="true"] { background: var(--surface); color: var(--ink); }
+
+    .hero { border-bottom: 1px solid var(--line); background: var(--surface); }
+    .hero-inner { padding: 72px 0 52px; }
+    .eyebrow { margin: 0 0 12px; color: var(--teal); font-size: 13px; font-weight: 700; }
+    h1, h2, h3, h4, p { margin-top: 0; }
+    h1 { max-width: 900px; margin-bottom: 18px; font-size: 58px; line-height: 1.08; }
+    .hero-copy { max-width: 820px; margin-bottom: 28px; color: var(--muted); font-size: 21px; line-height: 1.55; }
+    .hero-copy strong { color: var(--ink); }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 3px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--page);
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .tag.teal { border-color: #9fcfca; background: var(--teal-soft); color: var(--teal); }
+    .tag.amber { border-color: #e1c275; background: var(--amber-soft); color: var(--amber); }
+    .tag.coral { border-color: #e8b1a7; background: var(--coral-soft); color: var(--coral); }
+
+    .answer-band { border-bottom: 1px solid var(--line); background: var(--teal); color: #ffffff; }
+    .answer-grid { display: grid; grid-template-columns: 205px minmax(0, 1fr) 260px; gap: 28px; align-items: center; min-height: 130px; }
+    .answer-kicker { font-size: 13px; font-weight: 700; }
+    .answer-grid p { margin: 0; font-size: 20px; line-height: 1.5; }
+    .answer-grid small { color: #cde6e3; font-size: 13px; }
+
+    .band { padding: 72px 0; border-bottom: 1px solid var(--line); }
+    .band.surface { background: var(--surface); }
+    .section-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, 420px); gap: 46px; align-items: end; margin-bottom: 36px; }
+    .section-head h2 { margin-bottom: 0; font-size: 36px; line-height: 1.2; }
+    .section-head p { margin-bottom: 0; color: var(--muted); }
+    .section-label { margin: 0 0 8px; color: var(--teal); font-size: 13px; font-weight: 700; }
+
+    .term-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); }
+    .term { min-height: 224px; padding: 24px 26px 20px 0; border-right: 1px solid var(--line); }
+    .term + .term { padding-left: 26px; }
+    .term:last-child { border-right: 0; }
+    .term h3 { margin-bottom: 9px; font-size: 20px; }
+    .term p { color: var(--muted); }
+    .term .term-rule { display: block; margin-top: 16px; color: var(--teal); font-size: 14px; font-weight: 700; }
+
+    .tool { overflow: hidden; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; padding: 11px 16px; border-bottom: 1px solid var(--line); background: #fbfcfc; }
+    .toolbar span { color: var(--muted); font-size: 14px; }
+    .segmented { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+    .segment {
+      min-height: 38px;
+      padding: 7px 12px;
+      border: 0;
+      border-right: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .segment:last-child { border-right: 0; }
+    .segment:hover { background: #f3f7f6; color: var(--ink); }
+    .segment[aria-selected="true"] { background: var(--ink); color: #ffffff; }
+    .mode-layout { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(330px, .88fr); min-height: 420px; }
+    .mode-figure { padding: 30px; border-right: 1px solid var(--line); }
+    .mode-detail { padding: 30px; }
+    .mode-detail h3 { margin-bottom: 10px; font-size: 27px; line-height: 1.25; }
+    .mode-detail p { color: var(--muted); }
+    .mode-detail dl { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 10px 16px; margin: 22px 0 0; padding-top: 20px; border-top: 1px solid var(--line); }
+    .mode-detail dt { color: var(--muted); font-size: 13px; }
+    .mode-detail dd { margin: 0; }
+    .statement { margin: 22px 0 0; padding: 14px 16px; border-left: 3px solid var(--teal); background: var(--teal-soft); color: #234541; font-size: 14px; }
+
+    .decoder-stage { display: grid; gap: 14px; min-height: 312px; padding: 12px 0; }
+    .stage-title { color: var(--muted); font-size: 13px; }
+    .token-lane { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: 50px; }
+    .token {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 74px;
+      min-height: 42px;
+      padding: 5px 10px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #f9fbfa;
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+    }
+    .token.past { border-color: #aacbc6; background: var(--teal-soft); color: var(--teal); }
+    .token.proposed { border-color: #e8b1a7; background: var(--coral-soft); color: var(--coral); }
+    .token.accepted { border-color: #a6c9b6; background: #e9f5ed; color: #167047; }
+    .token.correction { border-color: #ddc07d; background: var(--amber-soft); color: var(--amber); }
+    .arrow { color: var(--line-strong); font-size: 21px; line-height: 1; }
+    .trunk { min-height: 70px; display: grid; place-items: center; padding: 10px; border: 1px solid #a6c9c4; border-radius: 6px; background: var(--teal-soft); color: #24504b; font-weight: 700; }
+    .head-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .head { min-height: 72px; display: grid; place-items: center; padding: 10px; border: 1px solid #d0c5ea; border-radius: 6px; background: var(--violet-soft); color: var(--violet); text-align: center; font-size: 14px; }
+    .sequential-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+    .module { min-height: 105px; display: grid; align-content: center; gap: 4px; padding: 12px; border: 1px solid #d0c5ea; border-radius: 6px; background: var(--violet-soft); color: var(--violet); text-align: center; }
+    .module strong { font-size: 14px; }
+    .module small { font-size: 12px; }
+    .verify-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center; }
+    .verify-step { min-height: 126px; padding: 16px; border-top: 3px solid var(--line-strong); background: #fbfcfc; }
+    .verify-step:nth-child(1) { border-color: var(--coral); }
+    .verify-step:nth-child(2) { border-color: var(--teal); }
+    .verify-step:nth-child(3) { border-color: var(--amber); }
+    .verify-step strong { display: block; margin-bottom: 6px; }
+    .verify-step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .sim-layout { display: grid; grid-template-columns: minmax(0, .92fr) minmax(360px, 1.08fr); gap: 38px; align-items: start; }
+    .sim-controls { padding: 2px 0; }
+    .range-group { padding: 18px 0 20px; border-top: 1px solid var(--line); }
+    .range-group:last-child { border-bottom: 1px solid var(--line); }
+    .range-title { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+    .range-title label { font-weight: 700; }
+    .range-title output { color: var(--teal); font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-weight: 700; }
+    input[type="range"] { width: 100%; accent-color: var(--teal); }
+    .range-hint { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
+    .sim-result { min-height: 342px; padding: 28px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+    .sim-result h3 { margin-bottom: 6px; font-size: 24px; }
+    .metric { margin: 20px 0 4px; font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 48px; font-weight: 700; line-height: 1; }
+    .metric-note { margin-bottom: 20px; color: var(--muted); }
+    .meter { height: 14px; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 4px; background: #edf1f0; }
+    .meter > span { display: block; width: 0; height: 100%; background: var(--teal); transition: width .18s ease; }
+    .sim-result dl { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 8px 16px; margin: 22px 0 0; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; }
+    .sim-result dt { color: var(--muted); }
+    .sim-result dd { margin: 0; }
+    .formula-note { margin-top: 18px; color: var(--muted); font-size: 13px; }
+
+    .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-strong); }
+    .evidence { min-height: 248px; padding: 26px 30px 20px 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .evidence:nth-child(even) { padding-left: 30px; border-right: 0; }
+    .evidence:nth-last-child(-n + 2) { border-bottom: 0; }
+    .evidence h3 { margin-bottom: 10px; font-size: 20px; }
+    .evidence p { color: var(--muted); }
+    .evidence small { display: block; color: var(--muted); font-size: 13px; }
+    .evidence .evidence-tag { display: inline-block; margin-bottom: 10px; color: var(--teal); font-size: 12px; font-weight: 700; }
+    .evidence.warning .evidence-tag { color: var(--coral); }
+
+    .timeline { border-top: 1px solid var(--line-strong); }
+    .timeline-item { display: grid; grid-template-columns: 110px minmax(0, 1fr) 126px; gap: 26px; width: 100%; padding: 22px 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; text-align: left; cursor: pointer; }
+    .timeline-item:hover { background: #f8faf9; }
+    .timeline-item[aria-selected="true"] { background: var(--teal-soft); }
+    .timeline-year { color: var(--teal); font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-weight: 700; }
+    .timeline-item h3 { margin: 0 0 4px; font-size: 18px; }
+    .timeline-item p { margin: 0; color: var(--muted); font-size: 14px; }
+    .timeline-kind { align-self: start; color: var(--muted); font-size: 13px; text-align: right; }
+    .timeline-detail { min-height: 164px; padding: 26px 28px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+    .timeline-detail h3 { margin-bottom: 8px; font-size: 24px; }
+    .timeline-detail p { max-width: 820px; margin-bottom: 14px; color: var(--muted); }
+    .timeline-detail a { font-weight: 700; }
+
+    .checklist { display: grid; grid-template-columns: minmax(0, .88fr) minmax(360px, 1.12fr); gap: 38px; }
+    .decision-list { border-top: 1px solid var(--line-strong); }
+    .decision-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 13px; padding: 16px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .decision-row input { width: 18px; height: 18px; margin: 4px 0 0; accent-color: var(--teal); }
+    .decision-row strong { display: block; }
+    .decision-row span { display: block; margin-top: 3px; color: var(--muted); font-size: 14px; }
+    .decision-output { min-height: 310px; padding: 28px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+    .decision-output h3 { margin-bottom: 8px; font-size: 24px; }
+    .decision-status { margin: 20px 0; padding: 13px 15px; border-left: 3px solid var(--coral); background: var(--coral-soft); color: #6b2d22; font-weight: 700; }
+    .decision-output ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    .decision-output li { margin: 8px 0; }
+
+    .faq { border-top: 1px solid var(--line-strong); }
+    .faq details { border-bottom: 1px solid var(--line); }
+    .faq summary { position: relative; padding: 19px 44px 19px 0; cursor: pointer; font-size: 18px; font-weight: 700; list-style: none; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; position: absolute; top: 16px; right: 8px; color: var(--teal); font-size: 24px; font-weight: 400; }
+    .faq details[open] summary::after { content: "-"; }
+    .faq p { max-width: 920px; padding: 0 44px 20px 0; margin: 0; color: var(--muted); }
+
+    .source-list { border-top: 1px solid var(--line-strong); }
+    .source-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 24px; align-items: start; padding: 19px 0; border-bottom: 1px solid var(--line); }
+    .source-type { color: var(--teal); font-size: 13px; font-weight: 700; }
+    .source-row p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .source-row a { font-weight: 700; }
+    .footer { padding: 34px 0 44px; background: var(--surface); }
+    .footer-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 360px); gap: 42px; }
+    .footer h2 { margin-bottom: 7px; font-size: 20px; }
+    .footer p { color: var(--muted); }
+    .footer-links { display: grid; align-content: start; gap: 9px; }
+    .footer-links a { font-size: 14px; }
+    .snapshot { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 900px) {
+      .shell { width: min(var(--max), calc(100% - 32px)); }
+      .main-nav { display: none; }
+      h1 { font-size: 44px; }
+      .answer-grid, .section-head, .sim-layout, .checklist { grid-template-columns: 1fr; }
+      .answer-grid { padding: 25px 0; gap: 8px; }
+      .mode-layout { grid-template-columns: 1fr; }
+      .mode-figure { border-right: 0; border-bottom: 1px solid var(--line); }
+      .term-grid { grid-template-columns: 1fr; }
+      .term, .term + .term { min-height: auto; padding: 22px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .term:last-child { border-bottom: 0; }
+      .evidence-grid { grid-template-columns: 1fr; }
+      .evidence, .evidence:nth-child(even) { min-height: auto; padding: 22px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .evidence:last-child { border-bottom: 0; }
+      .timeline-item { grid-template-columns: 80px minmax(0, 1fr); }
+      .timeline-kind { display: none; }
+      .source-row { grid-template-columns: 100px minmax(0, 1fr); }
+      .source-row a { grid-column: 2; }
+    }
+
+    @media (max-width: 620px) {
+      .hero-inner { padding: 52px 0 38px; }
+      h1 { font-size: 36px; }
+      .hero-copy { font-size: 18px; }
+      .band { padding: 52px 0; }
+      .section-head h2 { font-size: 29px; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .segmented { width: 100%; }
+      .segment { flex: 1 1 33%; padding-left: 7px; padding-right: 7px; font-size: 13px; }
+      .mode-figure, .mode-detail, .sim-result, .decision-output, .timeline-detail { padding: 22px; }
+      .head-grid, .sequential-grid, .verify-flow { grid-template-columns: 1fr; }
+      .metric { font-size: 40px; }
+      .mode-detail dl, .sim-result dl { grid-template-columns: 1fr; gap: 3px; }
+      .mode-detail dd, .sim-result dd { margin-bottom: 10px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 18px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .meter > span { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="/">
+        <strong>Love Engine Skill</strong>
+        <span>LLM MTP 分享</span>
+      </a>
+      <nav class="main-nav" aria-label="页面导航">
+        <a href="#meaning">概念</a>
+        <a href="#mechanism">机制</a>
+        <a href="#evidence">进展</a>
+        <a href="#evaluate">评估</a>
+        <a href="#sources">来源</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-inner">
+        <p class="eyebrow">LLM 研究分享 | 截止于 2026-08-18</p>
+        <h1>一次前向计算，如何推进多个 token？</h1>
+        <p class="hero-copy">Multi-Token Prediction（多 token 预测，MTP）让模型学习对多个未来 token 提前提出候选；它的工程价值不在于跳过验证，而在于让<strong>目标模型一次验证更长的候选前缀</strong>。这页把训练目标、模型模块与 speculative decoding（投机解码）拆开说明。</p>
+        <div class="tag-row" aria-label="研究范围">
+          <span class="tag teal">一手论文与官方文档</span>
+          <span class="tag teal">可交互机制演示</span>
+          <span class="tag amber">性能数字均保留测试条件</span>
+          <span class="tag coral">不把论文结果外推为通用承诺</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="answer-band" aria-label="核心结论">
+      <div class="shell answer-grid">
+        <div class="answer-kicker">一句话带走</div>
+        <p>MTP 是更好的<strong>提议能力</strong>；投机解码是由目标模型<strong>验证并接纳</strong>提议的流程。只有验证规则正确，速度提升才不会以输出语义为代价。</p>
+        <small>请把“能提议多个 token”与“能安全提交多个 token”视为两个不同问题。</small>
+      </div>
+    </section>
+
+    <section class="band surface" id="meaning">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">先对齐词义</p>
+            <h2>三个词，三个层次</h2>
+          </div>
+          <p>会议里最容易混淆的是把“训练时预测多个未来位置”直接等同于“推理时一次输出多个 token”。两者中间还必须有候选验证。</p>
+        </div>
+        <div class="term-grid">
+          <article class="term">
+            <h3>自回归解码</h3>
+            <p>传统 LLM 先生成下一个 token，再把它加入上下文，继续生成下一个。依赖关系让解码天然串行。</p>
+            <span class="term-rule">回答：目标模型每步“决定一个”。</span>
+          </article>
+          <article class="term">
+            <h3>MTP</h3>
+            <p>训练目标或模型模块：从同一段上下文，对未来多个位置给出候选分布。实现可用独立 heads，也可用保持因果链的顺序模块。</p>
+            <span class="term-rule">回答：模型可以“多提几个建议”。</span>
+          </article>
+          <article class="term">
+            <h3>投机解码</h3>
+            <p>服务算法：使用较快的候选来源，再让目标模型并行验证候选前缀；接受的部分前进，拒绝处由目标模型纠正。</p>
+            <span class="term-rule">回答：系统决定“哪些建议可以采用”。</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="mechanism">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">交互演示一</p>
+            <h2>同一个词，三种工作位置</h2>
+          </div>
+          <p>点击切换。图中的 token 只是教学符号，重点是：候选怎样产生、谁拥有最终提交权，以及不同论文的 MTP 结构为什么不能混为一谈。</p>
+        </div>
+        <div class="tool">
+          <div class="toolbar">
+            <span>工作模式</span>
+            <div class="segmented" role="tablist" aria-label="MTP 工作模式">
+              <button class="segment" type="button" role="tab" data-mode="baseline" aria-selected="true">普通解码</button>
+              <button class="segment" type="button" role="tab" data-mode="heads" aria-selected="false">独立 heads</button>
+              <button class="segment" type="button" role="tab" data-mode="deepseek" aria-selected="false">顺序 MTP</button>
+              <button class="segment" type="button" role="tab" data-mode="verify" aria-selected="false">验证提交</button>
+            </div>
+          </div>
+          <div class="mode-layout">
+            <div class="mode-figure" id="mode-figure" aria-live="polite"></div>
+            <div class="mode-detail">
+              <p class="section-label" id="mode-kicker">目标模型的普通自回归步骤</p>
+              <h3 id="mode-title">每一个新 token 都依赖上一个已提交 token</h3>
+              <p id="mode-summary">在常规 decode 中，模型必须等待当前位置的输出进入上下文，才能计算下一位置。这正是低 batch 解码容易受到串行依赖限制的原因。</p>
+              <dl>
+                <dt>预测范围</dt><dd id="mode-range">下一个 token</dd>
+                <dt>最终权威</dt><dd id="mode-authority">目标模型本身</dd>
+                <dt>关键限制</dt><dd id="mode-limit">K 个 token 通常需要 K 次串行推进</dd>
+              </dl>
+              <p class="statement" id="mode-statement">这里没有候选和验证之分，因为同一个目标模型既产生又提交 token。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band surface" id="simulator">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">交互演示二</p>
+            <h2>接受率决定“可前进多少”，不等于真实加速比</h2>
+          </div>
+          <p>调节候选长度和单 token 接受率。结果使用独立接受率的教学模型，帮助理解为什么候选越长并不必然越快。</p>
+        </div>
+        <div class="sim-layout">
+          <div class="sim-controls">
+            <div class="range-group">
+              <div class="range-title"><label for="draft-depth">一次提出的候选 token 数</label><output id="draft-depth-output">4</output></div>
+              <input id="draft-depth" type="range" min="1" max="8" step="1" value="4">
+              <span class="range-hint">候选越长，可能一次推进更多；也会增加草稿计算、验证容量和拒绝级联的风险。</span>
+            </div>
+            <div class="range-group">
+              <div class="range-title"><label for="accept-rate">每个候选 token 的接受率</label><output id="accept-rate-output">70%</output></div>
+              <input id="accept-rate" type="range" min="20" max="95" step="1" value="70">
+              <span class="range-hint">真实接受率会随模型、提示词、温度、上下文长度和并发负载变化，必须在目标 workload 下测量。</span>
+            </div>
+          </div>
+          <div class="sim-result" aria-live="polite">
+            <h3>单次目标验证的预期推进</h3>
+            <div class="metric"><span id="advance-value">2.77</span> <small>tokens</small></div>
+            <p class="metric-note">包含目标模型在首个拒绝处给出的纠正 token。</p>
+            <div class="meter" aria-label="相对最大候选窗口的预期推进"><span id="advance-meter"></span></div>
+            <dl>
+              <dt>预期接受候选</dt><dd id="accepted-value">1.77 个</dd>
+              <dt>目标验证调用</dt><dd>1 次</dd>
+              <dt>理论上限</dt><dd id="advance-ceiling">5 tokens</dd>
+              <dt>不能推出</dt><dd>端到端 TPS、TTFT、TPOT 或成本节省</dd>
+            </dl>
+            <p class="formula-note" title="假设每个候选以相同且相互独立的概率被接纳；真实系统并不满足这一简化假设。">教学公式：预期推进约为 <code>1 + r + r^2 + ... + r^k</code>。它解释接受率的作用，不是吞吐预测器。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="evidence">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">研究与工程进展</p>
+            <h2>哪些结论有证据，哪些还不能外推</h2>
+          </div>
+          <p>这里把论文实验、具体模型报告和 serving 文档分开。数字后面必须带模型、硬件、batch、候选策略和测量口径。</p>
+        </div>
+        <div class="evidence-grid">
+          <article class="evidence">
+            <span class="evidence-tag">论文结果 | Gloeckle et al. 2024</span>
+            <h3>MTP 可作为训练辅助目标</h3>
+            <p>论文采用共享 trunk 和多个独立输出 heads，在同等参数预算下比较。作者报告：13B 代码模型相对基线在 HumanEval 解题数高 12%，在 MBPP 高 17%。</p>
+            <small>这是该论文的实验结论，不是每个模型、语言或任务的普遍规律。</small>
+          </article>
+          <article class="evidence warning">
+            <span class="evidence-tag">同一论文中的反例</span>
+            <h3>预测更远不总是更好</h3>
+            <p>该研究的 7B 自然语言实验中，预测 2 个未来 token 在选择题基准大体持平，而预测 4 个未来 token 出现退化。</p>
+            <small>候选步长和损失权重是要被验证的设计变量，不是可以照搬的默认值。</small>
+          </article>
+          <article class="evidence">
+            <span class="evidence-tag">公开模型报告 | DeepSeek-V3</span>
+            <h3>把 MTP 作为训练目标，也可复用为草稿模块</h3>
+            <p>DeepSeek-V3 采用保持完整因果链的顺序 MTP，区别于独立 heads；报告称第二 token 的接受率在不同主题为 85% 到 90%，并报告 1.8 倍 TPS。</p>
+            <small>这是该模型、其解码配置和报告口径下的数字，不能替代自己的基准测试。</small>
+          </article>
+          <article class="evidence">
+            <span class="evidence-tag">公开权重与 serving 文档</span>
+            <h3>模型权重与服务实现已经衔接</h3>
+            <p>DeepSeek-V3 权重说明公开了一个 MTP module；SGLang 当前文档将 MTP 作为 built-in multi-token heads 的 speculative workflow，并列明调参和内存约束。</p>
+            <small>有实现入口不代表适合所有模型或所有并发形态。</small>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band surface" id="progress">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">发展脉络</p>
+            <h2>从“外部草稿”到“模型自带候选”</h2>
+          </div>
+          <p>点击每一条查看其真正贡献。时间线并不等于能力等级，它展示的是问题如何逐渐被拆分为可训练、可验证和可部署的部件。</p>
+        </div>
+        <div class="tool">
+          <div class="timeline" role="listbox" aria-label="MTP 发展时间线">
+            <button class="timeline-item" type="button" data-timeline="spec" role="option" aria-selected="true">
+              <span class="timeline-year">2022 / 2023</span>
+              <span><h3>Speculative Decoding</h3><p>先建立“候选 + 目标验证”可以保留目标分布的核心思路。</p></span>
+              <span class="timeline-kind">算法基础</span>
+            </button>
+            <button class="timeline-item" type="button" data-timeline="medusa" role="option" aria-selected="false">
+              <span class="timeline-year">2024-01</span>
+              <span><h3>Medusa</h3><p>给既有模型增加多个解码 heads，并以候选树做并行验证。</p></span>
+              <span class="timeline-kind">模型改造</span>
+            </button>
+            <button class="timeline-item" type="button" data-timeline="mtp" role="option" aria-selected="false">
+              <span class="timeline-year">2024-04</span>
+              <span><h3>Better & Faster LLMs via MTP</h3><p>把多未来位置预测上升为训练目标，并报告样本效率与自投机解码结果。</p></span>
+              <span class="timeline-kind">训练研究</span>
+            </button>
+            <button class="timeline-item" type="button" data-timeline="deepseek" role="option" aria-selected="false">
+              <span class="timeline-year">2024 / 2025</span>
+              <span><h3>DeepSeek-V3</h3><p>公开了顺序 MTP 设计、权重模块与在具体模型上的接受率报告。</p></span>
+              <span class="timeline-kind">大模型实践</span>
+            </button>
+            <button class="timeline-item" type="button" data-timeline="serving" role="option" aria-selected="false">
+              <span class="timeline-year">当前</span>
+              <span><h3>Serving 框架支持与工作负载调参</h3><p>引擎把 MTP 纳入投机解码路径，同时将显存、batch 和 acceptance 作为运行时变量。</p></span>
+              <span class="timeline-kind">工程化</span>
+            </button>
+          </div>
+          <div class="timeline-detail" id="timeline-detail" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="evaluate">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">给工程团队的判断框架</p>
+            <h2>不是“能不能开”，而是“值不值得在这个 workload 开”</h2>
+          </div>
+          <p>勾选已满足的条件。这个小工具不会替代基准测试，但能指出下一步是调查权重、接通 serving，还是先证明语义与性能边界。</p>
+        </div>
+        <div class="checklist">
+          <div class="decision-list" aria-label="MTP 采用检查表">
+            <label class="decision-row"><input type="checkbox" data-check="weights"><span><strong>模型确实具备 MTP heads 或匹配的 draft 方案</strong><span>先查权重配置、模型文档和版本，不凭模型名称猜测。</span></span></label>
+            <label class="decision-row"><input type="checkbox" data-check="engine"><span><strong>目标 serving 引擎支持该模型与候选路径</strong><span>还要核对 CUDA、attention backend、量化、并行策略和内存约束。</span></span></label>
+            <label class="decision-row"><input type="checkbox" data-check="semantics"><span><strong>验证策略已证明保留目标输出语义</strong><span>固定采样条件下做对照；随机采样要核对分布语义，而不是只比单次文本。</span></span></label>
+            <label class="decision-row"><input type="checkbox" data-check="benchmark"><span><strong>在真实提示、上下文、并发和温度下比较过基线</strong><span>至少记录 TTFT、TPOT、端到端吞吐、接受率、显存与失败率。</span></span></label>
+          </div>
+          <div class="decision-output" aria-live="polite">
+            <h3 id="decision-title">还不能下“已加速”结论</h3>
+            <p id="decision-summary">先完成候选来源与服务兼容性的核对。MTP 是模型能力与 serving 算法的组合，不是一个独立的开关。</p>
+            <div class="decision-status" id="decision-status">当前：先确定候选来源。</div>
+            <ul id="decision-actions">
+              <li>检查权重是否带有 multi-token 模块，或是否已有兼容的草稿模型。</li>
+              <li>把模型版本、tokenizer、量化和 serving 版本写入实验记录。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band surface" id="faq">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">会议中最可能被问到的问题</p>
+            <h2>短答案，但不省略边界</h2>
+          </div>
+          <p>这些回答以公开论文和官方实现文档为依据；不同模型或供应商的宣传数字不应替代这组问题的实际测量。</p>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>MTP 是否让 LLM “一次真实生成多个 token”？</summary>
+            <p>它可以同时提出多个未来位置的候选，但自回归语义仍需要确认候选之间的依赖。工程上通常由目标模型验证候选前缀；接纳前的多 token 是提议，不是最终输出。</p>
+          </details>
+          <details>
+            <summary>MTP 与 speculative decoding 是同一件事吗？</summary>
+            <p>不是。MTP 是训练目标或模型侧候选模块；speculative decoding 是服务算法。后者还可以使用小草稿模型、N-gram 或 EAGLE 等其他候选来源。</p>
+          </details>
+          <details>
+            <summary>能不能在任意已经训练好的 LLM 上只加几个 heads？</summary>
+            <p>不能把它当作低成本确定方案。2025 年研究发现，预训练为 next-token prediction 的隐藏层会对 NTP 专化，单独训练新 heads 的适配并不容易；联合训练有改善，但仍有差距。</p>
+          </details>
+          <details>
+            <summary>验证后为什么还可能没有加速？</summary>
+            <p>接受率低、草稿成本高、候选树占显存、batch 变大、context 很长，或内核和调度不匹配，都可能吞掉收益。应当用目标业务的 TTFT、TPOT、吞吐和显存一起比较，而不是只看接受率。</p>
+          </details>
+          <details>
+            <summary>“输出不变”是什么意思？</summary>
+            <p>经典投机解码论文的结论是：采用正确的接受与重采样规则后，可以保持目标模型的采样分布。若温度或随机种子不同，单次文本当然可能不同；若跳过验证或改变规则，则不能再声称保持该语义。</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="sources">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-label">可追溯来源</p>
+            <h2>只引用原始论文与官方文档</h2>
+          </div>
+          <p>页面中的性能数字全部回链到对应来源。资料页也保留了更完整的说明、比较方法和可复用的分享提纲。</p>
+        </div>
+        <div class="source-list">
+          <article class="source-row"><span class="source-type">算法论文</span><span><strong>Fast Inference from Transformers via Speculative Decoding</strong><p>定义以候选、验证和重采样在不改变目标分布的情况下加速解码的基本框架。</p></span><a href="https://arxiv.org/abs/2211.17192" target="_blank" rel="noopener">阅读论文</a></article>
+          <article class="source-row"><span class="source-type">模型论文</span><span><strong>Medusa</strong><p>多个解码 heads、候选树与并行验证的代表性框架。</p></span><a href="https://arxiv.org/abs/2401.10774" target="_blank" rel="noopener">阅读论文</a></article>
+          <article class="source-row"><span class="source-type">训练论文</span><span><strong>Better & Faster Large Language Models via Multi-token Prediction</strong><p>独立 future heads、样本效率、代码/自然语言实验与自投机解码报告。</p></span><a href="https://arxiv.org/abs/2404.19737" target="_blank" rel="noopener">阅读论文</a></article>
+          <article class="source-row"><span class="source-type">技术报告</span><span><strong>DeepSeek-V3 Technical Report</strong><p>顺序 MTP 结构、2-token 预测、接受率及特定模型 TPS 报告。</p></span><a href="https://arxiv.org/html/2412.19437" target="_blank" rel="noopener">阅读报告</a></article>
+          <article class="source-row"><span class="source-type">官方权重说明</span><span><strong>DeepSeek-V3 Weight File Documentation</strong><p>公开权重中 MTP module、层编号与共享 embedding/output head 的说明。</p></span><a href="https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README_WEIGHTS.md" target="_blank" rel="noopener">查看文档</a></article>
+          <article class="source-row"><span class="source-type">Serving 文档</span><span><strong>SGLang Speculative Decoding</strong><p>当前 MTP、EAGLE、草稿模型与运行时参数/内存限制的官方实现说明。</p></span><a href="https://docs.sglang.io/docs/advanced_features/speculative_decoding" target="_blank" rel="noopener">查看文档</a></article>
+          <article class="source-row"><span class="source-type">限制研究</span><span><strong>On multi-token prediction for efficient LLM inference</strong><p>研究 NTP 预训练模型的内在 MTP 能力与后加 heads 的适配障碍。</p></span><a href="https://arxiv.org/abs/2502.09419" target="_blank" rel="noopener">阅读论文</a></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      <div class="footer-grid">
+        <div>
+          <h2>LLM MTP 研究分享</h2>
+          <p>适合作为开发成员分享的共同底稿：先说清 MTP 是什么，再把候选、验证、性能与语义边界分开，最后拿自己的 workload 做可复现对照。</p>
+        </div>
+        <div class="footer-links">
+          <a href="/">返回 Love Engine Skill 展示页</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/codex/repository-cleanup-sites/docs/presentations/llm-mtp-research-brief.zh-CN.md" target="_blank" rel="noopener">查看研究简报</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill" target="_blank" rel="noopener">查看项目仓库</a>
+        </div>
+      </div>
+      <div class="snapshot">研究范围：MTP、投机解码与公开实现进展。页面不构成任何模型、硬件或供应商性能承诺。</div>
+    </div>
+  </footer>
+
+  <script>
+    const modes = {
+      baseline: {
+        kicker: "目标模型的普通自回归步骤",
+        title: "每一个新 token 都依赖上一个已提交 token",
+        summary: "在常规 decode 中，模型必须等待当前位置的输出进入上下文，才能计算下一位置。这正是低 batch 解码容易受到串行依赖限制的原因。",
+        range: "下一个 token",
+        authority: "目标模型本身",
+        limit: "K 个 token 通常需要 K 次串行推进",
+        statement: "这里没有候选和验证之分，因为同一个目标模型既产生又提交 token。",
+        figure: `<div class="decoder-stage"><span class="stage-title">已提交上下文</span><div class="token-lane"><span class="token past">上下文</span><span class="arrow">+</span><span class="token past">已提交</span></div><span class="stage-title">第 1 次目标模型前向</span><div class="token-lane"><span class="token">目标模型</span><span class="arrow">-></span><span class="token accepted">token t+1</span></div><span class="stage-title">第 2 次目标模型前向</span><div class="token-lane"><span class="token">目标模型</span><span class="arrow">-></span><span class="token accepted">token t+2</span></div></div>`
+      },
+      heads: {
+        kicker: "Gloeckle et al. 的独立 future heads",
+        title: "共享表示，同时为多个未来位置提出候选",
+        summary: "论文的基本结构是共享 trunk 上的多个独立输出 heads：每个 head 对未来第 1、第 2 或更远位置做分布预测。它首先是训练辅助目标，而不是已经完成的多 token 提交。",
+        range: "多个未来位置，彼此独立预测",
+        authority: "训练损失；推理仍需额外验证机制",
+        limit: "独立 head 的候选可能彼此不一致",
+        statement: "独立 heads 让模型提前提出多个位置的可能值；要用于自投机解码，仍需由目标模型确认可接纳的前缀。",
+        figure: `<div class="decoder-stage"><span class="stage-title">共享上下文表示</span><div class="trunk">共享 trunk 表示 z(t)</div><span class="stage-title">并行输出 heads</span><div class="head-grid"><div class="head">head 1<br>预测 t+1</div><div class="head">head 2<br>预测 t+2</div><div class="head">head 3<br>预测 t+3</div></div><span class="stage-title">得到的是多个候选分布，不是直接提交的连续文本</span></div>`
+      },
+      deepseek: {
+        kicker: "DeepSeek-V3 的顺序 MTP 模块",
+        title: "保持完整因果链，顺序预测额外 token",
+        summary: "DeepSeek-V3 的报告明确指出其实现不同于独立 heads：它使用顺序模块、共享 embedding 与 output head，并保持每个预测深度的因果链。该模块主要服务训练，也可在推理时复用为投机草稿。",
+        range: "多个未来位置，沿预测深度顺序推进",
+        authority: "主模型训练目标；推理可丢弃或复用模块",
+        limit: "这是特定模型结构，不能泛化为所有 MTP 实现",
+        statement: "同叫 MTP，并不代表结构相同。分享时应明确正在谈独立 heads，还是 DeepSeek 这类顺序模块。",
+        figure: `<div class="decoder-stage"><span class="stage-title">主模型表示 + 已知训练 token embedding</span><div class="trunk">主模型表示 h(0)</div><span class="stage-title">保持因果链的额外预测深度</span><div class="sequential-grid"><div class="module"><strong>MTP module 1</strong><small>预测 t+2</small></div><div class="module"><strong>MTP module 2</strong><small>预测 t+3</small></div><div class="module"><strong>MTP module D</strong><small>预测更远位置</small></div></div><span class="stage-title">训练时把每个深度加入额外交叉熵损失</span></div>`
+      },
+      verify: {
+        kicker: "Speculative decoding 的验证提交",
+        title: "候选从快速路径来，提交权始终回到目标模型",
+        summary: "草稿路径可以是 MTP modules、小模型、Medusa heads 或 EAGLE。目标模型一次验证候选块或候选树，接纳正确前缀，并在首个拒绝处生成纠正 token；然后继续下一轮。",
+        range: "候选前缀或候选树",
+        authority: "目标模型的验证与接受/重采样规则",
+        limit: "接受率、草稿成本、显存和调度共同决定实际收益",
+        statement: "只有采用正确的验证与重采样规则，才能谈保持目标模型的输出分布；跳过验证的候选不是同一件事。",
+        figure: `<div class="decoder-stage"><span class="stage-title">一次 speculative cycle</span><div class="verify-flow"><div class="verify-step"><strong>1. 提议</strong><p>草稿路径给出 t+1, t+2, t+3 候选。</p></div><div class="verify-step"><strong>2. 验证</strong><p>目标模型并行核对候选前缀或树。</p></div><div class="verify-step"><strong>3. 提交</strong><p>接纳前缀；在拒绝处由目标纠正。</p></div></div><div class="token-lane"><span class="token past">上下文</span><span class="arrow">-></span><span class="token accepted">接受</span><span class="token accepted">接受</span><span class="token proposed">拒绝候选</span><span class="arrow">-></span><span class="token correction">目标纠正</span></div></div>`
+      }
+    };
+
+    function renderMode(key) {
+      const mode = modes[key];
+      document.querySelectorAll("[data-mode]").forEach(button => button.setAttribute("aria-selected", String(button.dataset.mode === key)));
+      document.getElementById("mode-kicker").textContent = mode.kicker;
+      document.getElementById("mode-title").textContent = mode.title;
+      document.getElementById("mode-summary").textContent = mode.summary;
+      document.getElementById("mode-range").textContent = mode.range;
+      document.getElementById("mode-authority").textContent = mode.authority;
+      document.getElementById("mode-limit").textContent = mode.limit;
+      document.getElementById("mode-statement").textContent = mode.statement;
+      document.getElementById("mode-figure").innerHTML = mode.figure;
+    }
+
+    document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => renderMode(button.dataset.mode)));
+    renderMode("baseline");
+
+    const depth = document.getElementById("draft-depth");
+    const rate = document.getElementById("accept-rate");
+    function renderSimulator() {
+      const k = Number(depth.value);
+      const r = Number(rate.value) / 100;
+      let advance = 1;
+      let accepted = 0;
+      for (let index = 1; index <= k; index += 1) {
+        const value = r ** index;
+        advance += value;
+        accepted += value;
+      }
+      document.getElementById("draft-depth-output").textContent = String(k);
+      document.getElementById("accept-rate-output").textContent = `${Math.round(r * 100)}%`;
+      document.getElementById("advance-value").textContent = advance.toFixed(2);
+      document.getElementById("accepted-value").textContent = `${accepted.toFixed(2)} 个`;
+      document.getElementById("advance-ceiling").textContent = `${k + 1} tokens`;
+      document.getElementById("advance-meter").style.width = `${(advance / (k + 1)) * 100}%`;
+    }
+    depth.addEventListener("input", renderSimulator);
+    rate.addEventListener("input", renderSimulator);
+    renderSimulator();
+
+    const timeline = {
+      spec: {
+        title: "Speculative Decoding：验证是速度与语义之间的桥",
+        body: "经典框架的关键不是“让两个模型各自生成”，而是用候选模型提出一段序列，再由目标模型并行验证、接受或重采样。论文证明在其规则下可以不改变目标模型的采样分布，因此它为后来的 MTP、自草稿和候选树提供了语义锚点。",
+        link: "https://arxiv.org/abs/2211.17192",
+        label: "阅读 Fast Inference from Transformers via Speculative Decoding"
+      },
+      medusa: {
+        title: "Medusa：不一定要另带一个完整小模型",
+        body: "Medusa 在冻结或联合微调的 backbone 上增加多个解码 heads，以候选树和树注意力同时验证多条候选延续。它把“多 heads + tree verification”作为可部署设计提出，但性能仍取决于候选质量、树大小和目标模型验证成本。",
+        link: "https://arxiv.org/abs/2401.10774",
+        label: "阅读 Medusa"
+      },
+      mtp: {
+        title: "MTP 训练研究：未来位置成为额外监督信号",
+        body: "Gloeckle 等人的研究把未来多个位置的预测加入训练，并在代码和自然语言任务上做分层实验。真正有价值的细节是同时报告了增益和反例：更远的预测步数并非总好，模型规模、数据域和任务类型会改变结论。",
+        link: "https://arxiv.org/abs/2404.19737",
+        label: "阅读 Better & Faster Large Language Models via Multi-token Prediction"
+      },
+      deepseek: {
+        title: "DeepSeek-V3：把训练 MTP 和服务端草稿联系起来",
+        body: "其技术报告采用顺序 MTP 而非独立 heads，强调完整因果链；推理时模块可以舍弃，也可以重用为 speculative decoding 的候选路径。公开权重说明进一步给出一个 MTP module 的结构事实。",
+        link: "https://arxiv.org/html/2412.19437",
+        label: "阅读 DeepSeek-V3 Technical Report"
+      },
+      serving: {
+        title: "工程化：MTP 已进入 serving 的候选路径，但不再是静态参数",
+        body: "SGLang 当前文档把 MTP 列为 built-in heads 的 model-specific speculative path，同时明确草稿深度、分支、验证容量、显存和 batch 的相互约束。进展不等于“一个统一最佳配置”，而是把可测量的控制面暴露给工程团队。",
+        link: "https://docs.sglang.io/docs/advanced_features/speculative_decoding",
+        label: "查看 SGLang Speculative Decoding 文档"
+      }
+    };
+
+    function renderTimeline(key) {
+      const item = timeline[key];
+      document.querySelectorAll("[data-timeline]").forEach(button => button.setAttribute("aria-selected", String(button.dataset.timeline === key)));
+      const detail = document.getElementById("timeline-detail");
+      detail.innerHTML = "";
+      const heading = document.createElement("h3");
+      heading.textContent = item.title;
+      const paragraph = document.createElement("p");
+      paragraph.textContent = item.body;
+      const link = document.createElement("a");
+      link.href = item.link;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = item.label;
+      detail.append(heading, paragraph, link);
+    }
+    document.querySelectorAll("[data-timeline]").forEach(button => button.addEventListener("click", () => renderTimeline(button.dataset.timeline)));
+    renderTimeline("spec");
+
+    const decisionData = {
+      0: { title: "还不能下“已加速”结论", summary: "先完成候选来源与服务兼容性的核对。MTP 是模型能力与 serving 算法的组合，不是一个独立的开关。", status: "当前：先确定候选来源。", actions: ["检查权重是否带有 multi-token 模块，或是否已有兼容的草稿模型。", "把模型版本、tokenizer、量化和 serving 版本写入实验记录。"] },
+      1: { title: "已确认候选来源，还缺可运行路径", summary: "下一步不是调参数，而是核对 serving 引擎是否真正支持这组模型权重、候选算法和硬件组合。", status: "当前：验证引擎兼容性。", actions: ["以精确模型 revision 和引擎版本启动最小请求。", "记录可用算法、attention backend、显存占用和明确的限制条件。"] },
+      2: { title: "可以开始做语义对照", summary: "候选与 serving 路径可用后，先验证目标模型仍是最终权威，再谈性能数字。", status: "当前：验证输出语义。", actions: ["对固定提示与采样设置比较基线和 speculative 路径。", "随机采样场景要验证接受/重采样规则，而不是以单次文本一致性代替分布语义。"] },
+      3: { title: "语义已被约束，准备测业务性能", summary: "此时才能收集接受率、TTFT、TPOT、端到端吞吐、显存和失败率，并按并发和 context 分桶。", status: "当前：在真实 workload 下做基线对照。", actions: ["选择代表性提示集、目标温度、上下文长度和并发梯度。", "同时保留没有 speculative decoding 的基线，记录置信区间或重复运行结果。"] },
+      4: { title: "具备做受控上线决策的最低证据", summary: "四项都满足也不等于永久最优。把接受率和性能指标纳入观测，并为模型、流量或引擎升级重新跑对照。", status: "当前：可按测得结果选择性启用，并持续复测。", actions: ["为接受率、TPOT、OOM/拒绝率和质量异常设置监控与回退条件。", "升级模型、量化、驱动或 serving 引擎后，重新建立基线。"] }
+    };
+    function renderDecision() {
+      const count = [...document.querySelectorAll("[data-check]")].filter(input => input.checked).length;
+      const data = decisionData[count];
+      document.getElementById("decision-title").textContent = data.title;
+      document.getElementById("decision-summary").textContent = data.summary;
+      document.getElementById("decision-status").textContent = data.status;
+      const actions = document.getElementById("decision-actions");
+      actions.innerHTML = "";
+      data.actions.forEach(value => {
+        const item = document.createElement("li");
+        item.textContent = value;
+        actions.appendChild(item);
+      });
+    }
+    document.querySelectorAll("[data-check]").forEach(input => input.addEventListener("change", renderDecision));
+    renderDecision();
+  </script>
+</body>
+</html>

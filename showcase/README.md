@@ -3,6 +3,12 @@
 This directory contains the Chinese public project page deployed at
 [love-engine-skill.garyryry.chatgpt.site](https://love-engine-skill.garyryry.chatgpt.site).
 
+It has two public routes:
+
+- `/`: Love Engine Skill project overview and reviewed-question workflow.
+- `/mtp/`: LLM Multi-Token Prediction research sharing page, with source-backed
+  mechanism, acceptance-rate and adoption-checklist interactions.
+
 Open `index.html` directly for local review, or run the Sites-compatible build:
 
 ```powershell
