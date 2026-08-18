@@ -60,6 +60,12 @@ def test_current_spec_and_preserved_release_assets_exist() -> None:
         / "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md"
     ).is_file()
     assert (ROOT / "docs/articles/loveengine-technical-architecture.zh-CN.md").is_file()
+    archive = ROOT / "docs/archive/development/2026-06-m3-m5"
+    assert (archive / "m3-demo-runbook.md").is_file()
+    assert (archive / "m3-acceptance-report.md").is_file()
+    assert (archive / "m4-skill-supervision-and-next-stage-gaps.md").is_file()
+    assert (archive / "m5-acceptance-report.md").is_file()
+    assert not (ROOT / "docs/development/m3-demo-runbook.md").exists()
 
     for rel_path in M6_8_RUNBOOKS:
         assert (ROOT / rel_path).is_file(), rel_path

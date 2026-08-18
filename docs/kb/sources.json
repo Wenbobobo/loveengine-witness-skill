@@ -1575,8 +1575,8 @@
   {
     "id": "m3-demo-runbook",
     "title": "M3 demo runbook",
-    "path": "docs/development/m3-demo-runbook.md",
-    "source_group": "developer-docs",
+    "path": "docs/archive/development/2026-06-m3-m5/m3-demo-runbook.md",
+    "source_group": "docs/archive/development",
     "layer": "development",
     "domain_tags": [
       "M3",
@@ -1590,16 +1590,16 @@
   {
     "id": "m3-acceptance-report",
     "title": "M3 acceptance report",
-    "path": "docs/development/m3-acceptance-report.md",
-    "source_group": "developer-docs",
+    "path": "docs/archive/development/2026-06-m3-m5/m3-acceptance-report.md",
+    "source_group": "docs/archive/development",
     "layer": "verification",
     "domain_tags": [
       "M3",
       "acceptance",
       "E2E"
     ],
-    "status": "current",
-    "canonical_role": "Verified presentation baseline",
+    "status": "historical",
+    "canonical_role": "Historical M3 verification baseline",
     "summary": "Python, Foundry, local-loop, network-loop, GitHub delivery, and known-warning evidence."
   },
   {
@@ -1741,8 +1741,8 @@
   {
     "id": "m4-skill-supervision-next-stage-gaps",
     "title": "M4 Skill supervision and next-stage gaps",
-    "path": "docs/development/m4-skill-supervision-and-next-stage-gaps.md",
-    "source_group": "developer-docs",
+    "path": "docs/archive/development/2026-06-m3-m5/m4-skill-supervision-and-next-stage-gaps.md",
+    "source_group": "docs/archive/development",
     "layer": "supervision",
     "domain_tags": [
       "M4",
@@ -1775,8 +1775,8 @@
   {
     "id": "m5-acceptance-report",
     "title": "M5 LAN pilot acceptance report",
-    "path": "docs/development/m5-acceptance-report.md",
-    "source_group": "developer-docs",
+    "path": "docs/archive/development/2026-06-m3-m5/m5-acceptance-report.md",
+    "source_group": "docs/archive/development",
     "layer": "acceptance",
     "domain_tags": [
       "M5",
@@ -2428,5 +2428,227 @@
     "status": "generated",
     "canonical_role": "Runbook screenshot",
     "summary": "Deterministic UI fixture screenshot of the English read-only dashboard."
+  },
+  {
+    "id": "showcase-question-bridge",
+    "title": "Showcase question and local Codex bridge",
+    "path": "docs/development/showcase-question-bridge.zh-CN.md",
+    "source_group": "docs/development",
+    "layer": "operations",
+    "domain_tags": [
+      "showcase",
+      "GitHub Issues",
+      "Codex"
+    ],
+    "status": "current",
+    "canonical_role": "Safe operator workflow for answering public showcase questions",
+    "summary": "Routes maintainer-reviewed public GitHub Issues through a temporary tracked-file snapshot, read-only no-network Codex draft generation, and explicit maintainer publication."
+  },
+  {
+    "id": "showcase-question-tool",
+    "title": "Showcase question answer tool",
+    "path": "tools/answer_showcase_question.py",
+    "source_group": "tools",
+    "layer": "operations",
+    "domain_tags": [
+      "showcase",
+      "untrusted input",
+      "read-only automation"
+    ],
+    "status": "current",
+    "canonical_role": "One-issue local Codex answer entrypoint",
+    "summary": "Fetches a maintainer-reviewed marked issue, exports tracked files, runs ephemeral read-only no-network Codex, prevents duplicate replies and requires interactive publication approval."
+  },
+  {
+    "id": "security-policy",
+    "title": "Security policy",
+    "path": "SECURITY.md",
+    "source_group": "repository",
+    "layer": "governance",
+    "domain_tags": [
+      "vulnerability reporting",
+      "secret handling"
+    ],
+    "status": "current",
+    "canonical_role": "Public vulnerability and secret-reporting boundary",
+    "summary": "Directs sensitive reports away from public issues and lists material that must never enter repository artifacts."
+  },
+  {
+    "id": "public-showcase",
+    "title": "Love Engine Skill public showcase",
+    "path": "showcase/index.html",
+    "source_group": "showcase",
+    "layer": "presentation",
+    "domain_tags": [
+      "Chinese",
+      "Sites",
+      "public questions"
+    ],
+    "status": "published",
+    "canonical_role": "Chinese collaborator-facing project page",
+    "summary": "Explains the current witness flow and opens a visitor-confirmed GitHub Issue without exposing a local service."
+  },
+  {
+    "id": "presentation-introduction-300",
+    "title": "Love Engine Skill 300-character introduction",
+    "path": "docs/presentations/love-engine-skill-introduction-300.zh-CN.md",
+    "source_group": "docs/presentations",
+    "layer": "presentation",
+    "domain_tags": [
+      "Chinese",
+      "meeting"
+    ],
+    "status": "published",
+    "canonical_role": "Concise collaborator introduction",
+    "summary": "Short Chinese introduction retained with the meeting presentation materials."
+  },
+  {
+    "id": "presentation-deck",
+    "title": "Love Engine Skill introduction deck",
+    "path": "docs/presentations/love-engine-skill-introduction.zh-CN.pptx",
+    "source_group": "docs/presentations",
+    "layer": "presentation",
+    "domain_tags": [
+      "Chinese",
+      "PowerPoint",
+      "meeting"
+    ],
+    "status": "published",
+    "canonical_role": "Collaborator presentation deck",
+    "summary": "Chinese slide deck for explaining the project flow and maturity to partners."
+  },
+  {
+    "id": "m3-m5-development-archive-index",
+    "title": "M3-M5 development archive index",
+    "path": "docs/archive/development/2026-06-m3-m5/README.md",
+    "source_group": "docs/archive/development",
+    "layer": "archive-index",
+    "domain_tags": [
+      "M3",
+      "M4",
+      "M5"
+    ],
+    "status": "historical",
+    "canonical_role": "Scope and replacement entrypoints for archived development records",
+    "summary": "Marks the moved runbooks and acceptance reports as historical while preserving their content."
+  },
+  {
+    "id": "presentation-materials-index",
+    "title": "Presentation materials index",
+    "path": "docs/presentations/README.md",
+    "source_group": "docs/presentations",
+    "layer": "presentation",
+    "domain_tags": [
+      "meeting",
+      "collaboration"
+    ],
+    "status": "published",
+    "canonical_role": "Index for collaborator-facing introduction artifacts",
+    "summary": "Lists the concise introduction and slide deck and points maturity claims back to active authority."
+  },
+  {
+    "id": "showcase-readme",
+    "title": "Showcase development readme",
+    "path": "showcase/README.md",
+    "source_group": "showcase",
+    "layer": "development",
+    "domain_tags": [
+      "Sites",
+      "deployment",
+      "questions"
+    ],
+    "status": "published",
+    "canonical_role": "Local build and deployment boundary for the public showcase",
+    "summary": "Documents the Sites build output, project identifier boundary and GitHub Issue question flow."
+  },
+  {
+    "id": "showcase-build-script",
+    "title": "Showcase Sites build script",
+    "path": "showcase/build.mjs",
+    "source_group": "showcase",
+    "layer": "deployment",
+    "domain_tags": [
+      "Sites",
+      "Worker",
+      "static assets"
+    ],
+    "status": "published",
+    "canonical_role": "Deterministic Sites Worker build entrypoint",
+    "summary": "Copies static content and emits the Worker module required by the Sites runtime."
+  },
+  {
+    "id": "showcase-package-metadata",
+    "title": "Showcase package metadata",
+    "path": "showcase/package.json",
+    "source_group": "showcase",
+    "layer": "deployment",
+    "domain_tags": [
+      "Sites",
+      "Node.js"
+    ],
+    "status": "published",
+    "canonical_role": "Build command and Node runtime declaration",
+    "summary": "Declares the self-contained showcase build without runtime dependencies."
+  },
+  {
+    "id": "showcase-sites-project",
+    "title": "Showcase Sites project binding",
+    "path": "showcase/.openai/hosting.json",
+    "source_group": "showcase",
+    "layer": "deployment",
+    "domain_tags": [
+      "Sites",
+      "project ID"
+    ],
+    "status": "published",
+    "canonical_role": "Non-secret opaque Sites project binding",
+    "summary": "Binds local source to the existing Sites project without storing deployment credentials."
+  },
+  {
+    "id": "showcase-question-template",
+    "title": "Showcase question issue template",
+    "path": ".github/ISSUE_TEMPLATE/showcase_question.md",
+    "source_group": ".github/ISSUE_TEMPLATE",
+    "layer": "collaboration",
+    "domain_tags": [
+      "GitHub Issues",
+      "showcase",
+      "public questions"
+    ],
+    "status": "published",
+    "canonical_role": "Visitor-confirmed public question envelope",
+    "summary": "Applies a stable marker and public-data warning to questions submitted from the showcase."
+  },
+  {
+    "id": "llm-mtp-research-brief-zh-cn",
+    "title": "LLM MTP research brief zh-CN",
+    "path": "docs/presentations/llm-mtp-research-brief.zh-CN.md",
+    "source_group": "docs/presentations",
+    "layer": "research",
+    "domain_tags": [
+      "LLM",
+      "Multi-Token Prediction",
+      "speculative decoding",
+      "Chinese"
+    ],
+    "status": "published",
+    "canonical_role": "Source-backed MTP sharing brief for collaborators",
+    "summary": "Separates MTP training and model modules from speculative verification, records evidence boundaries, and gives a workload-specific evaluation protocol."
+  },
+  {
+    "id": "llm-mtp-interactive-showcase",
+    "title": "LLM MTP interactive showcase",
+    "path": "showcase/mtp.html",
+    "source_group": "showcase",
+    "layer": "presentation",
+    "domain_tags": [
+      "LLM",
+      "Multi-Token Prediction",
+      "interactive",
+      "Chinese"
+    ],
+    "status": "published",
+    "canonical_role": "Interactive Chinese explanation of MTP and speculative decoding",
+    "summary": "Provides interactive mechanism, acceptance-rate, evidence-timeline and adoption-checklist views, linked to primary research and official serving documentation."
   }
 ]

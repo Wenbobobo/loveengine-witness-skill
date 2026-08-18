@@ -1,0 +1,1131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Love Engine Skill 的核心流程、技术结构与实验进展。">
+  <title>Love Engine Skill | 项目进展</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f5f6f8;
+      --surface: #ffffff;
+      --ink: #15181d;
+      --muted: #5e6672;
+      --line: #d8dce2;
+      --line-strong: #aeb5bf;
+      --blue: #1769e0;
+      --blue-soft: #e9f1ff;
+      --green: #167447;
+      --green-soft: #e7f5ee;
+      --amber: #956100;
+      --amber-soft: #fff3d6;
+      --red: #b33b32;
+      --red-soft: #fdecea;
+      --violet: #6852a6;
+      --violet-soft: #f0edfa;
+      --code: #1e242b;
+      --max: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+      letter-spacing: 0;
+    }
+    button, input, textarea { font: inherit; letter-spacing: 0; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    a { color: var(--blue); text-underline-offset: 3px; }
+    code {
+      font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+      font-size: .9em;
+      overflow-wrap: anywhere;
+    }
+    .shell { width: min(var(--max), calc(100% - 48px)); margin: 0 auto; }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(245, 246, 248, .96);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+    }
+    .topbar-inner {
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      color: var(--ink);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .brand strong { font-size: 17px; font-weight: 700; }
+    .brand span { color: var(--muted); font-size: 13px; }
+    .main-nav { display: flex; align-items: center; gap: 6px; }
+    .main-nav a {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
+      border-radius: 6px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .main-nav a:hover, .main-nav a[aria-current="true"] {
+      color: var(--ink);
+      background: var(--surface);
+    }
+
+    .hero {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+    .hero-inner { padding: 64px 0 42px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--blue);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      max-width: 900px;
+      margin-bottom: 18px;
+      font-size: 64px;
+      line-height: 1.05;
+      font-weight: 700;
+    }
+    .hero-copy {
+      max-width: 800px;
+      margin-bottom: 28px;
+      color: var(--muted);
+      font-size: 22px;
+      line-height: 1.55;
+    }
+    .hero-copy strong { color: var(--ink); font-weight: 700; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 3px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--page);
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .tag.current { border-color: #9bbcf1; background: var(--blue-soft); color: #114d9f; }
+    .tag.good { border-color: #9ed0b6; background: var(--green-soft); color: var(--green); }
+    .tag.warn { border-color: #e5c277; background: var(--amber-soft); color: var(--amber); }
+    .tag.stop { border-color: #e5aaa6; background: var(--red-soft); color: var(--red); }
+
+    .status-band { border-bottom: 1px solid var(--line); background: var(--surface); }
+    .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .status-item { min-height: 118px; padding: 22px 24px; border-left: 1px solid var(--line); }
+    .status-item:first-child { border-left: 0; }
+    .status-item span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 13px; }
+    .status-item strong { display: block; font-size: 19px; line-height: 1.35; }
+    .status-item small { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; }
+
+    .band { padding: 72px 0; border-bottom: 1px solid var(--line); }
+    .band.surface { background: var(--surface); }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 430px);
+      gap: 48px;
+      align-items: end;
+      margin-bottom: 38px;
+    }
+    .section-head h2 { margin-bottom: 0; font-size: 36px; line-height: 1.2; }
+    .section-head p { margin-bottom: 0; color: var(--muted); }
+    .boundary-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line-strong); }
+    .boundary-column { min-height: 245px; padding: 24px 28px 12px 0; border-right: 1px solid var(--line); }
+    .boundary-column + .boundary-column { padding-left: 28px; }
+    .boundary-column:last-child { border-right: 0; }
+    .boundary-column h3 { margin-bottom: 14px; font-size: 20px; }
+    .boundary-column ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    .boundary-column li { margin: 8px 0; }
+
+    .tool {
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .tool-toolbar {
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fafbfc;
+    }
+    .toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .button {
+      min-height: 38px;
+      padding: 7px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .button:hover { border-color: var(--blue); color: var(--blue); }
+    .button.primary { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+    .button.primary:hover { background: var(--blue); border-color: var(--blue); }
+    .switch { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+    .switch input { width: 18px; height: 18px; accent-color: var(--blue); }
+
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0;
+      padding: 20px 20px 8px;
+      background: var(--surface);
+    }
+    .flow-step {
+      position: relative;
+      min-height: 92px;
+      padding: 12px 10px;
+      border: 0;
+      border-top: 3px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      text-align: left;
+      cursor: pointer;
+    }
+    .flow-step::after {
+      content: "";
+      position: absolute;
+      top: -3px;
+      right: -1px;
+      width: 2px;
+      height: 22px;
+      background: var(--line);
+    }
+    .flow-step:last-child::after { display: none; }
+    .flow-step:hover { color: var(--ink); background: #fafbfc; }
+    .flow-step[aria-selected="true"] { border-top-color: var(--blue); background: var(--blue-soft); color: var(--ink); }
+    .flow-step .number { display: block; margin-bottom: 5px; color: var(--blue); font-size: 12px; font-weight: 700; }
+    .flow-step strong { display: block; font-size: 15px; line-height: 1.3; }
+    .flow-detail {
+      min-height: 342px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: 0;
+      border-top: 1px solid var(--line);
+    }
+    .flow-main, .flow-facts { padding: 32px; }
+    .flow-main { border-right: 1px solid var(--line); }
+    .flow-kicker { margin-bottom: 8px; color: var(--blue); font-size: 13px; font-weight: 700; }
+    .flow-main h3 { margin-bottom: 12px; font-size: 28px; line-height: 1.25; }
+    .flow-summary { max-width: 690px; margin-bottom: 22px; color: var(--muted); font-size: 18px; }
+    .flow-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; margin: 0; padding: 0; list-style: none; }
+    .flow-checks li { padding: 10px 0 10px 20px; border-top: 1px solid var(--line); position: relative; }
+    .flow-checks li::before { content: ""; position: absolute; left: 0; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .fact-row { padding: 0 0 18px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .fact-row:last-child { margin-bottom: 0; border-bottom: 0; }
+    .fact-row span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; text-transform: uppercase; }
+    .fact-row strong { font-size: 16px; overflow-wrap: anywhere; }
+    .governance-branch {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 20px;
+      align-items: center;
+      padding: 18px 22px;
+      border-top: 1px dashed var(--line-strong);
+      background: #fafbfc;
+      color: var(--muted);
+    }
+    .governance-branch strong { color: var(--ink); }
+    .governance-branch.active { background: var(--violet-soft); color: #4d416e; }
+    .governance-branch.active strong { color: var(--violet); }
+
+    .segmented {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0;
+      margin-bottom: 26px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .segment {
+      min-height: 40px;
+      padding: 8px 15px;
+      border: 0;
+      border-right: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .segment:last-child { border-right: 0; }
+    .segment:hover { color: var(--ink); background: #fafbfc; }
+    .segment[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+    .maturity-list { min-height: 450px; border-top: 1px solid var(--line-strong); }
+    .maturity-row {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr) minmax(260px, 390px);
+      gap: 28px;
+      align-items: start;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .maturity-row h3 { margin: 0; font-size: 18px; }
+    .maturity-row p { margin: 0; color: var(--muted); }
+    .maturity-evidence { font-size: 14px; }
+    .maturity-evidence strong { display: block; margin-bottom: 5px; color: var(--ink); }
+
+    .verification-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 32px; align-items: start; }
+    .verification-nav { display: grid; gap: 8px; }
+    .verification-button {
+      min-height: 72px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--muted);
+      text-align: left;
+      cursor: pointer;
+    }
+    .verification-button strong { display: block; margin-bottom: 2px; color: var(--ink); overflow-wrap: anywhere; }
+    .verification-button[aria-selected="true"] { border-color: var(--blue); background: var(--blue-soft); color: #294d7a; }
+    .verification-content {
+      min-height: 320px;
+      padding: 30px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .verification-content h3 { margin-bottom: 8px; font-size: 28px; }
+    .verification-lede { color: var(--muted); font-size: 18px; }
+    .verification-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 24px; }
+    .verification-columns h4 { margin: 0 0 10px; font-size: 15px; }
+    .verification-columns ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    .trust-result { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); font-weight: 700; }
+
+    .evidence-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 38px; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); }
+    .evidence-stat { min-height: 134px; padding: 22px 26px; border-right: 1px solid var(--line); }
+    .evidence-stat:last-child { border-right: 0; }
+    .evidence-stat span { display: block; color: var(--muted); font-size: 13px; }
+    .evidence-stat strong { display: block; margin: 5px 0; font-size: 32px; line-height: 1.1; }
+    .evidence-stat small { color: var(--muted); }
+    .timeline { border-left: 2px solid var(--line-strong); margin-left: 10px; }
+    .timeline-item { position: relative; padding: 0 0 34px 34px; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-item::before { content: ""; position: absolute; left: -8px; top: 7px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 3px solid var(--line-strong); }
+    .timeline-item.passed::before { border-color: var(--green); }
+    .timeline-item.failed::before { border-color: var(--red); }
+    .timeline-item.current::before { border-color: var(--blue); }
+    .timeline-date { margin-bottom: 4px; color: var(--muted); font-size: 13px; }
+    .timeline-item h3 { margin-bottom: 6px; font-size: 20px; }
+    .timeline-item p { max-width: 850px; margin-bottom: 10px; color: var(--muted); }
+    details.evidence-detail { max-width: 900px; border-top: 1px solid var(--line); padding-top: 10px; }
+    details.evidence-detail summary { color: var(--blue); cursor: pointer; }
+    details.evidence-detail p { margin: 10px 0 0; font-size: 14px; }
+
+    .transport-flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--line-strong);
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 42px;
+    }
+    .transport-node { position: relative; min-height: 178px; padding: 24px 24px 18px 0; border-right: 1px solid var(--line); }
+    .transport-node + .transport-node { padding-left: 24px; }
+    .transport-node:last-child { border-right: 0; }
+    .transport-node h3 { margin-bottom: 6px; font-size: 18px; }
+    .transport-node p { color: var(--muted); font-size: 14px; }
+    .transport-node code { display: inline-block; margin-top: 4px; color: var(--blue); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 15px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-size: 13px; font-weight: 600; }
+    td:first-child { font-weight: 700; }
+    td { min-width: 150px; }
+    .subsection-title { margin: 42px 0 18px; font-size: 24px; }
+
+    .product-switch { margin-bottom: 22px; }
+    .product-figure { margin: 0; }
+    .product-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--code);
+    }
+    .product-frame img { width: 100%; height: 100%; display: block; object-fit: contain; }
+    .product-figure figcaption { display: grid; grid-template-columns: 180px minmax(0, 1fr) auto; gap: 24px; padding: 18px 0 0; color: var(--muted); }
+    .product-figure figcaption strong { color: var(--ink); }
+    .product-actions { display: flex; align-items: flex-start; justify-content: flex-end; }
+
+    .faq { border-top: 1px solid var(--line-strong); }
+    .faq details { border-bottom: 1px solid var(--line); }
+    .faq summary { position: relative; padding: 20px 44px 20px 0; font-size: 18px; font-weight: 700; cursor: pointer; list-style: none; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; position: absolute; right: 8px; top: 17px; color: var(--blue); font-size: 24px; font-weight: 400; }
+    .faq details[open] summary::after { content: "−"; }
+    .faq details p { max-width: 900px; padding: 0 44px 20px 0; margin: 0; color: var(--muted); }
+
+    .partner-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line-strong); }
+    .partner-item { padding: 24px 26px 12px 0; border-right: 1px solid var(--line); }
+    .partner-item + .partner-item { padding-left: 26px; }
+    .partner-item:last-child { border-right: 0; }
+    .partner-item span { color: var(--blue); font-size: 13px; font-weight: 700; }
+    .partner-item h3 { margin: 5px 0 8px; font-size: 20px; }
+    .partner-item p { color: var(--muted); }
+    .command-box {
+      margin-top: 30px;
+      padding: 18px 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--code);
+      color: #f4f7fa;
+      overflow-x: auto;
+    }
+    .command-box code { display: block; min-width: max-content; white-space: pre; line-height: 1.75; }
+
+    .question-form {
+      display: grid;
+      grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+      gap: 28px;
+      padding-top: 28px;
+      border-top: 1px solid var(--line-strong);
+    }
+    .question-label strong { display: block; margin-bottom: 6px; font-size: 18px; }
+    .question-label span { display: block; color: var(--muted); font-size: 14px; }
+    .question-input { display: grid; gap: 12px; }
+    .question-input textarea {
+      width: 100%;
+      min-height: 150px;
+      resize: vertical;
+      padding: 14px 16px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+    .question-input textarea:focus { outline: 3px solid var(--blue-soft); border-color: var(--blue); }
+    .question-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .question-count, .question-status { color: var(--muted); font-size: 13px; }
+    .question-status { min-height: 22px; margin: 0; }
+
+    .footer { padding: 40px 0 58px; background: var(--ink); color: #d9dde3; }
+    .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+    .footer h2 { color: #ffffff; font-size: 22px; }
+    .footer p { color: #aeb6c1; }
+    .source-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; }
+    .source-links a { color: #9ec5fb; overflow-wrap: anywhere; }
+    .snapshot { margin-top: 28px; padding-top: 18px; border-top: 1px solid #38404a; color: #8f99a6; font-size: 13px; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .fade-in { animation: content-in 180ms ease-out; }
+    @keyframes content-in { from { opacity: .4; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+    @media (max-width: 980px) {
+      .main-nav { display: none; }
+      h1 { font-size: 52px; }
+      .status-grid { grid-template-columns: 1fr 1fr; }
+      .status-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+      .status-item:nth-child(4) { border-top: 1px solid var(--line); }
+      .section-head { grid-template-columns: 1fr; gap: 14px; }
+      .flow-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .flow-step { border: 1px solid var(--line); border-top-width: 3px; border-radius: 6px; }
+      .flow-step::after { display: none; }
+      .flow-detail { grid-template-columns: 1fr; }
+      .flow-main { border-right: 0; border-bottom: 1px solid var(--line); }
+      .maturity-row { grid-template-columns: 160px 1fr; }
+      .maturity-evidence { grid-column: 2; }
+      .transport-flow { grid-template-columns: 1fr 1fr; }
+      .transport-node:nth-child(2) { border-right: 0; }
+      .transport-node:nth-child(3), .transport-node:nth-child(4) { border-top: 1px solid var(--line); }
+      .product-figure figcaption { grid-template-columns: 1fr; gap: 8px; }
+      .product-actions { justify-content: flex-start; }
+    }
+
+    @media (max-width: 720px) {
+      .shell { width: min(100% - 28px, var(--max)); }
+      .topbar-inner { min-height: 54px; }
+      .brand span { display: none; }
+      .hero-inner { padding: 42px 0 30px; }
+      h1 { font-size: 42px; }
+      .hero-copy { font-size: 18px; }
+      .band { padding: 52px 0; }
+      .section-head h2 { font-size: 30px; }
+      .boundary-grid, .partner-grid { grid-template-columns: 1fr; }
+      .boundary-column, .partner-item { min-height: 0; padding: 20px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .boundary-column + .boundary-column, .partner-item + .partner-item { padding-left: 0; }
+      .boundary-column:last-child, .partner-item:last-child { border-bottom: 0; }
+      .flow-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; }
+      .tool-toolbar { align-items: stretch; flex-direction: column; }
+      .toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+      .switch { justify-content: flex-start; }
+      .flow-main, .flow-facts { padding: 24px 20px; }
+      .flow-checks { grid-template-columns: 1fr; }
+      .governance-branch { grid-template-columns: 1fr; gap: 4px; }
+      .segmented { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+      .segment { border-bottom: 1px solid var(--line-strong); }
+      .segment:nth-child(2) { border-right: 0; }
+      .segment:nth-last-child(-n+2) { border-bottom: 0; }
+      .maturity-list { min-height: 0; }
+      .maturity-row { grid-template-columns: 1fr; gap: 10px; }
+      .maturity-evidence { grid-column: 1; }
+      .verification-layout { grid-template-columns: 1fr; }
+      .verification-nav { grid-template-columns: 1fr; }
+      .verification-columns { grid-template-columns: 1fr; }
+      .evidence-stats { grid-template-columns: 1fr; }
+      .evidence-stat { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .evidence-stat:last-child { border-bottom: 0; }
+      .transport-flow { grid-template-columns: 1fr; }
+      .transport-node, .transport-node + .transport-node { min-height: 0; padding: 20px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+      .transport-node:nth-child(3), .transport-node:nth-child(4) { border-top: 0; }
+      .transport-node:last-child { border-bottom: 0; }
+      .product-frame { aspect-ratio: 4 / 3; }
+      .command-box { padding: 16px; }
+      .question-form { grid-template-columns: 1fr; gap: 16px; }
+      .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+      .source-links { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 420px) {
+      h1 { font-size: 36px; }
+      .status-grid { grid-template-columns: 1fr; }
+      .status-item, .status-item:nth-child(3), .status-item:nth-child(4) { min-height: 0; border-left: 0; border-top: 1px solid var(--line); }
+      .status-item:first-child { border-top: 0; }
+      .segmented { grid-template-columns: 1fr; }
+      .segment, .segment:nth-child(2), .segment:nth-last-child(-n+2) { border-right: 0; border-bottom: 1px solid var(--line-strong); }
+      .segment:last-child { border-bottom: 0; }
+      .product-frame { aspect-ratio: 1 / 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .fade-in { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a class="brand" href="#top">
+        <strong>Love Engine Skill</strong>
+        <span>0.7 候选版</span>
+      </a>
+      <nav class="main-nav" aria-label="页面导航">
+        <a href="#flow">核心流程</a>
+        <a href="#progress">当前进度</a>
+        <a href="#verification">验证边界</a>
+        <a href="#architecture">技术结构</a>
+        <a href="#faq">常见问题</a>
+        <a href="/mtp/">MTP 分享</a>
+        <a href="#ask">提交问题</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-inner">
+        <p class="eyebrow">NaturalDAO · POL · LoveEngineSkill</p>
+        <h1>Love Engine Skill</h1>
+        <p class="hero-copy">由 Agent 协作完成公共表达的<strong>记录、验证、复核与整理</strong>，形成可以追溯来源、核对签名和检查引用关系的 Evidence（证据）。</p>
+        <div class="hero-meta" aria-label="版本状态">
+          <span class="tag current">当前主线 · LoveEngineSkill 核心闭环</span>
+          <span class="tag warn">源码 · 0.7 候选版</span>
+          <span class="tag">最新发布 · v0.6.0</span>
+          <span class="tag good">状态 · 本机流程可复跑</span>
+          <span class="tag">协议 · loveengine-witness-net/0.6</span>
+          <span class="tag">方向 · Agent Network 优先</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="status-band" aria-label="项目状态摘要">
+      <div class="shell status-grid">
+        <div class="status-item"><span>核心流程</span><strong>release → 提案门槛</strong><small>本机可完整运行</small></div>
+        <div class="status-item"><span>Agent 协作</span><strong>任务、确认与 Signed Receipt（签名回执）</strong><small>支持连接后继续派发</small></div>
+        <div class="status-item"><span>Evidence</span><strong>事件、原文与复核</strong><small>形成可重复检查的引用链</small></div>
+        <div class="status-item"><span>实验方向</span><strong>核心与治理分层</strong><small>先稳定核心，再扩展公开试点</small></div>
+      </div>
+    </section>
+
+    <section class="band" id="boundary">
+      <div class="shell">
+        <div class="section-head">
+          <h2>Love Engine Skill 是什么</h2>
+          <p>它是 LoveEngineSkill 中第一个可以实际运行和验证的 Agent Skill，围绕公共表达建立一条完整的 Evidence 流程。</p>
+        </div>
+        <div class="boundary-grid">
+          <article class="boundary-column">
+            <h3>核心能力</h3>
+            <ul>
+              <li>发布和验证 <code>loveengine-witness</code> release</li>
+              <li>通过 Agent Network 派发观察与复核任务</li>
+              <li>保存事件、Evidence 和 Signed Receipt（签名回执）</li>
+              <li>在提案完整性门槛形成可检查结果</li>
+            </ul>
+          </article>
+          <article class="boundary-column">
+            <h3>解决的问题</h3>
+            <ul>
+              <li>记录公共表达发生的顺序和来源</li>
+              <li>让多个 Agent 对同一份 Evidence 独立检查</li>
+              <li>把观察、确认、Receipt 和 Review 串成完整流程</li>
+              <li>把仍需处理的争议带到提案门槛之前</li>
+            </ul>
+          </article>
+          <article class="boundary-column">
+            <h3>当前工作重点</h3>
+            <ul>
+              <li>简化 release、Trust Policy（信任策略）和 Relay 的使用流程</li>
+              <li>提高 Evidence、Review 和 Transcript（可验证记录）的可读性</li>
+              <li>用本机和多节点实验验证异常恢复</li>
+              <li>为后续公开试点准备清晰的参与方式</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band surface" id="flow">
+      <div class="shell">
+        <div class="section-head">
+          <h2>一次见证，如何走到提案门槛</h2>
+          <p>点击任一步骤，查看它为什么存在、检查什么，以及会把什么交给下一步。</p>
+        </div>
+        <div class="tool" aria-label="核心流程交互图">
+          <div class="tool-toolbar">
+            <div class="toolbar-actions">
+              <button class="button primary" id="play-flow" type="button">自动演示</button>
+              <button class="button" id="reset-flow" type="button">回到发布</button>
+            </div>
+            <label class="switch" for="governance-toggle"><input id="governance-toggle" type="checkbox">显示可选治理实验</label>
+          </div>
+          <div class="flow-steps" role="tablist" aria-label="核心流程阶段">
+            <button class="flow-step" role="tab" aria-selected="true" data-flow-step="0"><span class="number">01</span><strong>代码 release</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="1"><span class="number">02</span><strong>Trust Policy（信任策略）</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="2"><span class="number">03</span><strong>Relay</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="3"><span class="number">04</span><strong>事件与 Evidence</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="4"><span class="number">05</span><strong>ACK 与 Receipt</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="5"><span class="number">06</span><strong>Review</strong></button>
+            <button class="flow-step" role="tab" aria-selected="false" data-flow-step="6"><span class="number">07</span><strong>提案门槛</strong></button>
+          </div>
+          <div class="flow-detail" id="flow-detail" role="tabpanel">
+            <div class="flow-main">
+              <p class="flow-kicker" id="flow-protocol">RELEASE / SKILLS REGISTRY</p>
+              <h3 id="flow-title">Publisher（发布方）打包代码并生成 release</h3>
+              <p class="flow-summary" id="flow-summary">release 保留 Skill 清单、发布元数据、校验和清单和源码清单，并要求这些内容彼此一致；Skills Registry 记录公开发布信息和关键哈希。</p>
+              <ul class="flow-checks" id="flow-checks">
+                <li>校验和清单非空并完整覆盖文件</li>
+                <li>release 的 Keccak 摘要与 Skill 清单哈希</li>
+                <li>有效发布与版本一致</li>
+                <li>秘密文件和路径规则</li>
+              </ul>
+            </div>
+            <aside class="flow-facts">
+              <div class="fact-row"><span>输入</span><strong id="flow-input">源码、Skill 清单、Publisher 身份</strong></div>
+              <div class="fact-row"><span>产物</span><strong id="flow-output">可重复构建的 release + Skills Registry 记录</strong></div>
+              <div class="fact-row"><span>为什么需要</span><strong id="flow-purpose">让所有节点检查同一份代码和元数据</strong></div>
+            </aside>
+          </div>
+          <div class="governance-branch" id="governance-branch">
+            <strong>默认在提案门槛停止</strong>
+            <span>开启后才进入 EIP-712 approval、Witness DAO 和 PublicSink；治理实验沿用核心结果，但由参与者显式完成投票。</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="progress">
+      <div class="shell">
+        <div class="section-head">
+          <h2>当前进度</h2>
+          <p>用四个层次查看代码、实验、验收和后续路线，避免把不同成熟度混在一起。</p>
+        </div>
+        <div class="segmented" role="tablist" aria-label="进度分类">
+          <button class="segment" role="tab" aria-selected="true" data-maturity="implemented">当前代码</button>
+          <button class="segment" role="tab" aria-selected="false" data-maturity="historical">实验验证</button>
+          <button class="segment" role="tab" aria-selected="false" data-maturity="pending">下一轮验收</button>
+          <button class="segment" role="tab" aria-selected="false" data-maturity="future">后续路线</button>
+        </div>
+        <div class="maturity-list" id="maturity-list" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="band surface" id="verification">
+      <div class="shell">
+        <div class="section-head">
+          <h2>“验证通过”有三种强度</h2>
+          <p>Transcript（可验证记录）自洽、链上事实一致、外部 Trust Policy（信任策略）绑定，是逐层增加的验证维度。</p>
+        </div>
+        <div class="verification-layout">
+          <div class="verification-nav" role="tablist" aria-label="可验证记录的验证等级">
+            <button class="verification-button" role="tab" aria-selected="true" data-verification="offline"><strong>离线完整性</strong>不连接链上远程调用</button>
+            <button class="verification-button" role="tab" aria-selected="false" data-verification="consistency"><strong>链上一致性</strong>连接链上远程调用，无外部信任策略</button>
+            <button class="verification-button" role="tab" aria-selected="false" data-verification="verified"><strong>链上信任绑定</strong>链上远程调用 + 外部信任策略</button>
+          </div>
+          <div class="verification-content" id="verification-content" role="tabpanel"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="evidence">
+      <div class="shell">
+        <div class="section-head">
+          <h2>项目进展框架</h2>
+          <p>这里保留整体成熟度，不再用具体日期和提交号打断介绍。</p>
+        </div>
+        <div class="evidence-stats" aria-label="历史四小时本机报告摘要">
+          <div class="evidence-stat"><span>核心闭环</span><strong>可运行</strong><small>release、Relay、Evidence、Review、提案门槛</small></div>
+          <div class="evidence-stat"><span>多节点实验</span><strong>已验证</strong><small>任务派发、ACK、Receipt 与异常恢复</small></div>
+          <div class="evidence-stat"><span>公开试点</span><strong>准备中</strong><small>继续补充外部身份、网络和长期运行证据</small></div>
+        </div>
+        <div class="timeline">
+          <article class="timeline-item passed">
+            <div class="timeline-date">核心流程</div>
+            <h3>从 release 到提案完整性门槛已经形成默认路径</h3>
+            <p>代码打包、Skills Registry、Trust Policy（信任策略）、Relay、事件、Evidence、ACK、Signed Receipt（签名回执）、Review 和 Transcript（可验证记录）已经能够在同一流程中衔接。</p>
+          </article>
+          <article class="timeline-item passed">
+            <div class="timeline-date">实验验证</div>
+            <h3>本机与跨主机实验已经覆盖关键交互</h3>
+            <p>实验覆盖多 Agent 连接、任务接收、Evidence 复算、Signed Receipt（签名回执）确认、断线恢复和服务清理，为继续简化流程提供了基础。</p>
+          </article>
+          <article class="timeline-item passed">
+            <div class="timeline-date">可靠性加固</div>
+            <h3>运行前检查、依赖准备和清理流程持续收敛</h3>
+            <p>当前重点是让同一套脚本能稳定准备环境、运行实验、保存报告并关闭子进程，降低远程机器差异带来的复杂度。</p>
+          </article>
+          <article class="timeline-item current">
+            <div class="timeline-date">下一阶段</div>
+            <h3>完成 Sepolia 锚点与受邀参与入口的外部验收</h3>
+            <p>下一轮使用真实外部 signer、两个独立链上远程调用和受邀远程操作者，核对同一份 release、Trust Policy（信任策略）、Signed Receipt（签名回执）和 Transcript（可验证记录）。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="band surface" id="architecture">
+      <div class="shell">
+        <div class="section-head">
+          <h2>数据、网络与权限</h2>
+          <p>原文主要留在链下；链上记录发布锚点和可选治理状态。节点通过出站连接工作，不接收投票任务。</p>
+        </div>
+        <div class="transport-flow" aria-label="数据传输与存储">
+          <article class="transport-node"><h3>Operator（操作员）</h3><p>鉴权写入 Session、事件、关闭与 Evidence finalize。</p><code>HTTP POST（鉴权写入）</code></article>
+          <article class="transport-node"><h3>Pilot / Evidence</h3><p><code>pilot.sqlite</code> 保存元数据；Artifact 保存原文；<code>audit.jsonl</code> 串联请求。</p><code>SSE + HTTP GET（事件流与读取）</code></article>
+          <article class="transport-node"><h3>Relay / Agent</h3><p><code>relay.sqlite</code> 保存任务状态；Agent 先持久化 Signed Receipt（签名回执）再发送。</p><code>WebSocket（出站长连接）</code></article>
+          <article class="transport-node"><h3>Skills Registry / Chain</h3><p>保存 release、Skill 清单哈希和可选治理状态，提供公开可核对的发布位置。</p><code>JSON-RPC（链上查询）</code></article>
+        </div>
+
+        <h3 class="subsection-title">角色权限</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>角色</th><th>核心动作</th><th>主要输出</th></tr></thead>
+            <tbody>
+              <tr><td>Publisher（发布方）</td><td>打包代码、生成 release、核对 Skills Registry</td><td>release、校验和与发布元数据</td></tr>
+              <tr><td>Operator（操作员）</td><td>创建 Session、写入事件、关闭并 finalize Evidence</td><td>事件链、Artifact 和 EvidenceBundle</td></tr>
+              <tr><td>Observation Agent（观察 Agent）</td><td>验证 release、任务和 Evidence，执行观察或 Review</td><td>ACK 与 Signed Receipt（签名回执）</td></tr>
+              <tr><td>Viewer（查看者）</td><td>查看 Session、事件、Evidence、Receipt 和提案门槛状态</td><td>只读展示与人工复核入口</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="subsection-title">五个合约方向与提案门槛</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>组件</th><th>当前定位</th><th>关键边界</th></tr></thead>
+            <tbody>
+              <tr><td>Skills Registry</td><td>公开发布的地方</td><td>登记 release、Publisher、版本和关键哈希</td></tr>
+              <tr><td>提案门槛</td><td>提案通过前的完整性检查</td><td>当前代码实现为链下模块，检查 finalized Evidence 和关键争议状态</td></tr>
+              <tr><td>Witness DAO</td><td>可选治理与显式投票</td><td>由 Voting Witness 使用外部 signer 批准，Agent 负责见证流程</td></tr>
+              <tr><td>直播设定合约</td><td>设置直播时间与实验参数</td><td>对应当前排期组件，不绑定“企业”场景</td></tr>
+              <tr><td>流式合约与公开结果合约</td><td>记录流式数据并公开最终结果</td><td>对应 StreamingEngine 与 PublicSink，复用核心 Evidence 结果</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="product">
+      <div class="shell">
+        <div class="section-head">
+          <h2>现有操作界面</h2>
+          <p>Operator 和 Viewer 分别用于写入与查看；最终结果由 Signed Receipt（签名回执）、Evidence 和 Transcript（可验证记录）共同支撑。</p>
+        </div>
+        <div class="segmented product-switch" role="tablist" aria-label="界面截图">
+          <button class="segment" role="tab" aria-selected="true" data-product="operator">Operator（操作员）</button>
+          <button class="segment" role="tab" aria-selected="false" data-product="viewer">Viewer（查看者）</button>
+        </div>
+        <figure class="product-figure">
+          <div class="product-frame"><img id="product-image" src="assets/operator-console.png" alt="Love Engine Skill Operator 界面截图"></div>
+          <figcaption><strong id="product-caption-title">Operator（操作员）</strong><span id="product-caption">创建 Session、发布事件、关闭 Session，并查看 Evidence 的连续状态。</span><span class="product-actions"><a class="button" id="product-original" href="assets/operator-console.png" target="_blank" rel="noopener">查看原图</a></span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="band surface" id="faq">
+      <div class="shell">
+        <div class="section-head">
+          <h2>伙伴最常问的问题</h2>
+          <p>答案只陈述当前代码和实验能够支持的范围。</p>
+        </div>
+        <div class="faq">
+          <details><summary>Love Engine Skill 当前包含什么？</summary><p>当前主线包含 release 验证、Agent 任务、事件与 Evidence、ACK、Signed Receipt（签名回执）、Review、提案完整性门槛和 Transcript（可验证记录）。</p></details>
+          <details><summary>Agent 和 Voting Witness 如何分工？</summary><p>Agent 执行观察与 Review，并签署 Signed Receipt（签名回执）；Voting Witness 在可选治理实验中使用外部 signer 显式批准投票。两条路径共享 Evidence，但保持各自权限。</p></details>
+          <details><summary>把文本做哈希摘要，为什么还不能证明它是真的？</summary><p>哈希摘要证明“当前取回的字节与当时保存的字节一致”，不能证明内容与现实相符。系统解决可追溯和可复核，不替代事实调查、来源判断或社会共识。</p></details>
+          <details><summary>三个 Agent 的实验主要验证什么？</summary><p>它验证成员身份、签名、法定数量、任务确认、Signed Receipt（签名回执）绑定和失败恢复等协议能力；后续公开试点再引入不同操作者和网络环境。</p></details>
+          <details><summary>为什么需要额外的 Trust Policy（信任策略）？</summary><p>Skill 说明“代码能做什么”，Trust Policy（信任策略）则独立固定“节点这次应该信任哪条链、哪个 Publisher、哪个版本、哪些哈希和任务签发方”。这个额外维度防止节点只根据连接邀请或任务自报信息建立信任。</p></details>
+          <details><summary>下一轮验收重点是什么？</summary><p>下一轮会用同一份 release 串联本机实验、远程实验、三节点 Signed Receipt（签名回执）、Transcript（可验证记录）和清理报告，使验收结果能够独立复跑。</p></details>
+          <details><summary>直播场景如何进入后续路线？</summary><p>直播场景将复用现有事件、Evidence、Review 和提案门槛，再通过直播设定合约增加时间和场次参数。</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="participate">
+      <div class="shell">
+        <div class="section-head"><h2>伙伴可以从哪里参与</h2></div>
+        <pre class="command-box"><code># 获取代码并准备依赖
+git clone https://github.com/Wenbobobo/loveengine-witness-skill.git
+cd loveengine-witness-skill
+uv sync --frozen
+uv run loveengine pilot contracts prepare
+
+# 先用一条命令跑完核心流程，输出 Evidence、Signed Receipt（签名回执）和 Transcript（可验证记录）
+uv run loveengine demo lan-pilot --stage core --events 12 --observers 10 --output .\core-output
+
+# Terminal 1 · Publisher（发布方）：打包代码并生成 release
+uv run loveengine package build --output .\release
+
+# Terminal 2 · Operator（操作员）：启动本机 Pilot，并自动打开操作界面
+uv run loveengine pilot quickstart --root .\pilot
+
+# Terminal 3 · Observation Agent（观察 Agent）：使用 quickstart 生成的身份与 Trust Policy（信任策略）连接 Relay
+uv run loveengine node connect --invite .\pilot\pilot-invite.json --trust-policy .\pilot\pilot-trust-policy.json --package .\pilot\release\loveengine-witness-0.7.0-invited-public-pilot.zip --profile .\pilot\profiles\node-1.json --rpc-url http://127.0.0.1:8545 --address ((Get-Content .\pilot\profiles\node-1.json | ConvertFrom-Json).profile.node) --cursor-db .\pilot\node-1.cursor.sqlite --expected-tasks 1 --idle-timeout-seconds 60 --output .\pilot\node-1-receipts.json
+
+# Terminal 4 · Viewer（查看者）：打开只读页面
+Start-Process "http://127.0.0.1:8780/demo/?lang=zh-CN"
+
+# Voting Witness 属于可选治理实验，因此不放进这条四角色核心流程。</code></pre>
+      </div>
+    </section>
+
+    <section class="band surface" id="ask">
+      <div class="shell">
+        <div class="section-head">
+          <h2>向项目提问</h2>
+          <p>问题会带到 GitHub 的确认页面。发布后，项目维护者可用本地只读 Codex 根据当前代码库生成回答草稿，并在人工检查后回复。</p>
+        </div>
+        <form class="question-form" id="question-form">
+          <label class="question-label" for="question-text">
+            <strong>你的问题</strong>
+            <span>问题和回答将公开保存在 GitHub。请勿填写个人信息、密钥或访问令牌。</span>
+          </label>
+          <div class="question-input">
+            <textarea id="question-text" name="question" maxlength="1200" required placeholder="例如：三个 Agent 的实验目前能够证明什么？"></textarea>
+            <div class="question-actions">
+              <span class="question-count" id="question-count">0 / 1200</span>
+              <button class="button primary" type="submit">询问</button>
+            </div>
+            <p class="question-status" id="question-status" role="status" aria-live="polite"></p>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">
+      <div class="footer-grid">
+        <div>
+          <h2>Love Engine Skill</h2>
+          <p>第一原则：系统围绕记录完整、引用一致、签名有效和争议可复核来组织 Evidence；内容判断由来源、参与者和后续治理共同完成。</p>
+        </div>
+        <div class="source-links" aria-label="主要来源">
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/main/README.zh-CN.md" target="_blank" rel="noopener">中文项目说明</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/main/QA.md" target="_blank" rel="noopener">项目问答</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/main/docs/architecture/witness-core-and-data-flow.zh-CN.md" target="_blank" rel="noopener">核心架构与数据流</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/main/docs/development/integration-guide.md" target="_blank" rel="noopener">开发者实验指南</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/blob/main/docs/specs/love-engine-invited-public-pilot.md" target="_blank" rel="noopener">受邀公开试点规格</a>
+          <a href="/mtp/">LLM MTP 互动研究页</a>
+          <a href="https://github.com/Wenbobobo/loveengine-witness-skill/issues" target="_blank" rel="noopener">公开问题</a>
+        </div>
+      </div>
+      <div class="snapshot">项目说明页 · 聚焦 LoveEngineSkill 核心流程、角色、合约方向与本机实验入口。</div>
+    </div>
+  </footer>
+
+  <script>
+    const flowSteps = [
+      {
+        protocol: "RELEASE / SKILLS REGISTRY",
+        title: "Publisher（发布方）打包代码并生成 release",
+        summary: "release 保留 Skill 清单、发布元数据、校验和清单和源码清单，并要求这些内容彼此一致；Skills Registry 记录公开发布信息和关键哈希。",
+        checks: ["校验和清单非空并完整覆盖文件", "release 的 Keccak 摘要与 Skill 清单哈希", "有效 release 与版本一致", "秘密文件和路径规则"],
+        input: "源码、Skill 清单、Publisher 身份",
+        output: "可重复构建的 release + Skills Registry 记录",
+        purpose: "让所有节点检查同一份代码和元数据"
+      },
+      {
+        protocol: "TRUST POLICY（信任策略）",
+        title: "Trust Policy（信任策略）为直接使用 Skill 增加独立信任维度",
+        summary: "Skill 说明代码具有什么能力；Trust Policy（信任策略）通过可信旁路独立固定节点这次应信任的链、Publisher、版本、release 哈希、Skill 清单哈希和任务签发方。",
+        checks: ["chain ID / Skills Registry / Publisher", "Skill ID / version", "release hash / manifest hash", "Agent profile / allowed issuers"],
+        input: "invite + 独立取得的 Trust Policy（信任策略）",
+        output: "trust-bound release context",
+        purpose: "让信任依据独立于 invite、Relay 和任务自报信息"
+      },
+      {
+        protocol: "RELAY（任务中继） / WEBSOCKET",
+        title: "Relay 负责派发、跟踪并收束任务",
+        summary: "Relay 把签名任务派给已认证 Agent，记录 ACK，接收 Signed Receipt（签名回执），并在任务完成后把待处理状态收束为完成状态；Agent 连接后仍可继续收到新任务。",
+        checks: ["bootstrap directory 成员身份", "issuer / recipient / nonce / deadline", "task payload hash 与签名", "ACK、Receipt confirmation 和任务完成状态"],
+        input: "signed NetworkTaskV2",
+        output: "可跟踪的任务状态 + durable ACK",
+        purpose: "让多个 Agent 的任务分配、确认、重试和完成状态有统一入口"
+      },
+      {
+        protocol: "EVENT / EVIDENCE / ARTIFACT",
+        title: "Operator 写入事件，系统保存原文与链式引用",
+        summary: "HTTP 写入 Session 和事件，SSE 提供观察游标；Artifact 保存原文并按 SHA-256 寻址。finalize 时重新读取原始字节，生成 finalized EvidenceBundle。",
+        checks: ["event sequence 与 canonical hash", "Artifact bytes 与 SHA-256", "hash-linked audit log", "close 与 finalize 状态分离"],
+        input: "鉴权事件 + Artifact",
+        output: "ObservationSet + finalized EvidenceBundle",
+        purpose: "把发生过的事件、原始内容和最终 Evidence 固定到同一引用链"
+      },
+      {
+        protocol: "ACK / SIGNED RECEIPT（签名回执）",
+        title: "ACK 表示接收，Signed Receipt（签名回执）表示完成",
+        summary: "Agent 接收任务后先返回 ACK；完成验证后先把 Signed Receipt（签名回执）持久化，再发送给 Relay。重连时确认同一份 Signed Receipt（签名回执），从而避免重复执行。",
+        checks: ["Receipt 绑定当前 Agent", "Receipt 绑定待处理 task", "task ID 与 issuer nonce 幂等", "Relay receipt confirmation"],
+        input: "accepted task + verified Evidence",
+        output: "signed TaskReceiptV2",
+        purpose: "把任务是否收到、是否完成、结果由谁签署三个问题分开记录"
+      },
+      {
+        protocol: "REVIEW（复核） / DISPUTE",
+        title: "Review 让第二组 Agent 重新检查最终 Evidence",
+        summary: "首次观察可能出现遗漏、引用不一致或对同一事件理解不同。Review Agent 重新取回 finalized Evidence、事件和 Artifact，独立复算哈希与引用，再对争议给出 Signed Receipt（签名回执）。",
+        checks: ["EvidenceBundle / events / Artifact 可取回", "事件链与引用重新计算", "成员签名与 quorum", "critical dispute 聚合结果"],
+        input: "finalized Evidence + dispute case",
+        output: "独立绑定的 Review Signed Receipt（签名回执）",
+        purpose: "让提案门槛依据经过二次检查的结果，而不是只依赖首次观察"
+      },
+      {
+        protocol: "PROPOSAL THRESHOLD（提案门槛）",
+        title: "提案完整性门槛汇总 Evidence 和 Review",
+        summary: "当 Evidence 已 finalize，并且 critical dispute 都有明确处理结果时，当前链下模块生成可进入后续治理实验的 proposal plan。",
+        checks: ["finalized Evidence", "critical dispute resolution", "跨阶段 Transcript（可验证记录）引用", "metrics 与 failure records"],
+        input: "EvidenceBundle + Review aggregate",
+        output: "threshold result + WitnessCoreTranscriptV1",
+        purpose: "确保进入下一阶段的提案已经具备完整 Evidence 和可复核争议记录"
+      }
+    ];
+
+    const maturityData = {
+      implemented: [
+        { title: "核心 Witness 闭环", body: "release、Skills Registry、Trust Policy（信任策略）、Relay、Evidence、Review、提案门槛与 Transcript（可验证记录）已形成默认路径。", evidence: "当前代码", source: "0.7 候选版" },
+        { title: "统一 Pilot Runtime", body: "Quickstart、核心实验和治理实验复用同一套链、合约、身份、Relay 和 Evidence 环境。", evidence: "当前代码", source: "Pilot Runtime" },
+        { title: "公开 Agent 连接路径", body: "Observation Agent 使用 invite、Trust Policy（信任策略）、release 和 profile 连接 Relay，并持续接收新任务。", evidence: "当前代码", source: "node connect" }
+      ],
+      historical: [
+        { title: "三 Agent 协作实验", body: "实验已经覆盖任务派发、ACK、Observation Signed Receipt（签名回执）、Review Signed Receipt（签名回执）和提案门槛。", evidence: "实验验证", source: "本机与跨主机" },
+        { title: "异常恢复实验", body: "实验覆盖 Agent 断线、服务重启、游标恢复、重复 Signed Receipt（签名回执）识别和子进程清理。", evidence: "实验验证", source: "耐久测试" },
+        { title: "确定性 release", body: "重复构建、校验和、Skill 清单哈希和 Registry release 能够被独立复核。", evidence: "实验验证", source: "package verification" }
+      ],
+      pending: [
+        { title: "统一候选验收", body: "用同一份 release 完成本机实验、远程实验、三 Agent Signed Receipt（签名回执）、Transcript（可验证记录）和清理报告。", evidence: "下一步", source: "release acceptance" },
+        { title: "参与者复跑", body: "让不同开发者按页面中的四角色命令启动环境、连接 Agent，并核对输出文件。", evidence: "下一步", source: "developer replay" },
+        { title: "受邀公开试点", body: "使用真实外部 signer、Sepolia 锚点、双链上远程调用和受邀远程操作者完成外部验收。", evidence: "下一步", source: "invited pilot" }
+      ],
+      future: [
+        { title: "直播场景实验", body: "在核心 Evidence 流程上增加直播时间、场次和公开反馈入口。", evidence: "后续路线", source: "livestream experiment" },
+        { title: "公开网络试点", body: "逐步加入测试网、不同网络、外部 signer 和多操作者 Agent。", evidence: "后续路线", source: "public pilot" },
+        { title: "长期 Evidence 服务", body: "继续研究持久存储、身份治理、灾难恢复和长期可用性。", evidence: "后续路线", source: "availability" }
+      ]
+    };
+
+    const verificationData = {
+      offline: {
+        title: "离线完整性验证",
+        lede: "不连接 RPC，只判断 Transcript（可验证记录）自身是否形成一条自洽、可重算的记录。",
+        proves: ["哈希摘要与签名格式", "成员身份与 quorum", "Artifact、事件和 EvidenceBundle 的跨阶段引用", "提案门槛、指标与故障记录的一致性"],
+        limits: ["验证范围集中在 Transcript（可验证记录）内部", "链上发布状态由下一层补充", "内容真实性仍由参与者和来源判断"],
+        result: "验证等级：离线完整性（offline_integrity） · 已绑定外部信任：否（trust_bound: false）"
+      },
+      consistency: {
+        title: "链上一致性验证",
+        lede: "在 Transcript（可验证记录）固定的历史区块读取 Skills Registry、交易、合约代码与可选治理状态。",
+        proves: ["chain ID 与历史区块存在", "Registry release 与代码 release 及 Skill 清单一致", "交易、区块和合约代码可核对", "后续出块不改变旧 Transcript（可验证记录）的验证点"],
+        limits: ["Publisher 选择由外部 Trust Policy（信任策略）补充", "链状态用于核对发布与交易", "部署成熟度由独立验收流程评估"],
+        result: "验证等级：链上一致性（chain_consistency） · 已绑定外部信任：否（trust_bound: false）"
+      },
+      verified: {
+        title: "外部信任绑定验证",
+        lede: "RPC 链上事实同时匹配可信旁路提供的 Trust Policy（信任策略）。",
+        proves: ["chain / Skills Registry / Publisher 与 Trust Policy（信任策略）一致", "Skill / version / release / manifest 被外部策略固定", "allowed issuers 与任务签名匹配", "release anchor 绑定到指定信任上下文"],
+        limits: ["Trust Policy（信任策略）的制定流程由组织治理", "内容判断继续保留来源与人工复核", "生产密钥、网络和可用性使用独立验收"],
+        result: "验证等级：链上信任绑定（chain_verified） · 已绑定外部信任：是（trust_bound: true）"
+      }
+    };
+
+    const productData = {
+      operator: { src: "assets/operator-console.png", alt: "Love Engine Skill Operator 界面截图", title: "Operator（操作员）", caption: "创建 Session、发布事件、关闭 Session，并查看 Evidence 的连续状态。" },
+      viewer: { src: "assets/read-only-dashboard.png", alt: "Love Engine Skill Viewer 界面截图", title: "Viewer（查看者）", caption: "查看 Session、事件时间线、Agent、Relay、Evidence 和提案门槛状态。" }
+    };
+
+    const flowButtons = [...document.querySelectorAll("[data-flow-step]")];
+    const flowDetail = document.getElementById("flow-detail");
+    let activeFlow = 0;
+    let playTimer = null;
+
+    function renderFlow(index) {
+      activeFlow = index;
+      const item = flowSteps[index];
+      flowButtons.forEach((button, buttonIndex) => button.setAttribute("aria-selected", String(buttonIndex === index)));
+      document.getElementById("flow-protocol").textContent = item.protocol;
+      document.getElementById("flow-title").textContent = item.title;
+      document.getElementById("flow-summary").textContent = item.summary;
+      document.getElementById("flow-input").textContent = item.input;
+      document.getElementById("flow-output").textContent = item.output;
+      document.getElementById("flow-purpose").textContent = item.purpose;
+      const checks = document.getElementById("flow-checks");
+      checks.replaceChildren(...item.checks.map(check => {
+        const node = document.createElement("li");
+        node.textContent = check;
+        return node;
+      }));
+      flowDetail.classList.remove("fade-in");
+      requestAnimationFrame(() => flowDetail.classList.add("fade-in"));
+    }
+
+    function stopFlow() {
+      if (playTimer) window.clearInterval(playTimer);
+      playTimer = null;
+      document.getElementById("play-flow").textContent = "自动演示";
+    }
+
+    flowButtons.forEach(button => button.addEventListener("click", () => {
+      stopFlow();
+      renderFlow(Number(button.dataset.flowStep));
+    }));
+
+    document.getElementById("play-flow").addEventListener("click", () => {
+      if (playTimer) {
+        stopFlow();
+        return;
+      }
+      document.getElementById("play-flow").textContent = "暂停演示";
+      playTimer = window.setInterval(() => renderFlow((activeFlow + 1) % flowSteps.length), 2600);
+    });
+
+    document.getElementById("reset-flow").addEventListener("click", () => {
+      stopFlow();
+      renderFlow(0);
+    });
+
+    document.getElementById("governance-toggle").addEventListener("change", event => {
+      const branch = document.getElementById("governance-branch");
+      branch.classList.toggle("active", event.target.checked);
+      branch.querySelector("strong").textContent = event.target.checked ? "可选治理实验已展开" : "默认在提案门槛停止";
+    });
+
+    function renderMaturity(key) {
+      document.querySelectorAll("[data-maturity]").forEach(button => button.setAttribute("aria-selected", String(button.dataset.maturity === key)));
+      const list = document.getElementById("maturity-list");
+      list.replaceChildren(...maturityData[key].map(item => {
+        const row = document.createElement("article");
+        row.className = "maturity-row fade-in";
+        row.innerHTML = `<h3>${item.title}</h3><p>${item.body}</p><div class="maturity-evidence"><strong>${item.evidence}</strong><code>${item.source}</code></div>`;
+        return row;
+      }));
+    }
+
+    document.querySelectorAll("[data-maturity]").forEach(button => button.addEventListener("click", () => renderMaturity(button.dataset.maturity)));
+
+    function renderVerification(key) {
+      document.querySelectorAll("[data-verification]").forEach(button => button.setAttribute("aria-selected", String(button.dataset.verification === key)));
+      const item = verificationData[key];
+      const content = document.getElementById("verification-content");
+      content.classList.remove("fade-in");
+      content.innerHTML = `<h3>${item.title}</h3><p class="verification-lede">${item.lede}</p><div class="verification-columns"><div><h4>能够验证</h4><ul>${item.proves.map(value => `<li>${value}</li>`).join("")}</ul></div><div><h4>适用范围</h4><ul>${item.limits.map(value => `<li>${value}</li>`).join("")}</ul></div></div><div class="trust-result"><code>${item.result}</code></div>`;
+      requestAnimationFrame(() => content.classList.add("fade-in"));
+    }
+
+    document.querySelectorAll("[data-verification]").forEach(button => button.addEventListener("click", () => renderVerification(button.dataset.verification)));
+
+    function renderProduct(key) {
+      document.querySelectorAll("[data-product]").forEach(button => button.setAttribute("aria-selected", String(button.dataset.product === key)));
+      const item = productData[key];
+      const image = document.getElementById("product-image");
+      image.src = item.src;
+      image.alt = item.alt;
+      document.getElementById("product-caption-title").textContent = item.title;
+      document.getElementById("product-caption").textContent = item.caption;
+      document.getElementById("product-original").href = item.src;
+    }
+
+    document.querySelectorAll("[data-product]").forEach(button => button.addEventListener("click", () => renderProduct(button.dataset.product)));
+
+    const questionForm = document.getElementById("question-form");
+    const questionText = document.getElementById("question-text");
+    const questionCount = document.getElementById("question-count");
+    const questionStatus = document.getElementById("question-status");
+    questionText.addEventListener("input", () => {
+      questionCount.textContent = `${questionText.value.length} / 1200`;
+    });
+    questionForm.addEventListener("submit", event => {
+      event.preventDefault();
+      const question = questionText.value.trim();
+      if (!question) {
+        questionStatus.textContent = "请先输入问题。";
+        questionText.focus();
+        return;
+      }
+      const title = `[展示页问答] ${question.replace(/\s+/g, " ").slice(0, 60)}`;
+      const body = `<!-- loveengine-showcase-question:v1 -->\n\n## 访客问题\n\n${question}\n\n## 公开说明\n\n此问题来自 Love Engine Skill 展示页。问题和回答将公开保存；项目维护者会先审核问题，再让本地 Codex 以已提交的仓库快照为工作目录生成草稿，回答经人工确认后发布。`;
+      const issueUrl = new URL("https://github.com/Wenbobobo/loveengine-witness-skill/issues/new");
+      issueUrl.searchParams.set("title", title);
+      issueUrl.searchParams.set("body", body);
+      questionStatus.textContent = "正在打开 GitHub，请登录、检查内容并确认发布。";
+      window.open(issueUrl.toString(), "_blank", "noopener,noreferrer");
+    });
+
+    const sectionLinks = [...document.querySelectorAll(".main-nav a")];
+    const observedSections = sectionLinks.map(link => document.querySelector(link.getAttribute("href"))).filter(Boolean);
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(entries => {
+        const visible = entries.filter(entry => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        sectionLinks.forEach(link => link.setAttribute("aria-current", String(link.getAttribute("href") === `#${visible.target.id}`)));
+      }, { rootMargin: "-20% 0px -65% 0px", threshold: [0, .2, .5] });
+      observedSections.forEach(section => observer.observe(section));
+    }
+
+    renderMaturity("implemented");
+    renderVerification("offline");
+  </script>
+</body>
+</html>

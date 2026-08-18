@@ -15,10 +15,12 @@
 │   ├── decisions/
 │   ├── development/
 │   ├── kb/
+│   ├── presentations/
 │   ├── reference/
 │   └── specs/
 ├── examples/
 ├── schemas/
+├── showcase/
 ├── skills/loveengine-witness/
 ├── src/loveengine_witness/
 ├── tests/
@@ -27,7 +29,8 @@
 
 ## Active development
 
-- `docs/specs/`: the master plan and active pre-enterprise remote lab SPEC.
+- `docs/specs/`: the master plan, current invited-pilot SPEC, and retained
+  pre-enterprise remote-lab evidence contract.
 - `docs/architecture/`: canonical core/data-flow explanations.
 - `docs/api/`: public protocol and replaceable port contracts.
 - `src/loveengine_witness/`: domain/use cases, release trust, Agent session,
@@ -37,6 +40,8 @@
 - `examples/`: secret-free fixtures and transcripts.
 - `tools/`: repository/release gates, cross-platform core experiments, and the
   key-only shared-host remote lab.
+- `showcase/`: Chinese public presentation page and Sites build entrypoint.
+- `docs/presentations/`: collaborator-facing introduction text and slide deck.
 
 ## Preserved provenance
 
@@ -46,5 +51,6 @@
 - `docs/archive/source-materials/`: historical original material.
 - `docs/archive/specs/implemented/`: completed implementation specifications.
 - `docs/archive/planning/`: superseded plans.
+- `docs/archive/development/`: historical runbooks and acceptance reports.
 
 Preserved materials are not rewritten. Their path and SHA-256 remain tracked in the source inventory.

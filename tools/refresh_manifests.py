@@ -30,7 +30,7 @@ RELEASE_ROOT_REFS = [
     "docs/api/lan-pilot-api.md",
     "docs/api/cli-reference.md",
     "docs/api/loveengine-contract-api.md",
-    "docs/development/m5-acceptance-report.md",
+    "docs/archive/development/2026-06-m3-m5/m5-acceptance-report.md",
     "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
     "docs/development/contract2-comparison-and-recommendations.md",
     "docs/development/participant-runbook.zh-CN.md",
@@ -187,6 +187,10 @@ def refresh_current() -> None:
         "docs/specs/love-engine-witness-core-optimization.md": "docs/archive/specs/implemented/love-engine-witness-core-optimization.md",
         "docs/development/m5-release-closeout-plan.md": "docs/archive/planning/2026-06-23/m5-release-closeout-plan.md",
         "docs/development/m6-demo-docs-publication-plan.md": "docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md",
+        "docs/development/m3-demo-runbook.md": "docs/archive/development/2026-06-m3-m5/m3-demo-runbook.md",
+        "docs/development/m3-acceptance-report.md": "docs/archive/development/2026-06-m3-m5/m3-acceptance-report.md",
+        "docs/development/m4-skill-supervision-and-next-stage-gaps.md": "docs/archive/development/2026-06-m3-m5/m4-skill-supervision-and-next-stage-gaps.md",
+        "docs/development/m5-acceptance-report.md": "docs/archive/development/2026-06-m3-m5/m5-acceptance-report.md",
     }
     refs = [
         moved_refs.get(ref, ref)

@@ -41,16 +41,19 @@ transaction plan、双 RPC 契约、分离的管理/参与者入口和 Tailscale
 - [Shared remote lab](development/runbooks/remote-lab-flow.zh-CN.md)
 - [Sepolia invited public pilot](development/runbooks/invited-public-pilot.zh-CN.md)
 - [Technical architecture article](articles/loveengine-technical-architecture.zh-CN.md)
+- [Public showcase question bridge](development/showcase-question-bridge.zh-CN.md)
+- [Presentation materials](presentations/README.md)
+- [Security policy](../SECURITY.md)
 
 ## Historical evidence
 
 M3-M6 runbooks, supervision notes, acceptance reports and closeout plans are historical
 records, not current authority:
 
-- development/m3-demo-runbook.md
-- development/m3-acceptance-report.md
-- development/m4-skill-supervision-and-next-stage-gaps.md
-- development/m5-acceptance-report.md
+- archive/development/2026-06-m3-m5/m3-demo-runbook.md
+- archive/development/2026-06-m3-m5/m3-acceptance-report.md
+- archive/development/2026-06-m3-m5/m4-skill-supervision-and-next-stage-gaps.md
+- archive/development/2026-06-m3-m5/m5-acceptance-report.md
 - archive/planning/2026-06-23/m5-release-closeout-plan.md
 - archive/planning/2026-06-24/m6-demo-docs-publication-plan.md
 

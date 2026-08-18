@@ -19,6 +19,8 @@
 | docs/api/ | 当前接口、ABI 和 CLI |
 | docs/development/integration-guide.md | 分层开发实验 |
 | docs/development/runbooks/ | 当前角色操作手册 |
+| showcase/ | 中文公开展示页、Sites 构建入口与公开问题入口 |
+| docs/development/showcase-question-bridge.zh-CN.md | GitHub Issue 到本地只读 Codex 的协作流程 |
 | skills/loveengine-witness/skill-manifest.json | 当前 source refs/hashes 与 package identity |
 
 最新 Git tag 是 `v0.6.0-contract-public-pilot`；PR #11 与 PR #12 已在
@@ -49,10 +51,10 @@ docs/archive/source-materials/。
 
 以下 development 文件保留验收/决策历史，但退出活动索引：
 
-- docs/development/m3-demo-runbook.md
-- docs/development/m3-acceptance-report.md
-- docs/development/m4-skill-supervision-and-next-stage-gaps.md
-- docs/development/m5-acceptance-report.md
+- docs/archive/development/2026-06-m3-m5/m3-demo-runbook.md
+- docs/archive/development/2026-06-m3-m5/m3-acceptance-report.md
+- docs/archive/development/2026-06-m3-m5/m4-skill-supervision-and-next-stage-gaps.md
+- docs/archive/development/2026-06-m3-m5/m5-acceptance-report.md
 - docs/archive/planning/2026-06-23/m5-release-closeout-plan.md
 - docs/archive/planning/2026-06-24/m6-demo-docs-publication-plan.md
 
